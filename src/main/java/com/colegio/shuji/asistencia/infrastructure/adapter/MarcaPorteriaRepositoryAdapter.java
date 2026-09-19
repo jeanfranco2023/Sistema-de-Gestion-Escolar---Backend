@@ -35,6 +35,14 @@ public class MarcaPorteriaRepositoryAdapter implements MarcaPorteriaRepositoryPo
     return mapper.toDomain(entity);
   }
 
+  public List<MarcaPorteria> guardarTodos(List<MarcaPorteria> valores) {
+    if (valores == null || valores.isEmpty()) return List.of();
+    auditoria.syncCurrentUserFromSecurityContext();
+    var entities = valores.stream().map(mapper::toEntity).toList();
+    var guardadas = repository.saveAll(entities);
+    return guardadas.stream().map(mapper::toDomain).toList();
+  }
+
   public Optional<MarcaPorteria> buscarPorId(Long id) {
     return repository.findById(id).map(mapper::toDomain);
   }

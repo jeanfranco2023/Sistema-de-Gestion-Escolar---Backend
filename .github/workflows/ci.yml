@@ -35,6 +35,9 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v4
 
+      - name: Dar permisos de ejecución al Maven Wrapper
+        run: chmod +x ./mvnw
+
       - name: Configurar Java 21 LTS (Temurin)
         uses: actions/setup-java@v4
         with:
@@ -51,20 +54,23 @@ jobs:
       - name: 2. Pruebas Unitarias y de Dominio (Sin dependencias externas)
         run: ./mvnw test -Dtest=DominioAuditTest,ReglasDominioTest -B
 
-      - name: 3. Pruebas Avanzadas de Seguridad (HMAC, Anti-Replay, IDOR, Open Redirect)
+      - name: 3. Pruebas Avanzadas de Seguridad (HMAC, Anti-Replay, Anti-IDOR, Open Redirect, Fail-Fast)
         run: ./mvnw test -Dtest=SeguridadAvanzadaTest -B
 
-      - name: 4. Pruebas de Integración Reales con PostgreSQL 16 (DML, Triggers, Flyway)
-        run: ./mvnw test -Dtest=PersistenciaPostgresTest -Dshuji.integration=true -B
+      - name: 4. Pruebas de Integración Reales con PostgreSQL 16 (DML, Triggers, Flyway V1 y V2)
+        run: ./mvnw test -Dtest=PersistenciaPostgresTest -B
 
       - name: 5. Pruebas Reales de Alta Concurrencia (Bloqueo Pesimista en Series y Vacantes)
-        run: ./mvnw test -Dtest=ConcurrenciaPostgresTest -Dshuji.integration=true -B
+        run: ./mvnw test -Dtest=ConcurrenciaPostgresTest -B
 
-      - name: 6. Pruebas de Carga y Regresiones N+1 (Ingesta Biométrica Masiva)
-        run: ./mvnw test -Dtest=CargaYRegresionNPlusOneTest -Dshuji.integration=true -B
+      - name: 6. Pruebas de Carga y Regresiones N+1 (Ingesta Biométrica Masiva con Hibernate Statistics)
+        run: ./mvnw test -Dtest=CargaYRegresionNPlusOneTest -B
 
-      - name: 7. Suite Completa de Verificación Final
-        run: ./mvnw verify -Dshuji.integration=true -B
+      - name: 7. Suite Completa de Verificación y Cobertura JaCoCo
+        run: ./mvnw verify -B
+
+      - name: 8. Análisis de Vulnerabilidades y Dependencias
+        run: ./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=8 -DskipProvidedScope=true -DskipRuntimeScope=false -B || true
 
       - name: Publicar Reportes de Pruebas JUnit
         if: always()
@@ -72,4 +78,12 @@ jobs:
         with:
           name: surefire-test-reports
           path: target/surefire-reports/
+          retention-days: 14
+
+      - name: Publicar Reporte de Cobertura JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage-report
+          path: target/site/jacoco/
           retention-days: 14

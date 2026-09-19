@@ -77,11 +77,27 @@ public class AuthController {
     return ResponseEntity.ok(ApiResponse.ok(response, "Token de acceso renovado exitosamente"));
   }
 
+  private static final java.util.regex.Pattern IPV4_PATTERN =
+      java.util.regex.Pattern.compile("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$");
+  private static final java.util.regex.Pattern IPV6_PATTERN =
+      java.util.regex.Pattern.compile("^[0-9a-fA-F:]+$");
+
   private String extractClientIp(HttpServletRequest request) {
     String xfHeader = request.getHeader("X-Forwarded-For");
-    if (xfHeader == null || xfHeader.isEmpty() || "unknown".equalsIgnoreCase(xfHeader)) {
-      return request.getRemoteAddr();
+    if (xfHeader != null && !xfHeader.isBlank() && !"unknown".equalsIgnoreCase(xfHeader)) {
+      String candidate = xfHeader.split(",")[0].trim();
+      if (isValidIp(candidate)) {
+        return candidate;
+      }
     }
-    return xfHeader.split(",")[0].trim();
+    return request.getRemoteAddr();
+  }
+
+  private boolean isValidIp(String ip) {
+    if (ip == null || ip.isBlank()) {
+      return false;
+    }
+    return IPV4_PATTERN.matcher(ip).matches()
+        || (ip.contains(":") && IPV6_PATTERN.matcher(ip).matches());
   }
 }

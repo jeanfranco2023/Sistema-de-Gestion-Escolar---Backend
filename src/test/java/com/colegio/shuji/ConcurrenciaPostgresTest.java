@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearGradoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearSeccionRequestDto;
-import com.colegio.shuji.academico.application.port.in.ConsultarVacantesUseCase;
 import com.colegio.shuji.academico.application.port.in.GestionarAnioLectivoUseCase;
 import com.colegio.shuji.academico.application.port.in.GestionarSeccionesUseCase;
 import com.colegio.shuji.config.security.UserPrincipal;
@@ -38,8 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -51,10 +50,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Valida el bloqueo pesimista (PESSIMISTIC_WRITE) en series_comprobante
  * y el control transaccional de vacantes.
  */
-@EnabledIfSystemProperty(named = "shuji.integration", matches = "true")
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/postgres",
+      "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres",
       "spring.datasource.username=postgres",
       "spring.datasource.password=",
       "spring.jpa.hibernate.ddl-auto=validate",
@@ -64,19 +62,19 @@ import org.springframework.transaction.support.TransactionTemplate;
       "spring.datasource.hikari.maximum-pool-size=20",
       "spring.datasource.hikari.minimum-idle=5"
     })
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@RequiredArgsConstructor
 class ConcurrenciaPostgresTest {
 
-  @Autowired EntityManager em;
-  @Autowired TransactionTemplate txTemplate;
-
-  @Autowired GestionarAnioLectivoUseCase calendario;
-  @Autowired GestionarSeccionesUseCase estructura;
-  @Autowired ConsultarVacantesUseCase vacantes;
-  @Autowired RegistrarFichaFamiliarUseCase familias;
-  @Autowired ProcesarMatriculaUseCase matriculas;
-  @Autowired GenerarCronogramaPensionesUseCase cronograma;
-  @Autowired ProcesarPagoPasarelaUseCase pagos;
-  @Autowired EmitirComprobanteUseCase comprobantes;
+  private final EntityManager em;
+  private final TransactionTemplate txTemplate;
+  private final GestionarAnioLectivoUseCase calendario;
+  private final GestionarSeccionesUseCase estructura;
+  private final RegistrarFichaFamiliarUseCase familias;
+  private final ProcesarMatriculaUseCase matriculas;
+  private final GenerarCronogramaPensionesUseCase cronograma;
+  private final ProcesarPagoPasarelaUseCase pagos;
+  private final EmitirComprobanteUseCase comprobantes;
 
   Long usuarioId;
   Short anioId, nivelId;

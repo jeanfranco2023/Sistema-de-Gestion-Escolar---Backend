@@ -3,9 +3,10 @@ package com.colegio.shuji.tesoreria.infrastructure.security;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,22 +14,26 @@ import org.springframework.stereotype.Component;
 public class MercadoPagoWebhookSignatureValidator {
   private static final long MAX_DESFASE_SEGUNDOS = 300;
 
-  private final String secret;
+  private final List<String> secrets = new ArrayList<>();
   private final Clock clock;
 
-  @Autowired
   public MercadoPagoWebhookSignatureValidator(
-      @Value("${integraciones.pagos.mercadopago.webhook-secret:}") String secret) {
-    this(secret, Clock.systemUTC());
+      @Value("${integraciones.pagos.mercadopago.webhook-secret:}") String secret,
+      @Value("${integraciones.pagos.mercadopago.webhook-previous-secret:}") String previousSecret,
+      java.util.Optional<Clock> clockOptional) {
+    if (secret != null && !secret.isBlank()) {
+      this.secrets.add(secret.trim());
+    }
+    if (previousSecret != null && !previousSecret.isBlank()) {
+      this.secrets.add(previousSecret.trim());
+    }
+    this.clock = clockOptional.orElseGet(Clock::systemUTC);
   }
 
-  public MercadoPagoWebhookSignatureValidator(String secret, Clock clock) {
-    this.secret = secret;
-    this.clock = clock;
-  }
+
 
   public boolean estaConfigurado() {
-    return secret != null && !secret.isBlank();
+    return !secrets.isEmpty();
   }
 
   public boolean validar(String signature, String requestId, String dataId) {
@@ -60,11 +65,18 @@ public class MercadoPagoWebhookSignatureValidator {
         manifest.append("request-id:").append(requestId).append(';');
       }
       manifest.append("ts:").append(ts).append(';');
-      Mac hmac = Mac.getInstance("HmacSHA256");
-      hmac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-      byte[] calculada = hmac.doFinal(manifest.toString().getBytes(StandardCharsets.UTF_8));
+      byte[] manifestBytes = manifest.toString().getBytes(StandardCharsets.UTF_8);
       byte[] recibida = java.util.HexFormat.of().parseHex(v1);
-      return MessageDigest.isEqual(calculada, recibida);
+
+      for (String s : secrets) {
+        Mac hmac = Mac.getInstance("HmacSHA256");
+        hmac.init(new SecretKeySpec(s.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] calculada = hmac.doFinal(manifestBytes);
+        if (MessageDigest.isEqual(calculada, recibida)) {
+          return true;
+        }
+      }
+      return false;
     } catch (Exception ex) {
       return false;
     }

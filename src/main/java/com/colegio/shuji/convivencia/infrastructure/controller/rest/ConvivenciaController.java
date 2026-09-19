@@ -1,17 +1,26 @@
 package com.colegio.shuji.convivencia.infrastructure.controller.rest;
 
-import com.colegio.shuji.convivencia.application.dto.in.*;
-import com.colegio.shuji.convivencia.application.dto.out.*;
-import com.colegio.shuji.convivencia.application.port.in.*;
+import com.colegio.shuji.convivencia.application.dto.in.ActualizarEstadoIncidenciaRequestDto;
+import com.colegio.shuji.convivencia.application.dto.in.RegistrarIncidenciaRequestDto;
+import com.colegio.shuji.convivencia.application.dto.out.HistorialConductualEstudianteResponseDto;
+import com.colegio.shuji.convivencia.application.dto.out.IncidenciaResponseDto;
+import com.colegio.shuji.convivencia.application.port.in.GestionarIncidenciasUseCase;
+import com.colegio.shuji.convivencia.application.port.in.RegistrarIncidenciaUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
-import java.util.*;
+import jakarta.validation.constraints.Positive;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/convivencia")
@@ -25,14 +34,14 @@ public class ConvivenciaController {
   @PostMapping("/incidencias")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "registro.registrar")
-  public IncidenciaResponseDto operacion0(@Valid @RequestBody RegistrarIncidenciaRequestDto r) {
+  public IncidenciaResponseDto registrarIncidencia(@Valid @RequestBody RegistrarIncidenciaRequestDto r) {
     return registro.registrar(r);
   }
 
   @PutMapping("/incidencias/{id}/estado")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.actualizar")
-  public IncidenciaResponseDto operacion1(
+  public IncidenciaResponseDto actualizarEstadoIncidencia(
       @PathVariable @Positive Long id, @Valid @RequestBody ActualizarEstadoIncidenciaRequestDto r) {
     return gestion.actualizar(id, r);
   }
@@ -40,14 +49,14 @@ public class ConvivenciaController {
   @GetMapping("/matricula/{id}")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.historial")
-  public HistorialConductualEstudianteResponseDto operacion2(@PathVariable @Positive Long id) {
+  public HistorialConductualEstudianteResponseDto consultarHistorialConductual(@PathVariable @Positive Long id) {
     return gestion.historial(id);
   }
 
   @GetMapping("/incidencias/citaciones")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.citaciones")
-  public List<IncidenciaResponseDto> operacion3() {
+  public List<IncidenciaResponseDto> listarCitaciones() {
     return gestion.citaciones();
   }
 }

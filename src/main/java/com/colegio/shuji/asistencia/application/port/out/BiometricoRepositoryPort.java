@@ -8,6 +8,8 @@ public interface BiometricoRepositoryPort {
 
   Optional<LoteBiometrico> buscarPorId(Long id);
 
+  Optional<LoteBiometrico> buscarPorHashContenido(String hashContenido);
+
   Optional<LoteBiometrico> bloquearPorId(Long id);
 
   List<LoteBiometrico> listar();

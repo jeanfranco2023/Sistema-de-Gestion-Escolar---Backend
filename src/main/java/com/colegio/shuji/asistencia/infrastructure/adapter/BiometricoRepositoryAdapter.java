@@ -39,6 +39,10 @@ public class BiometricoRepositoryAdapter implements BiometricoRepositoryPort {
     return repository.findById(id).map(mapper::toDomain);
   }
 
+  public Optional<LoteBiometrico> buscarPorHashContenido(String hashContenido) {
+    return repository.findByHashContenido(hashContenido).map(mapper::toDomain);
+  }
+
   public Optional<LoteBiometrico> bloquearPorId(Long id) {
     return repository
         .bloquearPorId(id)

@@ -1,15 +1,23 @@
 package com.colegio.shuji.tesoreria.infrastructure.controller.rest;
 
-import com.colegio.shuji.tesoreria.application.dto.in.*;
-import com.colegio.shuji.tesoreria.application.dto.out.*;
-import com.colegio.shuji.tesoreria.application.port.in.*;
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.application.dto.in.ProcesarPagoWebhookRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.out.TransaccionResponseDto;
+import com.colegio.shuji.tesoreria.application.port.in.ProcesarPagoPasarelaUseCase;
+import com.colegio.shuji.tesoreria.domain.enums.PasarelaProveedor;
+import com.colegio.shuji.tesoreria.infrastructure.security.MercadoPagoWebhookSignatureValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/pagos/webhook")
@@ -18,12 +26,11 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Tesoreria")
 public class WebhookController {
   private final ProcesarPagoPasarelaUseCase pagos;
-  private final com.colegio.shuji.tesoreria.infrastructure.security.MercadoPagoWebhookSignatureValidator
-      firmaMercadoPago;
+  private final MercadoPagoWebhookSignatureValidator firmaMercadoPago;
 
   @PostMapping("/culqi")
   @Operation(summary = "pagos.procesarWebhook")
-  public TransaccionResponseDto operacion0(
+  public TransaccionResponseDto webhookCulqi(
       @Valid @RequestBody ProcesarPagoWebhookRequestDto r,
       @RequestHeader(value = "X-Webhook-Secret", required = false) String credencial) {
     return pagos.procesarWebhook(PasarelaProveedor.CULQI, r, credencial);
@@ -31,7 +38,7 @@ public class WebhookController {
 
   @PostMapping("/niubiz")
   @Operation(summary = "pagos.procesarWebhook")
-  public TransaccionResponseDto operacion1(
+  public TransaccionResponseDto webhookNiubiz(
       @Valid @RequestBody ProcesarPagoWebhookRequestDto r,
       @RequestHeader(value = "X-Webhook-Secret", required = false) String credencial) {
     return pagos.procesarWebhook(PasarelaProveedor.NIUBIZ, r, credencial);
@@ -39,7 +46,7 @@ public class WebhookController {
 
   @PostMapping("/mercadopago")
   @Operation(summary = "Procesar IPN / Webhook de Mercado Pago")
-  public org.springframework.http.ResponseEntity<Void> webhookMercadoPago(
+  public ResponseEntity<Void> webhookMercadoPago(
       @RequestParam(value = "data.id", required = false) String dataIdParam,
       @RequestParam(value = "dataId", required = false) String dataId,
       @RequestParam(value = "id", required = false) String id,
@@ -47,11 +54,11 @@ public class WebhookController {
       @RequestParam(value = "topic", required = false) String topic,
       @RequestHeader(value = "x-signature", required = false) String signature,
       @RequestHeader(value = "x-request-id", required = false) String requestId,
-      @RequestBody(required = false) java.util.Map<String, Object> body) {
+      @RequestBody(required = false) Map<String, Object> body) {
     String transaccionId = dataId != null ? dataId : (dataIdParam != null ? dataIdParam : id);
     if (transaccionId == null && body != null && body.containsKey("data")) {
       Object dataObject = body.get("data");
-      if (dataObject instanceof java.util.Map<?, ?> data && data.get("id") != null) {
+      if (dataObject instanceof Map<?, ?> data && data.get("id") != null) {
         transaccionId = data.get("id").toString();
       }
     }
@@ -61,7 +68,7 @@ public class WebhookController {
 
     if (firmaMercadoPago.estaConfigurado()) {
       if (!firmaMercadoPago.validar(signature, requestId, transaccionId)) {
-        return org.springframework.http.ResponseEntity.status(401).build();
+        return ResponseEntity.status(401).build();
       }
     }
 
@@ -81,7 +88,6 @@ public class WebhookController {
           new ProcesarPagoWebhookRequestDto(transaccionId, null),
           "");
     }
-    return org.springframework.http.ResponseEntity.ok().build();
+    return ResponseEntity.ok().build();
   }
-
 }

@@ -9,6 +9,10 @@ public interface UserRepositoryPort {
 
   Optional<Usuario> findById(Long id);
 
+  default Optional<Usuario> obtenerPorId(Long id) {
+    return findById(id);
+  }
+
   Optional<Usuario> findByIdWithRoles(Long id);
 
   Optional<Usuario> findByUsername(String username);

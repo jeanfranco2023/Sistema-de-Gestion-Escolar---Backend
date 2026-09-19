@@ -51,7 +51,7 @@ public class ComprobantePago {
       throw new BusinessException("El pago debe estar aprobado");
     if (tipo == null
         || serie == null
-        || !serie.matches("[BFE][0-9]{3}")
+        || !serie.matches("[BE][0-9]{3}")
         || correlativo == null
         || correlativo <= 0) throw new BusinessException("Numeración de comprobante inválida");
     return builder()

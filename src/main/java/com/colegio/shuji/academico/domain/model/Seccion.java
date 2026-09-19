@@ -19,6 +19,7 @@ public class Seccion {
   private String letra;
   private Short cupoMaximo;
   private Short vacantesOcupadas;
+  private Integer aulaId;
   private String aulaFisica;
 
   public int vacantesDisponibles() {
@@ -56,5 +57,18 @@ public class Seccion {
 
   public void normalizarAula() {
     aulaFisica = aulaFisica == null || aulaFisica.isBlank() ? null : aulaFisica.trim();
+  }
+
+  public void asignarAula(Aula aula) {
+    if (aula == null || aula.getId() == null || !Boolean.TRUE.equals(aula.getActiva())) {
+      throw new com.colegio.shuji.shared.domain.exception.BusinessException(
+          "El aula asignada no es válida");
+    }
+    if (cupoMaximo != null && aula.getCapacidad() < cupoMaximo) {
+      throw new com.colegio.shuji.shared.domain.exception.BusinessException(
+          "El cupo supera la capacidad del aula");
+    }
+    aulaId = aula.getId();
+    aulaFisica = aula.getCodigo();
   }
 }

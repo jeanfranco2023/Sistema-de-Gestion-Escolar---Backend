@@ -26,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -113,7 +115,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
 
   @Override
   public UserResponseDto register(RegisterUserRequestDto registerRequest) {
-    log.info("Registrando nuevo usuario: {}", registerRequest.getUsername());
+    log.info("Registrando nuevo usuario (auto-registro público): {}", registerRequest.getUsername());
 
     if (userRepositoryPort.existsByUsername(registerRequest.getUsername())) {
       throw new UserAlreadyExistsException("nombre de usuario", registerRequest.getUsername());
@@ -123,10 +125,11 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
       throw new UserAlreadyExistsException("correo electrónico", registerRequest.getEmail());
     }
 
-    List<Rol> roles = roleRepositoryPort.findByCodigoIn(registerRequest.getRoles());
+    // Seguridad crítica: el auto-registro público asigna forzosamente y de forma exclusiva el rol APODERADO
+    List<Rol> roles = roleRepositoryPort.findByCodigoIn(List.of("APODERADO"));
     if (roles.isEmpty()) {
       throw new ResourceNotFoundException(
-          "Ninguno de los roles solicitados fue encontrado en el catálogo institucional.");
+          "El rol obligatorio APODERADO no fue encontrado en el catálogo institucional.");
     }
 
     Usuario usuario = userMapper.toDomain(registerRequest);
@@ -136,7 +139,45 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
         LocalDateTime.now());
 
     Usuario usuarioGuardado = userRepositoryPort.save(usuario);
-    log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
+    log.info("Usuario auto-registrado exitosamente con ID: {} y rol APODERADO", usuarioGuardado.getId());
+
+    return userMapper.toResponseDto(usuarioGuardado);
+  }
+
+  @Override
+  public UserResponseDto registrarPorDireccion(RegisterUserRequestDto request) {
+    log.info("Registrando nuevo usuario administrativo por Dirección: {}", request.getUsername());
+
+    if (userRepositoryPort.existsByUsername(request.getUsername())) {
+      throw new UserAlreadyExistsException("nombre de usuario", request.getUsername());
+    }
+
+    if (userRepositoryPort.existsByEmail(request.getEmail())) {
+      throw new UserAlreadyExistsException("correo electrónico", request.getEmail());
+    }
+
+    Collection<String> codigosRoles =
+        (request.getRoles() == null || request.getRoles().isEmpty())
+            ? List.of("APODERADO")
+            : request.getRoles();
+
+    List<Rol> roles = roleRepositoryPort.findByCodigoIn(codigosRoles);
+    if (roles.isEmpty()) {
+      throw new ResourceNotFoundException(
+          "Ninguno de los roles solicitados fue encontrado en el catálogo institucional.");
+    }
+
+    Usuario usuario = userMapper.toDomain(request);
+    usuario.registrar(
+        passwordEncoder.encode(request.getPassword()),
+        new HashSet<>(roles),
+        LocalDateTime.now());
+
+    Usuario usuarioGuardado = userRepositoryPort.save(usuario);
+    log.info(
+        "Usuario institucional creado por Dirección con ID: {} y roles: {}",
+        usuarioGuardado.getId(),
+        codigosRoles);
 
     return userMapper.toResponseDto(usuarioGuardado);
   }

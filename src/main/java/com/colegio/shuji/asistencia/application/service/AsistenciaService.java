@@ -25,7 +25,12 @@ import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.LocalDate;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -45,9 +50,13 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
   private final ActorActualPort actor;
 
   public LoteBiometricoResponseDto importar(ImportarLoteBiometricoRequestDto r) {
+    String hashContenido = calcularHash(r);
+    var loteExistente = lotes.buscarPorHashContenido(hashContenido);
+    if (loteExistente.isPresent()) return mapper.toResponse(loteExistente.get());
     var lote =
         LoteBiometrico.builder()
             .nombreArchivo(r.nombreArchivo())
+            .hashContenido(hashContenido)
             .totalFilas(r.marcas().size())
             .marcasValidas(0)
             .marcasErroneas(0)
@@ -86,6 +95,7 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
                       + m.getDispositivoCodigo())
           .forEach(existentes::add);
     }
+    List<MarcaPorteria> paraGuardar = new ArrayList<>(r.marcas().size());
     for (var fila : r.marcas()) {
       var marca =
           MarcaPorteria.builder()
@@ -112,10 +122,30 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
       else if (est.isEmpty()) marca.marcarDniNoIdentificado();
       if (marca.getEstadoProcesamiento() == EstadoMarca.PENDIENTE) validas++;
       else errores++;
-      marcas.guardar(marca);
+      paraGuardar.add(marca);
     }
+    marcas.guardarTodos(paraGuardar);
     lote.registrarResultado(validas, errores);
     return mapper.toResponse(lotes.guardar(lote));
+  }
+
+  private String calcularHash(ImportarLoteBiometricoRequestDto request) {
+    try {
+      var digest = MessageDigest.getInstance("SHA-256");
+      for (var marca : request.marcas()) {
+        String fila =
+            marca.dniLeido()
+                + '|'
+                + marca.fechaHora().toInstant()
+                + '|'
+                + marca.dispositivoCodigo()
+                + '\n';
+        digest.update(fila.getBytes(StandardCharsets.UTF_8));
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 no disponible", ex);
+    }
   }
 
   public AsistenciaAulaResponseDto registrar(RegistrarAsistenciaAulaRequestDto r) {

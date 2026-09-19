@@ -296,7 +296,7 @@ CREATE TABLE IF NOT EXISTS comprobantes_pago (
     uuid UUID DEFAULT gen_random_uuid() UNIQUE NOT NULL,
     pago_transaccion_id BIGINT UNIQUE NOT NULL REFERENCES pagos_transacciones(id) ON DELETE RESTRICT,
     tipo_comprobante VARCHAR(20) DEFAULT 'RECIBO_INTERNO' NOT NULL CHECK (tipo_comprobante IN ('BOLETA', 'RECIBO_INTERNO')),
-    serie VARCHAR(4) NOT NULL CHECK (serie ~ '^[BFE][0-9]{3}$'),
+    serie VARCHAR(4) NOT NULL CHECK (serie ~ '^[BE][0-9]{3}$'),
     correlativo INT NOT NULL CHECK (correlativo > 0),
     fecha_emision TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     monto_total NUMERIC(10, 2) NOT NULL CHECK (monto_total > 0.00),
@@ -311,14 +311,6 @@ CREATE TABLE IF NOT EXISTS comprobantes_pago (
     ),
     UNIQUE (serie, correlativo)
 );
-
-CREATE TABLE IF NOT EXISTS series_comprobante (
-    serie VARCHAR(4) PRIMARY KEY CHECK (serie ~ '^[BFE][0-9]{3}$'),
-    ultimo_correlativo INT NOT NULL DEFAULT 0 CHECK (ultimo_correlativo >= 0),
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-INSERT INTO series_comprobante (serie, ultimo_correlativo) VALUES ('B001', 0), ('E001', 0), ('F001', 0) ON CONFLICT (serie) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
 -- 7. MÓDULO DE ASISTENCIA, BIOMETRÍA Y CONCILIACIÓN DE AULA (M5)
@@ -469,7 +461,6 @@ CREATE TABLE IF NOT EXISTS comunicado_destinatarios (
 CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones (usuario_id);
 CREATE INDEX IF NOT EXISTS idx_estudiantes_apellidos ON estudiantes (apellido_paterno, apellido_materno);
 CREATE INDEX IF NOT EXISTS idx_estudiante_apoderados_apod ON estudiante_apoderados (apoderado_id);
-CREATE INDEX IF NOT EXISTS idx_estudiante_apoderado_est_apod ON estudiante_apoderados (estudiante_id, apoderado_id);
 CREATE INDEX IF NOT EXISTS idx_matriculas_seccion ON matriculas (seccion_id, estado_matricula);
 CREATE INDEX IF NOT EXISTS idx_competencias_area ON competencias (area_id);
 CREATE INDEX IF NOT EXISTS idx_asignaciones_docente ON asignaciones_docentes (docente_usuario_id);
@@ -484,7 +475,6 @@ CREATE INDEX IF NOT EXISTS idx_pagos_obligacion_id ON pagos_transacciones (oblig
 CREATE INDEX IF NOT EXISTS idx_comprobantes_pago_id ON comprobantes_pago (pago_transaccion_id);
 CREATE INDEX IF NOT EXISTS idx_marcas_lote ON marcas_biometrico_porteria (lote_id);
 CREATE INDEX IF NOT EXISTS idx_marcas_porteria_dni_fecha ON marcas_biometrico_porteria (dni_leido, fecha_hora);
-CREATE INDEX IF NOT EXISTS idx_marcas_porteria_fecha_hora ON marcas_biometrico_porteria (fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_incidencias_matricula ON incidencias_conductuales (matricula_id);
 CREATE INDEX IF NOT EXISTS idx_incidencias_reportado ON incidencias_conductuales (reportado_por_usuario_id);
 CREATE INDEX IF NOT EXISTS idx_calificaciones_docente ON calificaciones_cneb (docente_usuario_id);
@@ -866,14 +856,3 @@ INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALU
     ('PENSION_MENSUAL', 'Pensión Escolar de Enseñanza (Cuotas 1 a 10)', 'PENSION', 380.00),
     ('CONSTANCIA_ESTUDIOS', 'Emisión de Constancia de Estudios', 'CERTIFICADO', 25.00)
 ON CONFLICT (codigo) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- 13. ÍNDICES DE RENDIMIENTO Y ALTA CONCURRENCIA ADICIONALES
--- ------------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_marcas_porteria_fecha_hora ON marcas_biometrico_porteria (fecha_hora);
-CREATE INDEX IF NOT EXISTS idx_marcas_porteria_dni_leido ON marcas_biometrico_porteria (dni_leido);
-CREATE INDEX IF NOT EXISTS idx_obligaciones_pago_matricula_id ON obligaciones_pago (matricula_id);
-CREATE INDEX IF NOT EXISTS idx_matriculas_estudiante_id ON matriculas (estudiante_id);
-CREATE INDEX IF NOT EXISTS idx_estudiante_apoderados_apoderado_id ON estudiante_apoderados (apoderado_id);
-CREATE INDEX IF NOT EXISTS idx_estudiante_apoderados_estudiante_id ON estudiante_apoderados (estudiante_id);
-

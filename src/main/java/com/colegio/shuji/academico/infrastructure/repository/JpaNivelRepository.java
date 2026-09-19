@@ -1,10 +1,13 @@
 package com.colegio.shuji.academico.infrastructure.repository;
 
-import com.colegio.shuji.academico.domain.enums.*;
+import com.colegio.shuji.academico.domain.enums.NivelCodigo;
 import com.colegio.shuji.academico.infrastructure.entity.NivelEntity;
 import jakarta.persistence.LockModeType;
-import java.util.*;
-import org.springframework.data.jpa.repository.*;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaNivelRepository extends JpaRepository<NivelEntity, Short> {

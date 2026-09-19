@@ -7,4 +7,6 @@ import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 public interface RegisterUserUseCase {
 
   UserResponseDto register(RegisterUserRequestDto registerRequest);
+
+  UserResponseDto registrarPorDireccion(RegisterUserRequestDto request);
 }

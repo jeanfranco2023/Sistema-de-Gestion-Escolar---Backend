@@ -3,10 +3,12 @@ package com.colegio.shuji.usuario.application.service;
 import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
+import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.UpdateUsuarioRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 import com.colegio.shuji.usuario.application.mapper.UserMapper;
 import com.colegio.shuji.usuario.application.port.in.GestionUsuarioUseCase;
+import com.colegio.shuji.usuario.application.port.in.RegisterUserUseCase;
 import com.colegio.shuji.usuario.application.port.out.PasswordHashPort;
 import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
 import com.colegio.shuji.usuario.domain.exception.InvalidCredentialsException;
@@ -33,6 +35,7 @@ public class UsuarioService implements GestionUsuarioUseCase {
   private final PasswordHashPort passwordEncoder;
   private final UserMapper userMapper;
   private final AuditContextPort auditoria;
+  private final RegisterUserUseCase registerUserUseCase;
 
   @Override
   @Transactional(readOnly = true)
@@ -139,5 +142,12 @@ public class UsuarioService implements GestionUsuarioUseCase {
     usuario.cambiarPassword(passwordEncoder.encode(cambiarPasswordDto.getPasswordNuevo()));
     userRepositoryPort.save(usuario);
     log.info("Contraseña actualizada exitosamente para el usuario ID: {}", usuarioId);
+  }
+
+  @Override
+  public UserResponseDto registrarPorDireccion(RegisterUserRequestDto request) {
+    log.info("Delegando alta administrativa de usuario institucional a RegisterUserUseCase");
+    auditoria.syncCurrentUserFromSecurityContext();
+    return registerUserUseCase.registrarPorDireccion(request);
   }
 }

@@ -10,7 +10,6 @@ import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequest
 import com.colegio.shuji.matricula.application.port.in.RegistrarFichaFamiliarUseCase;
 import com.colegio.shuji.matricula.domain.enums.Genero;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
-import com.colegio.shuji.tesoreria.application.port.in.GenerarCronogramaPensionesUseCase;
 import com.colegio.shuji.usuario.infrastructure.entity.RolEntity;
 import com.colegio.shuji.usuario.infrastructure.entity.UsuarioEntity;
 import jakarta.persistence.EntityManager;
@@ -20,8 +19,8 @@ import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -33,10 +32,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Valida que la ingesta masiva de biometría y las consultas financieras
  * escalen en tiempo O(1) respecto a las consultas a base de datos (batch queries).
  */
-@EnabledIfSystemProperty(named = "shuji.integration", matches = "true")
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/postgres",
+      "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres",
       "spring.datasource.username=postgres",
       "spring.datasource.password=",
       "spring.jpa.hibernate.ddl-auto=validate",
@@ -45,13 +43,14 @@ import org.springframework.transaction.support.TransactionTemplate;
       "logging.level.org.hibernate.SQL=WARN",
       "spring.datasource.hikari.maximum-pool-size=10"
     })
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@RequiredArgsConstructor
 class CargaYRegresionNPlusOneTest {
 
-  @Autowired EntityManager em;
-  @Autowired TransactionTemplate txTemplate;
-  @Autowired RegistrarFichaFamiliarUseCase familias;
-  @Autowired ProcesarBiometricoUseCase biometrico;
-  @Autowired GenerarCronogramaPensionesUseCase tesoreria;
+  private final EntityManager em;
+  private final TransactionTemplate txTemplate;
+  private final RegistrarFichaFamiliarUseCase familias;
+  private final ProcesarBiometricoUseCase biometrico;
 
   Long usuarioId;
 
@@ -100,19 +99,29 @@ class CargaYRegresionNPlusOneTest {
       }
     }
 
-    // Medición de rendimiento: Ingesta en lote de 300 marcas
+    // Medición de rendimiento y prevención de N+1 con Hibernate Statistics
+    org.hibernate.SessionFactory sessionFactory =
+        em.getEntityManagerFactory().unwrap(org.hibernate.SessionFactory.class);
+    sessionFactory.getStatistics().setStatisticsEnabled(true);
+    sessionFactory.getStatistics().clear();
+
     long t0 = System.currentTimeMillis();
     var resultado = biometrico.importar(
         new ImportarLoteBiometricoRequestDto("lote_masivo_performance.csv", marcasLote));
     long duracionMs = System.currentTimeMillis() - t0;
+    long queriesLectura = sessionFactory.getStatistics().getQueryExecutionCount();
+    long statementsTotales = sessionFactory.getStatistics().getPrepareStatementCount();
 
     assertNotNull(resultado);
     assertEquals(TOTAL_MARCAS, resultado.totalFilas());
     assertEquals(TOTAL_MARCAS, resultado.marcasValidas());
     assertEquals(0, resultado.marcasErroneas());
 
-    // Si hubiera N+1 (300 marcas * 3 consultas = 900 roundtrips secuenciales a Postgres),
-    // tardaría varios segundos. Con batching (3 consultas en total), tarda típicamente < 500ms.
+    // Medición rigurosa de N+1:
+    // Las consultas SELECT de lectura para verificar estudiantes y marcas existentes se ejecutan en batch
+    // (solo 3 consultas SELECT para 50 estudiantes y 300 marcas, eliminando 600 consultas repetidas).
+    assertTrue(queriesLectura <= 10, "Las consultas SELECT deben ejecutarse en batch (se ejecutaron " + queriesLectura + " consultas, no 600 de N+1)");
+    assertTrue(statementsTotales <= 1200, "Statements totales acotados al lote");
     assertTrue(duracionMs < 4000, "El procesamiento por lotes debe ser subsegundo (duró " + duracionMs + " ms)");
   }
 

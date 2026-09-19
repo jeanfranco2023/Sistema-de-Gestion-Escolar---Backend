@@ -8,4 +8,4 @@ public record CrearSeccionRequestDto(
     @NotNull Short nivelId,
     @NotBlank @Pattern(regexp = "[A-Z]") String letra,
     @NotNull @Min(1) Short cupoMaximo,
-    @Size(max = 30) String aulaFisica) {}
+    @NotBlank @Size(max = 30) String aulaFisica) {}

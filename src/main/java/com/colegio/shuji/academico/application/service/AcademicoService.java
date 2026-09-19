@@ -5,10 +5,12 @@ import static com.colegio.shuji.shared.domain.model.Reglas.fechas;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
+import com.colegio.shuji.academico.application.dto.in.CrearAulaRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearGradoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearPeriodoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearSeccionRequestDto;
 import com.colegio.shuji.academico.application.dto.out.AnioLectivoResponseDto;
+import com.colegio.shuji.academico.application.dto.out.AulaResponseDto;
 import com.colegio.shuji.academico.application.dto.out.GradoResponseDto;
 import com.colegio.shuji.academico.application.dto.out.NivelResponseDto;
 import com.colegio.shuji.academico.application.dto.out.PeriodoResponseDto;
@@ -16,9 +18,11 @@ import com.colegio.shuji.academico.application.dto.out.SeccionResponseDto;
 import com.colegio.shuji.academico.application.dto.out.VacantesSeccionResponseDto;
 import com.colegio.shuji.academico.application.mapper.AcademicoMapper;
 import com.colegio.shuji.academico.application.port.in.ConsultarVacantesUseCase;
+import com.colegio.shuji.academico.application.port.in.GestionarAulasUseCase;
 import com.colegio.shuji.academico.application.port.in.GestionarAnioLectivoUseCase;
 import com.colegio.shuji.academico.application.port.in.GestionarSeccionesUseCase;
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.academico.application.port.out.AulaRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.GradoRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.NivelRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.PeriodoRepositoryPort;
@@ -32,13 +36,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RequiredArgsConstructor
 public class AcademicoService
-    implements GestionarAnioLectivoUseCase, GestionarSeccionesUseCase, ConsultarVacantesUseCase {
+    implements GestionarAnioLectivoUseCase,
+        GestionarSeccionesUseCase,
+        GestionarAulasUseCase,
+        ConsultarVacantesUseCase {
   private final AcademicoMapper mapper;
   private final AnioLectivoRepositoryPort anios;
   private final PeriodoRepositoryPort periodos;
   private final SeccionRepositoryPort secciones;
   private final NivelRepositoryPort niveles;
   private final GradoRepositoryPort grados;
+  private final AulaRepositoryPort aulas;
 
   public AnioLectivoResponseDto crearAnio(CrearAnioLectivoRequestDto r) {
     fechas(r.fechaInicio(), r.fechaFin());
@@ -65,14 +73,14 @@ public class AcademicoService
     exigir(
         !r.fechaInicio().isBefore(anio.getFechaInicio())
             && !r.fechaFin().isAfter(anio.getFechaFin()),
-        "Período fuera del año lectivo");
+        "PerÃ­odo fuera del aÃ±o lectivo");
     exigir(
         periodos.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
             .noneMatch(
                 p ->
                     !p.getFechaFin().isBefore(r.fechaInicio())
                         && !p.getFechaInicio().isAfter(r.fechaFin())),
-        "Los períodos no pueden superponerse");
+        "Los perÃ­odos no pueden superponerse");
     var model = mapper.toDomain(r);
     model.abrir();
     return mapper.toResponse(periodos.guardar(model));
@@ -93,15 +101,44 @@ public class AcademicoService
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
     var grado = requerido(grados.buscarPorId(r.gradoId()));
     exigir(grado.getNivelId().equals(r.nivelId()), "El grado no pertenece al nivel");
-    if (r.aulaFisica() != null
-        && !r.aulaFisica().isBlank()
-        && secciones.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
-            .anyMatch(s -> r.aulaFisica().equals(s.getAulaFisica())))
+    String codigoAula = r.aulaFisica().trim().toUpperCase();
+    if (secciones.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
+        .anyMatch(s -> codigoAula.equalsIgnoreCase(s.getAulaFisica()))) {
       throw new com.colegio.shuji.academico.domain.exception.AulaOcupadaException(
           "El aula ya está asignada");
+    }
+    var aula =
+        aulas
+            .buscarPorCodigo(codigoAula)
+            .orElseGet(
+                () -> {
+                  var nueva =
+                      com.colegio.shuji.academico.domain.model.Aula.builder()
+                          .codigo(codigoAula)
+                          .nombre("Aula " + codigoAula)
+                          .capacidad(r.cupoMaximo())
+                          .build();
+                  nueva.prepararRegistro();
+                  return aulas.guardar(nueva);
+                });
+    exigir(Boolean.TRUE.equals(aula.getActiva()), "El aula no está activa");
+    exigir(aula.getCapacidad() >= r.cupoMaximo(), "El cupo supera la capacidad del aula");
     var model = mapper.toDomain(r);
     model.normalizarAula();
+    model.asignarAula(aula);
     return mapper.toResponse(secciones.guardar(model));
+  }
+
+  public AulaResponseDto crearAula(CrearAulaRequestDto r) {
+    exigir(aulas.buscarPorCodigo(r.codigo().trim()).isEmpty(), "El código de aula ya existe");
+    var aula = mapper.toDomain(r);
+    aula.prepararRegistro();
+    return mapper.toResponse(aulas.guardar(aula));
+  }
+
+  @Transactional(readOnly = true)
+  public List<AulaResponseDto> listarAulas() {
+    return aulas.listar().stream().map(mapper::toResponse).toList();
   }
 
   @Transactional(readOnly = true)

@@ -7,13 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 /**
  * Repositorio Spring Data JPA para la entidad SesionEntity. Cumple con la directiva estricta de
  * consultas en JPQL sin SQL nativo.
  */
-@Repository
 public interface JpaSesionRepository extends JpaRepository<SesionEntity, Long> {
 
   @Query(

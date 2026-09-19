@@ -18,6 +18,9 @@ public class LoteBiometricoEntity {
   @Column(name = "nombre_archivo", nullable = false, length = 150)
   private String nombreArchivo;
 
+  @Column(name = "hash_contenido", nullable = false, unique = true, length = 64)
+  private String hashContenido;
+
   @Column(name = "total_filas", nullable = false)
   private Integer totalFilas;
 

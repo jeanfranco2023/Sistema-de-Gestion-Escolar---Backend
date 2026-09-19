@@ -1,6 +1,7 @@
 package com.colegio.shuji.usuario.application.port.in;
 
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
+import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.UpdateUsuarioRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 import java.util.List;
@@ -19,4 +20,6 @@ public interface GestionUsuarioUseCase {
   UserResponseDto cambiarEstado(Long usuarioId, Boolean activo);
 
   void cambiarPassword(Long usuarioId, CambiarPasswordRequestDto cambiarPasswordDto);
+
+  UserResponseDto registrarPorDireccion(RegisterUserRequestDto request);
 }

@@ -2,8 +2,12 @@ package com.colegio.shuji.asistencia.infrastructure.repository;
 
 import com.colegio.shuji.asistencia.infrastructure.entity.MarcaBiometricoEntity;
 import jakarta.persistence.LockModeType;
-import java.util.*;
-import org.springframework.data.jpa.repository.*;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaMarcaPorteriaRepository extends JpaRepository<MarcaBiometricoEntity, Long> {
@@ -19,5 +23,5 @@ public interface JpaMarcaPorteriaRepository extends JpaRepository<MarcaBiometric
 
   @Query("select e from MarcaBiometricoEntity e where e.fechaHora >= :inicio and e.fechaHora < :fin order by e.id")
   List<MarcaBiometricoEntity> buscarPorRangoFecha(
-      @Param("inicio") java.time.OffsetDateTime inicio, @Param("fin") java.time.OffsetDateTime fin);
+      @Param("inicio") OffsetDateTime inicio, @Param("fin") OffsetDateTime fin);
 }

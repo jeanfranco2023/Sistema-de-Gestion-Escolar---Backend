@@ -6,13 +6,11 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 /**
  * Repositorio Spring Data JPA para la entidad UsuarioEntity. Cumple con la directiva estricta de
  * consultas en JPQL sin SQL nativo.
  */
-@Repository
 public interface JpaUsuarioRepository extends JpaRepository<UsuarioEntity, Long> {
 
   @Query("SELECT u FROM UsuarioEntity u LEFT JOIN FETCH u.roles WHERE u.id = :id")

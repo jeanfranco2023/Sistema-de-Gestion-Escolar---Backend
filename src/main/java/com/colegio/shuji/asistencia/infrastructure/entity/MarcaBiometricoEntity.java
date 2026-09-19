@@ -25,7 +25,7 @@ public class MarcaBiometricoEntity {
   @Column(name = "fecha_hora", nullable = false)
   private OffsetDateTime fechaHora;
 
-  @Column(name = "dispositivo_codigo", length = 30)
+  @Column(name = "dispositivo_codigo", nullable = false, length = 30)
   private String dispositivoCodigo;
 
   @Column(name = "estudiante_id")

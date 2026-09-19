@@ -15,6 +15,7 @@ import lombok.Setter;
 public class LoteBiometrico {
   private Long id;
   private String nombreArchivo;
+  private String hashContenido;
   private Integer totalFilas;
   private Integer marcasValidas;
   private Integer marcasErroneas;

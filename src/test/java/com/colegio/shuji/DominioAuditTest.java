@@ -121,7 +121,7 @@ class DominioAuditTest {
             java.time.Instant.ofEpochSecond(now), java.time.ZoneOffset.UTC);
     var validator =
         new com.colegio.shuji.tesoreria.infrastructure.security
-            .MercadoPagoWebhookSignatureValidator(secret, clock);
+            .MercadoPagoWebhookSignatureValidator(secret, null, java.util.Optional.of(clock));
     assertTrue(validator.validar("ts=" + tsValido + ",v1=" + firmaCorrecta, requestId, dataId));
     assertFalse(
         validator.validar(

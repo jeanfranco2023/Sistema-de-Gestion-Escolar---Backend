@@ -6,6 +6,8 @@ import java.util.*;
 public interface MarcaPorteriaRepositoryPort {
   MarcaPorteria guardar(MarcaPorteria valor);
 
+  List<MarcaPorteria> guardarTodos(List<MarcaPorteria> valores);
+
   Optional<MarcaPorteria> buscarPorId(Long id);
 
   Optional<MarcaPorteria> bloquearPorId(Long id);

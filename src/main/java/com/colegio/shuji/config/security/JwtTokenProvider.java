@@ -5,7 +5,6 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
@@ -30,6 +29,9 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
   @Value("${app.jwt.secret:c2h1amlfa2l0YW11cmFfcHJveWVjdG9faW50ZWdyYWRvcl91dHBfMjAyNg==}")
   private String jwtSecret;
 
+  @Value("${app.jwt.previous-secret:}")
+  private String jwtPreviousSecret;
+
   @Value("${app.jwt.expiration-ms:86400000}")
   private long jwtExpirationMs;
 
@@ -37,16 +39,27 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
   private long jwtRefreshExpirationMs;
 
   private SecretKey key;
+  private List<SecretKey> verificationKeys = new java.util.ArrayList<>();
+
+  private SecretKey deriveKey(String secret) {
+    try {
+      byte[] keyBytes = Decoders.BASE64.decode(secret);
+      return Keys.hmacShaKeyFor(keyBytes);
+    } catch (Exception e) {
+      log.warn("El secreto JWT no está en formato Base64 estándar, derivando bytes UTF-8");
+      byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+      return Keys.hmacShaKeyFor(keyBytes);
+    }
+  }
 
   @PostConstruct
   public void init() {
-    try {
-      byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-      this.key = Keys.hmacShaKeyFor(keyBytes);
-    } catch (Exception e) {
-      log.warn("El secreto JWT no está en formato Base64 estándar, derivando bytes UTF-8");
-      byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-      this.key = Keys.hmacShaKeyFor(keyBytes);
+    this.key = deriveKey(jwtSecret);
+    this.verificationKeys = new java.util.ArrayList<>();
+    this.verificationKeys.add(this.key);
+    if (jwtPreviousSecret != null && !jwtPreviousSecret.isBlank()) {
+      this.verificationKeys.add(deriveKey(jwtPreviousSecret));
+      log.info("Configurada clave previa de rotación JWT para verificación de tokens existentes");
     }
   }
 
@@ -134,25 +147,34 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
    */
   public boolean validateToken(String token) {
     try {
-      Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+      extractAllClaims(token);
       return true;
-    } catch (SecurityException | MalformedJwtException e) {
-      log.error("Firma JWT inválida o token malformado: {}", e.getMessage());
     } catch (ExpiredJwtException e) {
       log.warn("El token JWT ha expirado: {}", e.getMessage());
-    } catch (UnsupportedJwtException e) {
-      log.error("Token JWT no soportado: {}", e.getMessage());
-    } catch (IllegalArgumentException e) {
-      log.error("La cadena de claims JWT está vacía o es nula: {}", e.getMessage());
-    } catch (JwtException e) {
-      log.error("Error al procesar el token JWT: {}", e.getMessage());
+    } catch (JwtException | IllegalArgumentException e) {
+      log.error("Firma JWT inválida o token malformado: {}", e.getMessage());
     }
     return false;
   }
 
-  /** Extrae todas las claims verificando la firma con la clave simétrica. */
+  /** Extrae todas las claims verificando la firma con la clave simétrica (soporta rotación de claves). */
   public Claims extractAllClaims(String token) {
-    return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+    JwtException lastException = null;
+    for (SecretKey k : verificationKeys) {
+      try {
+        return Jwts.parser().verifyWith(k).build().parseSignedClaims(token).getPayload();
+      } catch (ExpiredJwtException eje) {
+        throw eje;
+      } catch (SecurityException | MalformedJwtException se) {
+        lastException = se;
+      } catch (JwtException je) {
+        lastException = je;
+      }
+    }
+    if (lastException != null) {
+      throw lastException;
+    }
+    throw new MalformedJwtException("Token inválido");
   }
 
   public long getJwtExpirationMs() {

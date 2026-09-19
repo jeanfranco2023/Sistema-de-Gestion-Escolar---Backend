@@ -22,26 +22,26 @@ import com.colegio.shuji.matricula.domain.enums.*;
 import com.colegio.shuji.tesoreria.application.dto.in.*;
 import com.colegio.shuji.tesoreria.application.port.in.*;
 import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.usuario.infrastructure.entity.AuditoriaCambiosEntity;
 import com.colegio.shuji.usuario.infrastructure.entity.RolEntity;
 import com.colegio.shuji.usuario.infrastructure.entity.UsuarioEntity;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Requiere DDL oficial en una base desechable local; nunca usa las credenciales de .env. */
-@EnabledIfSystemProperty(named = "shuji.integration", matches = "true")
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:postgresql://127.0.0.1:55439/postgres",
+      "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres",
       "spring.datasource.username=postgres",
       "spring.datasource.password=",
       "spring.jpa.hibernate.ddl-auto=validate",
@@ -51,28 +51,30 @@ import org.springframework.transaction.annotation.Transactional;
       "spring.datasource.hikari.minimum-idle=0"
     })
 @Transactional
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@RequiredArgsConstructor
 class PersistenciaPostgresTest {
-  @Autowired EntityManager em;
-  @Autowired GestionarAnioLectivoUseCase calendario;
-  @Autowired GestionarSeccionesUseCase estructura;
-  @Autowired ConsultarVacantesUseCase vacantes;
-  @Autowired RegistrarFichaFamiliarUseCase familias;
-  @Autowired ProcesarMatriculaUseCase matriculas;
-  @Autowired GenerarCronogramaPensionesUseCase cronograma;
-  @Autowired ProcesarPagoPasarelaUseCase pagos;
-  @Autowired EmitirComprobanteUseCase comprobantes;
-  @Autowired RevertirPagoUseCase reversiones;
-  @Autowired GestionarCurriculoUseCase curriculo;
-  @Autowired AsignarCargaDocenteUseCase carga;
-  @Autowired GenerarMallaHorariaUseCase horarios;
-  @Autowired RegistrarEvaluacionCnebUseCase evaluacion;
-  @Autowired DerivarAlumnosRefuerzoUseCase refuerzo;
-  @Autowired ProcesarBiometricoUseCase biometrico;
-  @Autowired RegistrarListaAulaUseCase aula;
-  @Autowired EjecutarConciliacionDiariaUseCase conciliacion;
-  @Autowired PublicarComunicadoUseCase publicacion;
-  @Autowired ConfirmarLecturaUseCase lectura;
-  @Autowired ConsultarBandejaUseCase bandeja;
+  private final EntityManager em;
+  private final GestionarAnioLectivoUseCase calendario;
+  private final GestionarSeccionesUseCase estructura;
+  private final ConsultarVacantesUseCase vacantes;
+  private final RegistrarFichaFamiliarUseCase familias;
+  private final ProcesarMatriculaUseCase matriculas;
+  private final GenerarCronogramaPensionesUseCase cronograma;
+  private final ProcesarPagoPasarelaUseCase pagos;
+  private final EmitirComprobanteUseCase comprobantes;
+  private final RevertirPagoUseCase reversiones;
+  private final GestionarCurriculoUseCase curriculo;
+  private final AsignarCargaDocenteUseCase carga;
+  private final GenerarMallaHorariaUseCase horarios;
+  private final RegistrarEvaluacionCnebUseCase evaluacion;
+  private final DerivarAlumnosRefuerzoUseCase refuerzo;
+  private final ProcesarBiometricoUseCase biometrico;
+  private final RegistrarListaAulaUseCase aula;
+  private final EjecutarConciliacionDiariaUseCase conciliacion;
+  private final PublicarComunicadoUseCase publicacion;
+  private final ConfirmarLecturaUseCase lectura;
+  private final ConsultarBandejaUseCase bandeja;
 
   Long usuarioId, estudianteId, matriculaId;
   Short anioId, nivelId;
@@ -192,6 +194,26 @@ class PersistenciaPostgresTest {
             .setParameter("id", usuarioId)
             .getSingleResult();
     assertEquals(usuarioId.toString(), actor);
+  }
+
+  @Test
+  void auditoriaTransaccionalRegistraActorEnAuditoriaCambios() {
+    em.clear();
+    matriculas.confirmar(new ConfirmarMatriculaRequestDto(matriculaId));
+    em.flush();
+    em.clear();
+
+    var registros =
+        em.createQuery(
+                "select a from AuditoriaCambiosEntity a where a.usuario.id = :uid order by a.id desc",
+                AuditoriaCambiosEntity.class)
+            .setParameter("uid", usuarioId)
+            .getResultList();
+
+    assertFalse(
+        registros.isEmpty(),
+        "La auditoría de cambios debe registrar el actor autenticado en la transacción");
+    assertEquals(usuarioId, registros.getFirst().getUsuario().getId());
   }
 
   @Test

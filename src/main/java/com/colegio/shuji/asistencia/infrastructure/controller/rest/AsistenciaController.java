@@ -1,17 +1,30 @@
 package com.colegio.shuji.asistencia.infrastructure.controller.rest;
 
-import com.colegio.shuji.asistencia.application.dto.in.*;
-import com.colegio.shuji.asistencia.application.dto.out.*;
-import com.colegio.shuji.asistencia.application.port.in.*;
+import com.colegio.shuji.asistencia.application.dto.in.ImportarLoteBiometricoRequestDto;
+import com.colegio.shuji.asistencia.application.dto.in.JustificarInasistenciaRequestDto;
+import com.colegio.shuji.asistencia.application.dto.in.RegistrarAsistenciaAulaRequestDto;
+import com.colegio.shuji.asistencia.application.dto.out.AsistenciaAulaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.ConciliacionAsistenciaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.DiscrepanciaAlertaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.LoteBiometricoResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.ReporteAsistenciaDiariaResponseDto;
+import com.colegio.shuji.asistencia.application.port.in.EjecutarConciliacionDiariaUseCase;
+import com.colegio.shuji.asistencia.application.port.in.ProcesarBiometricoUseCase;
+import com.colegio.shuji.asistencia.application.port.in.RegistrarListaAulaUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.*;
-import java.util.*;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/asistencia")
@@ -26,7 +39,7 @@ public class AsistenciaController {
   @PostMapping("/biometrico/importar")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "biometrico.importar")
-  public LoteBiometricoResponseDto operacion0(
+  public LoteBiometricoResponseDto importarLoteBiometrico(
       @Valid @RequestBody ImportarLoteBiometricoRequestDto r) {
     return biometrico.importar(r);
   }
@@ -34,7 +47,7 @@ public class AsistenciaController {
   @PostMapping("/aula")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "aula.registrar")
-  public AsistenciaAulaResponseDto operacion1(
+  public AsistenciaAulaResponseDto registrarAsistenciaAula(
       @Valid @RequestBody RegistrarAsistenciaAulaRequestDto r) {
     return aula.registrar(r);
   }
@@ -42,7 +55,7 @@ public class AsistenciaController {
   @PostMapping("/aula/justificacion")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "aula.justificar")
-  public AsistenciaAulaResponseDto operacion2(
+  public AsistenciaAulaResponseDto justificarInasistencia(
       @Valid @RequestBody JustificarInasistenciaRequestDto r) {
     return aula.justificar(r);
   }
@@ -50,14 +63,14 @@ public class AsistenciaController {
   @GetMapping("/aula")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "aula.reporte")
-  public ReporteAsistenciaDiariaResponseDto operacion3(@RequestParam LocalDate fecha) {
+  public ReporteAsistenciaDiariaResponseDto obtenerReporteDiario(@RequestParam LocalDate fecha) {
     return aula.reporte(fecha);
   }
 
   @PostMapping("/conciliacion")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "conciliacion.conciliar")
-  public List<ConciliacionAsistenciaResponseDto> operacion4(
+  public List<ConciliacionAsistenciaResponseDto> conciliarAsistencia(
       @RequestParam Short anioId,
       @RequestParam LocalDate fecha,
       @RequestParam boolean turnoCerrado) {
@@ -67,7 +80,7 @@ public class AsistenciaController {
   @GetMapping("/conciliacion/alertas")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "conciliacion.alertas")
-  public List<DiscrepanciaAlertaResponseDto> operacion5(@RequestParam LocalDate fecha) {
+  public List<DiscrepanciaAlertaResponseDto> consultarAlertas(@RequestParam LocalDate fecha) {
     return conciliacion.alertas(fecha);
   }
 }

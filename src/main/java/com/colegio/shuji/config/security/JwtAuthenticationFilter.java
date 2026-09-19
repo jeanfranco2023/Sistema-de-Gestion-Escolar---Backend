@@ -1,12 +1,15 @@
 package com.colegio.shuji.config.security;
 
 import com.colegio.shuji.config.persistence.SupabaseAuditInterceptor;
+import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
+import com.colegio.shuji.usuario.domain.model.Usuario;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -29,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtTokenProvider tokenProvider;
   private final SupabaseAuditInterceptor supabaseAuditInterceptor;
+  private final UserRepositoryPort userRepositoryPort;
 
   @Override
   protected void doFilterInternal(
@@ -45,28 +49,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         Long userId = tokenProvider.getUserIdFromToken(jwt);
         List<String> roles = tokenProvider.getRolesFromToken(jwt);
 
-        List<SimpleGrantedAuthority> authorities =
-            roles.stream()
-                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
-                .map(SimpleGrantedAuthority::new)
-                .toList();
-
-        UserPrincipal principal =
-            UserPrincipal.builder()
-                .id(userId)
-                .username(username)
-                .active(true)
-                .authorities(authorities)
-                .build();
-
-        UsernamePasswordAuthenticationToken authentication =
-            new UsernamePasswordAuthenticationToken(principal, null, authorities);
-        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // Configura opcionalmente el actor en la persistencia si hay userId disponible
         if (userId != null) {
+          Optional<Usuario> usuarioOpt = userRepositoryPort.obtenerPorId(userId);
+          if (usuarioOpt.isEmpty() || !usuarioOpt.get().estaActivo()) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"status\":401,\"message\":\"Usuario inactivo o revocado\"}");
+            return;
+          }
+
+          Usuario usuario = usuarioOpt.get();
+
+          List<SimpleGrantedAuthority> authorities =
+              roles.stream()
+                  .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                  .map(SimpleGrantedAuthority::new)
+                  .toList();
+
+          UserPrincipal principal =
+              UserPrincipal.builder()
+                  .id(userId)
+                  .username(username)
+                  .active(usuario.estaActivo())
+                  .authorities(authorities)
+                  .build();
+
+          UsernamePasswordAuthenticationToken authentication =
+              new UsernamePasswordAuthenticationToken(principal, null, authorities);
+          authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+          SecurityContextHolder.getContext().setAuthentication(authentication);
+
+          // Configura opcionalmente el actor en la persistencia si hay userId disponible
           supabaseAuditInterceptor.setCurrentUserId(userId);
         }
       }

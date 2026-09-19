@@ -29,6 +29,11 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
   }
 
   @Override
+  public Optional<Usuario> obtenerPorId(Long id) {
+    return findById(id);
+  }
+
+  @Override
   public Optional<Usuario> findByIdWithRoles(Long id) {
     return jpaUsuarioRepository.findByIdWithRoles(id).map(userMapper::toDomain);
   }
