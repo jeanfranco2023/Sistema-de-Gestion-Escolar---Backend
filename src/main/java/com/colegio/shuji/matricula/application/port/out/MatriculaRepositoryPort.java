@@ -22,4 +22,6 @@ public interface MatriculaRepositoryPort {
   List<Matricula> buscarPorEstadoMatricula(EstadoMatricula valor);
 
   List<Matricula> buscarPorIds(Collection<Long> ids);
+
+  List<Matricula> bloquearPorIds(Collection<Long> ids);
 }

@@ -84,9 +84,9 @@ class DominioAuditTest {
   }
 
   @Test
-  void serieComprobanteIncrementaCorrelativoAtomicamente() {
+  void serieComprobanteIncrementaCorrelativoSecuencialmente() {
     var serie =
-        com.colegio.shuji.tesoreria.infrastructure.entity.SerieComprobanteEntity.builder()
+        com.colegio.shuji.tesoreria.domain.model.SerieComprobante.builder()
             .serie("B001")
             .ultimoCorrelativo(0)
             .updatedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
@@ -116,19 +116,26 @@ class DominioAuditTest {
     for (byte b : rawBytes) sb.append(String.format("%02x", b));
     String firmaCorrecta = sb.toString();
 
-    // Verificación de comparación en tiempo constante
-    assertTrue(java.security.MessageDigest.isEqual(
-        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-    assertFalse(java.security.MessageDigest.isEqual(
-        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-        "firma_falsificada_o_modificada".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    var clock =
+        java.time.Clock.fixed(
+            java.time.Instant.ofEpochSecond(now), java.time.ZoneOffset.UTC);
+    var validator =
+        new com.colegio.shuji.tesoreria.infrastructure.security
+            .MercadoPagoWebhookSignatureValidator(secret, clock);
+    assertTrue(validator.validar("ts=" + tsValido + ",v1=" + firmaCorrecta, requestId, dataId));
+    assertFalse(
+        validator.validar(
+            "ts=" + tsValido + ",v1=" + "0".repeat(64), requestId, dataId));
 
-    // Verificación de frescura de timestamp (máximo 300 segundos)
-    long diffValida = Math.abs(now - Long.parseLong(tsValido));
-    assertTrue(diffValida <= 300, "Timestamp reciente debe ser aceptado");
-    long diffExpirada = Math.abs(now - Long.parseLong(tsExpirado));
-    assertTrue(diffExpirada > 300, "Timestamp de hace 10 minutos debe ser rechazado como replay");
+    String manifestExpirado =
+        "id:" + dataId + ";request-id:" + requestId + ";ts:" + tsExpirado + ";";
+    mac.init(
+        new javax.crypto.spec.SecretKeySpec(
+            secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+    String firmaExpirada = java.util.HexFormat.of().formatHex(
+        mac.doFinal(manifestExpirado.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    assertFalse(
+        validator.validar("ts=" + tsExpirado + ",v1=" + firmaExpirada, requestId, dataId));
   }
 
   @Test

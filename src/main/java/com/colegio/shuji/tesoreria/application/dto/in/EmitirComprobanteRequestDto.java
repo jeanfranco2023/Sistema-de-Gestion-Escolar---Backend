@@ -6,5 +6,4 @@ import jakarta.validation.constraints.*;
 public record EmitirComprobanteRequestDto(
     @NotNull Long pagoId,
     @NotNull TipoComprobante tipoComprobante,
-    @NotBlank @Pattern(regexp = "[BFE][0-9]{3}") String serie,
-    @NotNull @Min(1) Integer correlativo) {}
+    @NotBlank @Pattern(regexp = "[BFE][0-9]{3}") String serie) {}

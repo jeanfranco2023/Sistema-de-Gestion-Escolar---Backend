@@ -18,9 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Tesoreria")
 public class WebhookController {
   private final ProcesarPagoPasarelaUseCase pagos;
-
-  @org.springframework.beans.factory.annotation.Value("${integraciones.pagos.mercadopago.webhook-secret:}")
-  private String webhookSecret;
+  private final com.colegio.shuji.tesoreria.infrastructure.security.MercadoPagoWebhookSignatureValidator
+      firmaMercadoPago;
 
   @PostMapping("/culqi")
   @Operation(summary = "pagos.procesarWebhook")
@@ -51,15 +50,17 @@ public class WebhookController {
       @RequestBody(required = false) java.util.Map<String, Object> body) {
     String transaccionId = dataId != null ? dataId : (dataIdParam != null ? dataIdParam : id);
     if (transaccionId == null && body != null && body.containsKey("data")) {
-      var data = (java.util.Map<?, ?>) body.get("data");
-      if (data != null && data.get("id") != null) transaccionId = data.get("id").toString();
+      Object dataObject = body.get("data");
+      if (dataObject instanceof java.util.Map<?, ?> data && data.get("id") != null) {
+        transaccionId = data.get("id").toString();
+      }
     }
     if (transaccionId == null && body != null && body.get("id") != null) {
       transaccionId = body.get("id").toString();
     }
 
-    if (webhookSecret != null && !webhookSecret.isBlank()) {
-      if (signature == null || signature.isBlank() || !validarFirmaMercadoPago(signature, requestId, transaccionId)) {
+    if (firmaMercadoPago.estaConfigurado()) {
+      if (!firmaMercadoPago.validar(signature, requestId, transaccionId)) {
         return org.springframework.http.ResponseEntity.status(401).build();
       }
     }
@@ -83,69 +84,4 @@ public class WebhookController {
     return org.springframework.http.ResponseEntity.ok().build();
   }
 
-  private boolean validarFirmaMercadoPago(String signature, String requestId, String transaccionId) {
-    String ts = null;
-    String v1 = null;
-    for (String part : signature.split(",")) {
-      String[] kv = part.trim().split("=", 2);
-      if (kv.length == 2) {
-        if ("ts".equalsIgnoreCase(kv[0].trim())) {
-          ts = kv[1].trim();
-        } else if ("v1".equalsIgnoreCase(kv[0].trim())) {
-          v1 = kv[1].trim();
-        }
-      }
-    }
-    if (ts == null || v1 == null) {
-      return false;
-    }
-    try {
-      long tsSeconds = Long.parseLong(ts);
-      long nowSeconds = java.time.Instant.now().getEpochSecond();
-      if (Math.abs(nowSeconds - tsSeconds) > 300) {
-        return false;
-      }
-    } catch (NumberFormatException e) {
-      return false;
-    }
-    try {
-      javax.crypto.Mac hmac = javax.crypto.Mac.getInstance("HmacSHA256");
-      hmac.init(
-          new javax.crypto.spec.SecretKeySpec(
-              webhookSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
-
-      String reqIdVal = (requestId != null) ? requestId : "";
-      String txIdVal = (transaccionId != null) ? transaccionId : "";
-
-      String manifest = "id:" + txIdVal + ";request-id:" + reqIdVal + ";ts:" + ts + ";";
-      byte[] hash = hmac.doFinal(manifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      String calculatedHash = bytesToHex(hash);
-      if (java.security.MessageDigest.isEqual(
-          calculatedHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8),
-          v1.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
-        return true;
-      }
-      if (reqIdVal.isEmpty()) {
-        String altManifest = "id:" + txIdVal + ";ts:" + ts + ";";
-        byte[] altHash = hmac.doFinal(altManifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String altCalculatedHash = bytesToHex(altHash);
-        if (java.security.MessageDigest.isEqual(
-            altCalculatedHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8),
-            v1.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
-          return true;
-        }
-      }
-      return false;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private static String bytesToHex(byte[] bytes) {
-    StringBuilder sb = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      sb.append(String.format("%02x", b));
-    }
-    return sb.toString();
-  }
 }

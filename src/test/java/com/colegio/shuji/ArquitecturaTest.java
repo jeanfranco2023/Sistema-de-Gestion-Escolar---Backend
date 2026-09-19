@@ -20,8 +20,7 @@ class ArquitecturaTest {
 
   @Test
   void aplicacionNoImportaInfraestructuraYDominioNoImportaFrameworks() throws IOException {
-    var frontera =
-        Pattern.compile("import com\\.colegio\\.shuji\\..*\\.(infrastructure|config)\\.");
+    var frontera = Pattern.compile("com\\.colegio\\.shuji\\..*\\.(infrastructure|config)\\.");
     var framework =
         Pattern.compile("import (jakarta\\.persistence|org\\.springframework|org\\.hibernate)");
     for (var path : fuentes()) {

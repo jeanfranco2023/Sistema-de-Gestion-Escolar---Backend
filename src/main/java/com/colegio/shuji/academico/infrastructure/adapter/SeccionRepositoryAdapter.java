@@ -49,6 +49,11 @@ public class SeccionRepositoryAdapter implements SeccionRepositoryPort {
             });
   }
 
+  public List<Seccion> bloquearPorIds(Collection<Integer> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
+
   public List<Seccion> listar() {
     return repository.findAll(org.springframework.data.domain.Sort.by("id")).stream()
         .map(mapper::toDomain)

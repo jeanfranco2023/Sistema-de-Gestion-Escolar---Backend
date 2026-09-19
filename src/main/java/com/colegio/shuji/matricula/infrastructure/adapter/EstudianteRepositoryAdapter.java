@@ -58,4 +58,14 @@ public class EstudianteRepositoryAdapter implements EstudianteRepositoryPort {
   public List<Estudiante> buscarPorNumeroDocumento(String valor) {
     return repository.buscarPorNumeroDocumento(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<Estudiante> buscarPorNumerosDocumento(Collection<String> numeros) {
+    if (numeros == null || numeros.isEmpty()) return List.of();
+    return repository.buscarPorNumerosDocumento(numeros).stream().map(mapper::toDomain).toList();
+  }
+
+  public List<Estudiante> bloquearPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

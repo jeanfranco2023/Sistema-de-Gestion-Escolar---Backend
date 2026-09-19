@@ -26,7 +26,8 @@ import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.LocalDate;
 import java.util.HashSet;
-import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,36 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     lote = lotes.guardar(lote);
     int validas = 0, errores = 0;
     var vistas = new HashSet<String>();
+    var estudiantesPorDni =
+        estudiantes
+            .buscarPorNumerosDocumento(
+                r.marcas().stream().map(f -> f.dniLeido()).distinct().toList())
+            .stream()
+            .filter(e -> e.getTipoDocumento() == TipoDocumento.DNI)
+            .collect(Collectors.toMap(e -> e.getNumeroDocumento(), Function.identity(), (a, b) -> a));
+    var estudiantesBloqueados =
+        estudiantes.bloquearPorIds(
+            estudiantesPorDni.values().stream().map(e -> e.getId()).distinct().toList());
+    var estudiantesPorId =
+        estudiantesBloqueados.stream()
+            .collect(Collectors.toMap(e -> e.getId(), Function.identity()));
+    estudiantesPorDni.replaceAll((dni, e) -> estudiantesPorId.getOrDefault(e.getId(), e));
+
+    var inicio = r.marcas().stream().map(f -> f.fechaHora()).min(java.util.Comparator.naturalOrder());
+    var fin = r.marcas().stream().map(f -> f.fechaHora()).max(java.util.Comparator.naturalOrder());
+    var existentes = new HashSet<String>();
+    if (inicio.isPresent() && fin.isPresent()) {
+      marcas.buscarPorRangoFecha(inicio.get(), fin.get().plusNanos(1)).stream()
+          .filter(m -> m.getEstudianteId() != null)
+          .map(
+              m ->
+                  m.getEstudianteId()
+                      + "/"
+                      + m.getFechaHora().toInstant()
+                      + "/"
+                      + m.getDispositivoCodigo())
+          .forEach(existentes::add);
+    }
     for (var fila : r.marcas()) {
       var marca =
           MarcaPorteria.builder()
@@ -63,24 +94,19 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
               .fechaHora(fila.fechaHora())
               .dispositivoCodigo(fila.dispositivoCodigo())
               .build();
-      var est =
-          estudiantes.buscarPorNumeroDocumento(fila.dniLeido()).stream()
-              .filter(e -> e.getTipoDocumento() == TipoDocumento.DNI)
-              .findFirst();
+      var est = java.util.Optional.ofNullable(estudiantesPorDni.get(fila.dniLeido()));
       String clave =
           fila.dniLeido() + "/" + fila.fechaHora().toInstant() + "/" + fila.dispositivoCodigo();
       boolean duplicada = !vistas.add(clave);
       if (est.isPresent()) {
-        requerido(estudiantes.bloquearPorId(est.get().getId()));
         marca.identificar(est.get().getId());
-        duplicada =
-            duplicada
-                || marcas.buscarPorEstudianteId(est.get().getId()).stream()
-                    .anyMatch(
-                        m ->
-                            m.getFechaHora().toInstant().equals(fila.fechaHora().toInstant())
-                                && Objects.equals(
-                                    m.getDispositivoCodigo(), fila.dispositivoCodigo()));
+        String claveExistente =
+            est.get().getId()
+                + "/"
+                + fila.fechaHora().toInstant()
+                + "/"
+                + fila.dispositivoCodigo();
+        duplicada = duplicada || existentes.contains(claveExistente);
       }
       if (duplicada) marca.marcarDuplicado();
       else if (est.isEmpty()) marca.marcarDniNoIdentificado();

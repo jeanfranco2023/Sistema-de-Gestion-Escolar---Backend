@@ -9,7 +9,6 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
-import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
 import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnualesRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.ProcesarPagoWebhookRequestDto;
@@ -113,10 +112,9 @@ public class TesoreriaService
 
   @Transactional(readOnly = true)
   public EstadoCuentaEstudianteResponseDto estadoCuenta(Long estudianteId) {
-    var deudas =
-        matriculas.buscarPorEstudianteId(estudianteId).stream()
-            .flatMap(m -> obligaciones.buscarPorMatriculaId(m.getId()).stream())
-            .toList();
+    var matriculaIds =
+        matriculas.buscarPorEstudianteId(estudianteId).stream().map(m -> m.getId()).toList();
+    var deudas = obligaciones.buscarPorMatriculaIds(matriculaIds);
     return new EstadoCuentaEstudianteResponseDto(
         estudianteId,
         deudas.stream().map(mapper::toResponse).toList(),
@@ -155,9 +153,16 @@ public class TesoreriaService
 
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(CrearPreferenciaMercadoPagoDto r) {
     var o = requerido(obligaciones.buscarPorId(r.obligacionPagoId()));
-    if (actor.tieneRol("ROLE_APODERADO") || actor.tieneRol("APODERADO")) {
+    boolean soloApoderado =
+        actor.tieneRol("APODERADO")
+            && !actor.tieneRol("DIRECCION")
+            && !actor.tieneRol("SECRETARIA");
+    if (soloApoderado) {
       var apoderadosLista = apoderados.buscarPorUsuarioId(actor.usuarioId());
-      exigir(!apoderadosLista.isEmpty(), "Ficha de apoderado no encontrada");
+      if (apoderadosLista.isEmpty()) {
+        throw new org.springframework.security.access.AccessDeniedException(
+            "Ficha de apoderado no encontrada");
+      }
       var apoderado = apoderadosLista.getFirst();
       var m = requerido(matriculas.buscarPorId(o.getMatriculaId()));
       var vinculos = estudianteApoderados.buscarPorApoderadoId(apoderado.getId());
@@ -167,7 +172,10 @@ public class TesoreriaService
                   v ->
                       v.getEstudianteId().equals(m.getEstudianteId())
                           && Boolean.TRUE.equals(v.getEsResponsableEconomico()));
-      exigir(autorizado, "Solo el apoderado designado como responsable económico puede gestionar el pago");
+      if (!autorizado) {
+        throw new org.springframework.security.access.AccessDeniedException(
+            "Solo el responsable económico puede gestionar el pago");
+      }
     }
     exigir(
         o.getEstado() == EstadoObligacion.PENDIENTE || o.getEstado() == EstadoObligacion.VENCIDO,

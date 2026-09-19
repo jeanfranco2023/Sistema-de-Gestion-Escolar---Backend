@@ -62,4 +62,9 @@ public class ApoderadoRepositoryAdapter implements ApoderadoRepositoryPort {
   public List<Apoderado> buscarPorNumeroDocumento(String valor) {
     return repository.buscarPorNumeroDocumento(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<Apoderado> buscarPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

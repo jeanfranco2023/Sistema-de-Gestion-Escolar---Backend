@@ -70,10 +70,14 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   public int liberarVencidas() {
     int total = 0;
     var ahora = OffsetDateTime.now();
-    for (var m : matriculas.buscarPorEstadoMatricula(EstadoMatricula.RESERVADA_TEMPORAL)) {
-      if (m.getReservaExpiraAt().isAfter(ahora)) continue;
-      requerido(secciones.bloquearPorId(m.getSeccionId()));
-      var actual = requerido(matriculas.bloquearPorId(m.getId()));
+    var vencidas =
+        matriculas.buscarPorEstadoMatricula(EstadoMatricula.RESERVADA_TEMPORAL).stream()
+            .filter(m -> !m.getReservaExpiraAt().isAfter(ahora))
+            .toList();
+    secciones.bloquearPorIds(vencidas.stream().map(m -> m.getSeccionId()).distinct().toList());
+    var bloqueadas =
+        matriculas.bloquearPorIds(vencidas.stream().map(m -> m.getId()).toList());
+    for (var actual : bloqueadas) {
       if (actual.liberarSiVencida(ahora)) {
         matriculas.guardar(actual);
         total++;
@@ -85,11 +89,17 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   @Transactional(readOnly = true)
   public FichaMatriculaResponseDto ficha(Long id) {
     var m = requerido(matriculas.buscarPorId(id));
+    var relaciones = vinculos.buscarPorEstudianteId(m.getEstudianteId());
+    var apoderadosMap =
+        apoderados.buscarPorIds(relaciones.stream().map(v -> v.getApoderadoId()).toList()).stream()
+            .collect(java.util.stream.Collectors.toMap(
+                com.colegio.shuji.matricula.domain.model.Apoderado::getId,
+                java.util.function.Function.identity()));
     return new FichaMatriculaResponseDto(
         mapper.toResponse(m),
         mapper.toResponse(requerido(estudiantes.buscarPorId(m.getEstudianteId()))),
-        vinculos.buscarPorEstudianteId(m.getEstudianteId()).stream()
-            .map(v -> mapper.toResponse(requerido(apoderados.buscarPorId(v.getApoderadoId()))))
+        relaciones.stream()
+            .map(v -> mapper.toResponse(requerido(java.util.Optional.ofNullable(apoderadosMap.get(v.getApoderadoId())))))
             .toList());
   }
 }

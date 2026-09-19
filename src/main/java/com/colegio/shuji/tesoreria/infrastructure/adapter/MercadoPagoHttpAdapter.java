@@ -13,6 +13,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
@@ -26,15 +28,23 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   private final String apiUrl;
   private final String accessToken;
   private final String publicKey;
+  private final Set<String> returnUrlHosts;
   private final RestClient client;
 
   public MercadoPagoHttpAdapter(
       @Value("${integraciones.pagos.mercadopago.api-url:https://api.mercadopago.com}") String apiUrl,
       @Value("${integraciones.pagos.mercadopago.access-token:}") String accessToken,
-      @Value("${integraciones.pagos.mercadopago.public-key:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}") String publicKey) {
+      @Value("${integraciones.pagos.mercadopago.public-key:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}") String publicKey,
+      @Value("${integraciones.pagos.mercadopago.return-url-hosts:}") String returnUrlHosts) {
     this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
     this.accessToken = accessToken;
     this.publicKey = publicKey;
+    this.returnUrlHosts =
+        java.util.Arrays.stream(returnUrlHosts.split(","))
+            .map(String::trim)
+            .filter(v -> !v.isBlank())
+            .map(v -> v.toLowerCase(java.util.Locale.ROOT))
+            .collect(Collectors.toUnmodifiableSet());
     var factory =
         new JdkClientHttpRequestFactory(
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
@@ -161,9 +171,14 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     try {
       var uri = java.net.URI.create(url);
       var host = uri.getHost();
-      boolean esLocal = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
-      if (!"https".equalsIgnoreCase(uri.getScheme()) && !esLocal) {
-        throw new BusinessException("Las URLs de retorno deben utilizar el protocolo seguro HTTPS");
+      if (!uri.isAbsolute()
+          || host == null
+          || uri.getUserInfo() != null
+          || !"https".equalsIgnoreCase(uri.getScheme())) {
+        throw new BusinessException("La URL de retorno debe ser HTTPS, absoluta y sin credenciales");
+      }
+      if (!returnUrlHosts.contains(host.toLowerCase(java.util.Locale.ROOT))) {
+        throw new BusinessException("Dominio no permitido en URL de retorno");
       }
     } catch (IllegalArgumentException ex) {
       throw new BusinessException("URL de retorno inválida");

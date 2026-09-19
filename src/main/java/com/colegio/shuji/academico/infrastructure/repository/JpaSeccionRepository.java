@@ -11,6 +11,10 @@ public interface JpaSeccionRepository extends JpaRepository<SeccionEntity, Integ
   @Query("select e from SeccionEntity e where e.id = :id")
   Optional<SeccionEntity> bloquearPorId(@Param("id") Integer id);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select e from SeccionEntity e where e.id in :ids order by e.id")
+  List<SeccionEntity> bloquearPorIds(@Param("ids") Collection<Integer> ids);
+
   @Query("select e from SeccionEntity e where e.anioLectivoId = :valor order by e.id")
   List<SeccionEntity> buscarPorAnioLectivoId(@Param("valor") Short valor);
 

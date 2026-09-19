@@ -15,6 +15,8 @@ public interface ObligacionRepositoryPort {
 
   List<ObligacionPago> buscarPorMatriculaId(Long valor);
 
+  List<ObligacionPago> buscarPorMatriculaIds(Collection<Long> ids);
+
   List<ObligacionPago> buscarPorConceptoId(Short valor);
 
   List<ObligacionPago> buscarPorEstado(EstadoObligacion valor);

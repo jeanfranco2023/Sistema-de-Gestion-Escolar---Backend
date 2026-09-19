@@ -1,0 +1,75 @@
+name: Shuji Backend - CI/CD Enterprise Quality Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-verify:
+    name: Compilación, Seguridad, Pruebas de Concurrencia y Calidad
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21 LTS (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Compilar código fuente y validar MapStruct / Lombok
+        run: ./mvnw clean compile test-compile -B
+
+      - name: 1. Auditoría de Arquitectura Hexagonal y Cero SQL Nativo
+        run: ./mvnw test -Dtest=ArquitecturaTest -B
+
+      - name: 2. Pruebas Unitarias y de Dominio (Sin dependencias externas)
+        run: ./mvnw test -Dtest=DominioAuditTest,ReglasDominioTest -B
+
+      - name: 3. Pruebas Avanzadas de Seguridad (HMAC, Anti-Replay, IDOR, Open Redirect)
+        run: ./mvnw test -Dtest=SeguridadAvanzadaTest -B
+
+      - name: 4. Pruebas de Integración Reales con PostgreSQL 16 (DML, Triggers, Flyway)
+        run: ./mvnw test -Dtest=PersistenciaPostgresTest -Dshuji.integration=true -B
+
+      - name: 5. Pruebas Reales de Alta Concurrencia (Bloqueo Pesimista en Series y Vacantes)
+        run: ./mvnw test -Dtest=ConcurrenciaPostgresTest -Dshuji.integration=true -B
+
+      - name: 6. Pruebas de Carga y Regresiones N+1 (Ingesta Biométrica Masiva)
+        run: ./mvnw test -Dtest=CargaYRegresionNPlusOneTest -Dshuji.integration=true -B
+
+      - name: 7. Suite Completa de Verificación Final
+        run: ./mvnw verify -Dshuji.integration=true -B
+
+      - name: Publicar Reportes de Pruebas JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-test-reports
+          path: target/surefire-reports/
+          retention-days: 14

@@ -15,4 +15,6 @@ public interface ApoderadoRepositoryPort {
   List<Apoderado> buscarPorUsuarioId(Long valor);
 
   List<Apoderado> buscarPorNumeroDocumento(String valor);
+
+  List<Apoderado> buscarPorIds(Collection<Long> ids);
 }

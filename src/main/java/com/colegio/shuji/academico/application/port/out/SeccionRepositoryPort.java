@@ -10,6 +10,8 @@ public interface SeccionRepositoryPort {
 
   Optional<Seccion> bloquearPorId(Integer id);
 
+  List<Seccion> bloquearPorIds(Collection<Integer> ids);
+
   List<Seccion> listar();
 
   List<Seccion> buscarPorAnioLectivoId(Short valor);

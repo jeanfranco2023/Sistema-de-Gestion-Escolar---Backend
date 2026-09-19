@@ -16,4 +16,7 @@ public interface JpaApoderadoRepository extends JpaRepository<ApoderadoEntity, L
 
   @Query("select e from ApoderadoEntity e where e.numeroDocumento = :valor order by e.id")
   List<ApoderadoEntity> buscarPorNumeroDocumento(@Param("valor") String valor);
+
+  @Query("select e from ApoderadoEntity e where e.id in :ids order by e.id")
+  List<ApoderadoEntity> buscarPorIds(@Param("ids") Collection<Long> ids);
 }

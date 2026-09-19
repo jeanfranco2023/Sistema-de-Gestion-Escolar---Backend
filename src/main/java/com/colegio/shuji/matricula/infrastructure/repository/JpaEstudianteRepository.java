@@ -13,4 +13,11 @@ public interface JpaEstudianteRepository extends JpaRepository<EstudianteEntity,
 
   @Query("select e from EstudianteEntity e where e.numeroDocumento = :valor order by e.id")
   List<EstudianteEntity> buscarPorNumeroDocumento(@Param("valor") String valor);
+
+  @Query("select e from EstudianteEntity e where e.numeroDocumento in :numeros order by e.id")
+  List<EstudianteEntity> buscarPorNumerosDocumento(@Param("numeros") Collection<String> numeros);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select e from EstudianteEntity e where e.id in :ids order by e.id")
+  List<EstudianteEntity> bloquearPorIds(@Param("ids") Collection<Long> ids);
 }

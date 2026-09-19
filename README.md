@@ -165,6 +165,7 @@ JWT_EXPIRATION_MS=86400000
 MERCADOPAGO_PUBLIC_KEY=APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a
 MERCADOPAGO_ACCESS_TOKEN=tu_access_token_de_prueba
 MERCADOPAGO_WEBHOOK_SECRET=tu_webhook_secret
+MERCADOPAGO_RETURN_URL_HOSTS=localhost
 ```
 
 ### 3. Ejecutar la Suite de Pruebas Automatizadas

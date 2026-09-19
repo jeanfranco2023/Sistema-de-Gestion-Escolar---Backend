@@ -15,6 +15,9 @@ public interface JpaObligacionRepository extends JpaRepository<ObligacionPagoEnt
   @Query("select e from ObligacionPagoEntity e where e.matriculaId = :valor order by e.id")
   List<ObligacionPagoEntity> buscarPorMatriculaId(@Param("valor") Long valor);
 
+  @Query("select e from ObligacionPagoEntity e where e.matriculaId in :ids order by e.id")
+  List<ObligacionPagoEntity> buscarPorMatriculaIds(@Param("ids") Collection<Long> ids);
+
   @Query("select e from ObligacionPagoEntity e where e.conceptoId = :valor order by e.id")
   List<ObligacionPagoEntity> buscarPorConceptoId(@Param("valor") Short valor);
 

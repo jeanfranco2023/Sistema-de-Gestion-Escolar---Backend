@@ -60,6 +60,11 @@ public class ObligacionRepositoryAdapter implements ObligacionRepositoryPort {
     return repository.buscarPorMatriculaId(valor).stream().map(mapper::toDomain).toList();
   }
 
+  public List<ObligacionPago> buscarPorMatriculaIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorMatriculaIds(ids).stream().map(mapper::toDomain).toList();
+  }
+
   public List<ObligacionPago> buscarPorConceptoId(Short valor) {
     return repository.buscarPorConceptoId(valor).stream().map(mapper::toDomain).toList();
   }

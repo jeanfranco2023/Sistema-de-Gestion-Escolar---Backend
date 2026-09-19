@@ -33,12 +33,6 @@ public class SerieComprobanteEntity {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
-  public int siguienteCorrelativo() {
-    this.ultimoCorrelativo++;
-    this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    return this.ultimoCorrelativo;
-  }
-
   @PrePersist
   @PreUpdate
   void prePersist() {

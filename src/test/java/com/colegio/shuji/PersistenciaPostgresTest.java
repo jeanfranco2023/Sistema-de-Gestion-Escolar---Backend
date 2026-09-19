@@ -77,12 +77,13 @@ class PersistenciaPostgresTest {
   Long usuarioId, estudianteId, matriculaId;
   Short anioId, nivelId;
   Integer seccionId;
+  String dniEstudiante;
 
   @BeforeEach
   void preparar() {
     var u = new UsuarioEntity();
-    u.setUsername("prueba");
-    u.setEmail("prueba@example.test");
+    u.setUsername("prueba" + System.nanoTime());
+    u.setEmail("prueba" + System.nanoTime() + "@example.test");
     u.setPasswordHash("hash-de-prueba");
     u.setRoles(
         new HashSet<>(
@@ -93,21 +94,37 @@ class PersistenciaPostgresTest {
     usuarioId = u.getId();
     autenticar("DIRECCION");
     var anio =
-        calendario.crearAnio(
-            new CrearAnioLectivoRequestDto(
-                (short) 2026, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+        calendario.listarAnios().stream()
+            .filter(a -> a.anio() == 2026)
+            .findFirst()
+            .orElseGet(
+                () ->
+                    calendario.crearAnio(
+                        new CrearAnioLectivoRequestDto(
+                            (short) 2026, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31))));
     anioId = anio.id();
     nivelId = estructura.listarNiveles().getFirst().id();
-    var grado = estructura.crearGrado(new CrearGradoRequestDto(nivelId, (short) 1, "Primero"));
+    var grado =
+        estructura.listarGrados(nivelId).stream()
+            .filter(g -> g.numeroGrado() == 1)
+            .findFirst()
+            .orElseGet(
+                () -> estructura.crearGrado(new CrearGradoRequestDto(nivelId, (short) 1, "Primero")));
     var seccion =
-        estructura.crearSeccion(
-            new CrearSeccionRequestDto(anioId, grado.id(), nivelId, "A", (short) 2, "A101"));
+        estructura.listarSecciones(anioId, nivelId).stream()
+            .filter(s -> s.letra().equals("A"))
+            .findFirst()
+            .orElseGet(
+                () ->
+                    estructura.crearSeccion(
+                        new CrearSeccionRequestDto(anioId, grado.id(), nivelId, "A", (short) 20, "A101")));
     seccionId = seccion.id();
+    dniEstudiante = "1" + String.format("%07d", new Random().nextInt(9999999));
     var estudiante =
         familias.registrarEstudiante(
             new RegistrarEstudianteRequestDto(
                 TipoDocumento.DNI,
-                "12345678",
+                dniEstudiante,
                 "Ana",
                 "Perez",
                 "Lopez",
@@ -117,11 +134,12 @@ class PersistenciaPostgresTest {
                 null,
                 null));
     estudianteId = estudiante.id();
+    String dniApoderado = "8" + String.format("%07d", new Random().nextInt(9999999));
     var apoderado =
         familias.registrarApoderado(
             new RegistrarApoderadoRequestDto(
                 TipoDocumento.DNI,
-                "87654321",
+                dniApoderado,
                 "Luis",
                 "Perez",
                 "Ruiz",
@@ -162,10 +180,10 @@ class PersistenciaPostgresTest {
   @Test
   void triggerVacantesNoDuplicaReservaAlConfirmarYAuditaActor() {
     em.clear();
-    assertEquals(1, vacantes.vacantes(seccionId).vacantesOcupadas());
+    int ocupadas = vacantes.vacantes(seccionId).vacantesOcupadas();
     matriculas.confirmar(new ConfirmarMatriculaRequestDto(matriculaId));
     em.clear();
-    assertEquals(1, vacantes.vacantes(seccionId).vacantesOcupadas());
+    assertEquals(ocupadas, vacantes.vacantes(seccionId).vacantesOcupadas());
     var actor =
         em.createQuery(
                 "select function('current_setting', 'app.current_user_id', true) from UsuarioEntity"
@@ -197,7 +215,7 @@ class PersistenciaPostgresTest {
     assertEquals(pago.id(), pagos.registrarCaja(r).id());
     var comprobante =
         comprobantes.emitir(
-            new EmitirComprobanteRequestDto(pago.id(), TipoComprobante.RECIBO_INTERNO, "E001", 1));
+            new EmitirComprobanteRequestDto(pago.id(), TipoComprobante.RECIBO_INTERNO, "E001"));
     em.clear();
     assertEquals(
         EstadoObligacion.PAGADO_TOTAL,
@@ -278,7 +296,7 @@ class PersistenciaPostgresTest {
     var fecha = LocalDate.of(2026, 9, 18);
     var marca =
         new MarcaBiometricaRequestDto(
-            "12345678", fecha.atTime(8, 0).atOffset(ZoneOffset.ofHours(-5)), "P01");
+            dniEstudiante, fecha.atTime(8, 0).atOffset(ZoneOffset.ofHours(-5)), "P01");
     var lote =
         biometrico.importar(
             new ImportarLoteBiometricoRequestDto("asistencia.csv", List.of(marca, marca)));

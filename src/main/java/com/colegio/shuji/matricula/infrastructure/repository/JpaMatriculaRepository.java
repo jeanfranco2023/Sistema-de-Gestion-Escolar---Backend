@@ -26,4 +26,8 @@ public interface JpaMatriculaRepository extends JpaRepository<MatriculaEntity, L
 
   @Query("select e from MatriculaEntity e where e.id in :ids order by e.id")
   List<MatriculaEntity> buscarPorIds(@Param("ids") java.util.Collection<Long> ids);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select e from MatriculaEntity e where e.id in :ids order by e.id")
+  List<MatriculaEntity> bloquearPorIds(@Param("ids") Collection<Long> ids);
 }

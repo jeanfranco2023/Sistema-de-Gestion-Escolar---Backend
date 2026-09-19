@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS series_comprobante (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-INSERT INTO series_comprobante (serie, ultimo_correlativo) VALUES ('B001', 0), ('E001', 0) ON CONFLICT (serie) DO NOTHING;
+INSERT INTO series_comprobante (serie, ultimo_correlativo) VALUES ('B001', 0), ('E001', 0), ('F001', 0) ON CONFLICT (serie) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
 -- 7. MÓDULO DE ASISTENCIA, BIOMETRÍA Y CONCILIACIÓN DE AULA (M5)
@@ -866,3 +866,14 @@ INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALU
     ('PENSION_MENSUAL', 'Pensión Escolar de Enseñanza (Cuotas 1 a 10)', 'PENSION', 380.00),
     ('CONSTANCIA_ESTUDIOS', 'Emisión de Constancia de Estudios', 'CERTIFICADO', 25.00)
 ON CONFLICT (codigo) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- 13. ÍNDICES DE RENDIMIENTO Y ALTA CONCURRENCIA ADICIONALES
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_marcas_porteria_fecha_hora ON marcas_biometrico_porteria (fecha_hora);
+CREATE INDEX IF NOT EXISTS idx_marcas_porteria_dni_leido ON marcas_biometrico_porteria (dni_leido);
+CREATE INDEX IF NOT EXISTS idx_obligaciones_pago_matricula_id ON obligaciones_pago (matricula_id);
+CREATE INDEX IF NOT EXISTS idx_matriculas_estudiante_id ON matriculas (estudiante_id);
+CREATE INDEX IF NOT EXISTS idx_estudiante_apoderados_apoderado_id ON estudiante_apoderados (apoderado_id);
+CREATE INDEX IF NOT EXISTS idx_estudiante_apoderados_estudiante_id ON estudiante_apoderados (estudiante_id);
+

@@ -76,4 +76,9 @@ public class MatriculaRepositoryAdapter implements MatriculaRepositoryPort {
     if (ids == null || ids.isEmpty()) return List.of();
     return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
   }
+
+  public List<Matricula> bloquearPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

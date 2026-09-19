@@ -9,6 +9,7 @@ import com.colegio.shuji.tesoreria.application.mapper.TesoreriaMapper;
 import com.colegio.shuji.tesoreria.application.port.in.EmitirComprobanteUseCase;
 import com.colegio.shuji.tesoreria.application.port.out.ComprobanteRepositoryPort;
 import com.colegio.shuji.tesoreria.application.port.out.PagoRepositoryPort;
+import com.colegio.shuji.tesoreria.application.port.out.SerieComprobanteRepositoryPort;
 import com.colegio.shuji.tesoreria.domain.enums.EstadoPago;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import com.colegio.shuji.tesoreria.domain.model.ComprobantePago;
@@ -23,7 +24,7 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
   private final TesoreriaMapper mapper;
   private final ComprobanteRepositoryPort comprobantes;
   private final PagoRepositoryPort pagos;
-  private final com.colegio.shuji.tesoreria.infrastructure.repository.JpaSerieComprobanteRepository seriesRepository;
+  private final SerieComprobanteRepositoryPort series;
 
   public ComprobanteResponseDto emitir(EmitirComprobanteRequestDto r) {
     var pago = requerido(pagos.bloquearPorId(r.pagoId()));
@@ -31,8 +32,7 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
     if (!comprobantes.buscarPorPagoTransaccionId(r.pagoId()).isEmpty())
       throw new com.colegio.shuji.tesoreria.domain.exception.ComprobanteYaEmitidoException(
           "El pago ya tiene comprobante");
-    var c = ComprobantePago.emitir(pago, r.tipoComprobante(), r.serie(), r.correlativo());
-    return mapper.toResponse(comprobantes.guardar(c));
+    return emitirConContador(pago, r.tipoComprobante(), r.serie());
   }
 
   public ComprobanteResponseDto emitirAutomaticoParaPago(Long pagoId, TipoComprobante tipo, String serie) {
@@ -41,22 +41,24 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
     var previos = comprobantes.buscarPorPagoTransaccionId(pagoId);
     if (!previos.isEmpty()) return mapper.toResponse(previos.getFirst());
 
-    var serieLock =
-        seriesRepository
-            .bloquearPorSerie(serie)
-            .orElseGet(
-                () ->
-                    seriesRepository.saveAndFlush(
-                        com.colegio.shuji.tesoreria.infrastructure.entity.SerieComprobanteEntity.builder()
-                            .serie(serie)
-                            .ultimoCorrelativo(0)
-                            .updatedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
-                            .build()));
-    int correlativo = serieLock.siguienteCorrelativo();
-    seriesRepository.saveAndFlush(serieLock);
+    return emitirConContador(pago, tipo, serie);
+  }
 
-    var c = ComprobantePago.emitir(pago, tipo, serie, correlativo);
-    return mapper.toResponse(comprobantes.guardar(c));
+  private ComprobanteResponseDto emitirConContador(
+      com.colegio.shuji.tesoreria.domain.model.PagoTransaccion pago,
+      TipoComprobante tipo,
+      String codigoSerie) {
+    var serie =
+        series
+            .bloquearPorSerie(codigoSerie)
+            .orElseThrow(
+                () ->
+                    new com.colegio.shuji.shared.domain.exception.BusinessException(
+                        "Serie de comprobante no configurada: " + codigoSerie));
+    int correlativo = serie.siguienteCorrelativo();
+    series.guardar(serie);
+    var comprobante = ComprobantePago.emitir(pago, tipo, codigoSerie, correlativo);
+    return mapper.toResponse(comprobantes.guardar(comprobante));
   }
 
   @Transactional(readOnly = true)

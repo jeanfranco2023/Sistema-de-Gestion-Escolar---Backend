@@ -8,7 +8,7 @@ spring:
     name: shuji-backend
 
   datasource:
-    url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=${SUPABASE_DB_SSLMODE:require}
+    url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/postgres?sslmode=${SUPABASE_DB_SSLMODE:require}
     username: ${SUPABASE_DB_USER:postgres}
     password: ${SUPABASE_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
@@ -80,4 +80,23 @@ integraciones:
       public-key: ${MERCADOPAGO_PUBLIC_KEY:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}
       access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
       webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+      return-url-hosts: ${MERCADOPAGO_RETURN_URL_HOSTS:}
       api-url: ${MERCADOPAGO_API_URL:https://api.mercadopago.com}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
