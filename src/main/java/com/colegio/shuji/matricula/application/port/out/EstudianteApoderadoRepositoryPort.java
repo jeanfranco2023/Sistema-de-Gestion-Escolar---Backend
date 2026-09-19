@@ -1,0 +1,18 @@
+package com.colegio.shuji.matricula.application.port.out;
+
+import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
+import java.util.*;
+
+public interface EstudianteApoderadoRepositoryPort {
+  EstudianteApoderado guardar(EstudianteApoderado valor);
+
+  Optional<EstudianteApoderado> buscarPorId(Long id);
+
+  Optional<EstudianteApoderado> bloquearPorId(Long id);
+
+  List<EstudianteApoderado> listar();
+
+  List<EstudianteApoderado> buscarPorEstudianteId(Long valor);
+
+  List<EstudianteApoderado> buscarPorApoderadoId(Long valor);
+}

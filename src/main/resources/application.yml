@@ -1,0 +1,83 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: shuji-backend
+
+  datasource:
+    url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=${SUPABASE_DB_SSLMODE:require}
+    username: ${SUPABASE_DB_USER:postgres}
+    password: ${SUPABASE_DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: ShujiSupabaseHikariPool
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:2}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:300000}
+      max-lifetime: ${HIKARI_MAX_LIFETIME:600000}
+      connection-timeout: 30000
+      leak-detection-threshold: 60000
+
+  jpa:
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate # El esquema se gestiona con DDL oficial / Supabase
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 25
+          order_inserts: true
+          order_updates: true
+
+# Configuración institucional de la aplicación
+app:
+  jwt:
+    secret: ${JWT_SECRET:c2h1amlfa2l0YW11cmFfcHJveWVjdG9faW50ZWdyYWRvcl91dHBfMjAyNg==}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000,http://localhost:5173}
+    allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
+    allowed-headers: "*"
+    allow-credentials: true
+  services:
+    reniec:
+      url: ${RENIEC_API_URL:https://api.reniec.gob.pe/v1}
+      token: ${RENIEC_API_TOKEN:}
+
+# Documentación OpenAPI 3 / Swagger
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+logging:
+  level:
+    root: INFO
+    com.colegio.shuji: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+integraciones:
+  reniec:
+    url: ${RENIEC_PROXY_URL:}
+    token: ${RENIEC_PROXY_TOKEN:}
+  pagos:
+    verificador-url: ${PAGOS_VERIFICADOR_URL:}
+    api-token: ${PAGOS_API_TOKEN:}
+    webhook-secret: ${PAGOS_WEBHOOK_SECRET:}
+    mercadopago:
+      public-key: ${MERCADOPAGO_PUBLIC_KEY:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}
+      access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+      webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+      api-url: ${MERCADOPAGO_API_URL:https://api.mercadopago.com}
