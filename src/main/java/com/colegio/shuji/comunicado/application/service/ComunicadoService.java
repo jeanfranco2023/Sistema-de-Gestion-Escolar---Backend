@@ -21,10 +21,12 @@ import com.colegio.shuji.comunicado.domain.model.ComunicadoDestinatario;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
+import com.colegio.shuji.academico.domain.model.Seccion;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -58,10 +60,13 @@ public class ComunicadoService
     c.publicar(actor.usuarioId());
     c = comunicados.guardar(c);
     var ids = new TreeSet<Long>();
+    var seccionesCache = new HashMap<Integer, Seccion>();
     for (var m : matriculas.buscarPorAnioLectivoId(r.anioLectivoId())) {
       if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO
           || (r.seccionId() != null && !m.getSeccionId().equals(r.seccionId()))) continue;
-      var s = requerido(secciones.buscarPorId(m.getSeccionId()));
+      var s =
+          seccionesCache.computeIfAbsent(
+              m.getSeccionId(), id -> requerido(secciones.buscarPorId(id)));
       if (r.nivelId() != null && !s.getNivelId().equals(r.nivelId())) continue;
       vinculos.buscarPorEstudianteId(m.getEstudianteId()).stream()
           .filter(v -> Boolean.TRUE.equals(v.getTieneCustodia()))

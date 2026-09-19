@@ -12,8 +12,10 @@ import com.colegio.shuji.curriculo.application.port.in.GenerarMallaHorariaUseCas
 import com.colegio.shuji.curriculo.application.port.out.AsignacionRepositoryPort;
 import com.colegio.shuji.curriculo.application.port.out.BloqueHorarioRepositoryPort;
 import com.colegio.shuji.curriculo.application.port.out.HorarioRepositoryPort;
+import com.colegio.shuji.curriculo.domain.model.BloqueHorario;
 import com.colegio.shuji.curriculo.domain.model.HorarioSeccion;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,9 +36,12 @@ public class HorarioService implements GenerarMallaHorariaUseCase {
     requerido(anios.bloquearPorId(a.getAnioLectivoId())).verificarAbierto();
     var b = requerido(bloques.buscarPorId(r.bloqueHorarioId()));
     exigir(!Boolean.TRUE.equals(b.getEsRecreo()), "No se asignan clases en recreo");
+    var bloquesCache = new HashMap<Short, BloqueHorario>();
     for (var h : horarios.buscarPorAnioLectivoId(a.getAnioLectivoId())) {
       if (h.getDiaSemana() != r.diaSemana().getCodigo()) continue;
-      var otro = requerido(bloques.buscarPorId(h.getBloqueHorarioId()));
+      var otro =
+          bloquesCache.computeIfAbsent(
+              h.getBloqueHorarioId(), id -> requerido(bloques.buscarPorId(id)));
       if (!otro.getHoraInicio().isBefore(b.getHoraFin())
           || !otro.getHoraFin().isAfter(b.getHoraInicio())) continue;
       if (h.getDocenteUsuarioId().equals(a.getDocenteUsuarioId()))

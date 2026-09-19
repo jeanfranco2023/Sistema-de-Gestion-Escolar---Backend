@@ -14,6 +14,7 @@ import com.colegio.shuji.asistencia.application.port.out.MarcaPorteriaRepository
 import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
 import com.colegio.shuji.asistencia.domain.enums.TipoDiscrepancia;
+import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.ConciliacionAsistencia;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
@@ -21,6 +22,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +50,20 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
         !fecha.isAfter(LocalDate.now(ZoneId.of("America/Lima"))), "No se concilian fechas futuras");
     var result = new ArrayList<ConciliacionAsistenciaResponseDto>();
     var zona = ZoneId.of("America/Lima");
+    var asistenciasDelDia =
+        asistencias.buscarPorFechaSesion(fecha).stream()
+            .collect(
+                Collectors.toMap(
+                    AsistenciaAula::getMatriculaId,
+                    Function.identity(),
+                    (a1, a2) -> a1));
+    var conciliacionesDelDia =
+        conciliaciones.buscarPorFecha(fecha).stream()
+            .collect(
+                Collectors.toMap(
+                    ConciliacionAsistencia::getEstudianteId,
+                    Function.identity(),
+                    (c1, c2) -> c1));
     for (var m : matriculas.buscarPorAnioLectivoId(anioId)) {
       if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO) continue;
       var delDia =
@@ -57,10 +75,7 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
                           && v.getEstadoProcesamiento() != EstadoMarca.DNI_NO_IDENTIFICADO)
               .toList();
       boolean porteria = !delDia.isEmpty();
-      var lista =
-          asistencias.buscarPorMatriculaId(m.getId()).stream()
-              .filter(a -> a.getFechaSesion().equals(fecha))
-              .findFirst();
+      var lista = Optional.ofNullable(asistenciasDelDia.get(m.getId()));
       boolean presente =
           lista
               .map(
@@ -69,9 +84,7 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
                           || a.getEstado() == EstadoAsistenciaAula.TARDANZA)
               .orElse(false);
       var c =
-          conciliaciones.buscarPorEstudianteId(m.getEstudianteId()).stream()
-              .filter(v -> v.getFecha().equals(fecha))
-              .findFirst()
+          Optional.ofNullable(conciliacionesDelDia.get(m.getEstudianteId()))
               .orElseGet(
                   () ->
                       ConciliacionAsistencia.builder()
