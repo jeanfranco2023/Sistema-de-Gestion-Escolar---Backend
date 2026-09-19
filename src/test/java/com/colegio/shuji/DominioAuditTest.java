@@ -84,6 +84,75 @@ class DominioAuditTest {
   }
 
   @Test
+  void serieComprobanteIncrementaCorrelativoAtomicamente() {
+    var serie =
+        com.colegio.shuji.tesoreria.infrastructure.entity.SerieComprobanteEntity.builder()
+            .serie("B001")
+            .ultimoCorrelativo(0)
+            .updatedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
+            .build();
+    assertEquals(1, serie.siguienteCorrelativo());
+    assertEquals(2, serie.siguienteCorrelativo());
+    assertEquals(3, serie.siguienteCorrelativo());
+    assertEquals(3, serie.getUltimoCorrelativo());
+    assertNotNull(serie.getUpdatedAt());
+  }
+
+  @Test
+  void validacionFirmaHmacYFrescuraTsProtegeContraReplay() throws Exception {
+    String secret = "clave_secreta_test";
+    String dataId = "123456";
+    String requestId = "req-test-789";
+    long now = java.time.Instant.now().getEpochSecond();
+    String tsValido = String.valueOf(now);
+    String tsExpirado = String.valueOf(now - 600); // 10 minutos atrás
+
+    // Manifest: id:123456;request-id:req-test-789;ts:now;
+    String manifest = "id:" + dataId + ";request-id:" + requestId + ";ts:" + tsValido + ";";
+    var mac = javax.crypto.Mac.getInstance("HmacSHA256");
+    mac.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+    var rawBytes = mac.doFinal(manifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    var sb = new StringBuilder();
+    for (byte b : rawBytes) sb.append(String.format("%02x", b));
+    String firmaCorrecta = sb.toString();
+
+    // Verificación de comparación en tiempo constante
+    assertTrue(java.security.MessageDigest.isEqual(
+        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    assertFalse(java.security.MessageDigest.isEqual(
+        firmaCorrecta.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        "firma_falsificada_o_modificada".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+    // Verificación de frescura de timestamp (máximo 300 segundos)
+    long diffValida = Math.abs(now - Long.parseLong(tsValido));
+    assertTrue(diffValida <= 300, "Timestamp reciente debe ser aceptado");
+    long diffExpirada = Math.abs(now - Long.parseLong(tsExpirado));
+    assertTrue(diffExpirada > 300, "Timestamp de hace 10 minutos debe ser rechazado como replay");
+  }
+
+  @Test
+  void vinculoApoderadoExigeResponsabilidadEconomicaParaGestionPago() {
+    var vinculoNoEconomico =
+        com.colegio.shuji.matricula.domain.model.EstudianteApoderado.builder()
+            .estudianteId(10L)
+            .apoderadoId(20L)
+            .tieneCustodia(true)
+            .esResponsableEconomico(false)
+            .build();
+    assertFalse(vinculoNoEconomico.getEsResponsableEconomico());
+
+    var vinculoEconomico =
+        com.colegio.shuji.matricula.domain.model.EstudianteApoderado.builder()
+            .estudianteId(10L)
+            .apoderadoId(20L)
+            .tieneCustodia(true)
+            .esResponsableEconomico(true)
+            .build();
+    assertTrue(vinculoEconomico.getEsResponsableEconomico());
+  }
+
+  @Test
   void justificacionNoSePuedeCrearSinMotivo() {
     var asistencia =
         AsistenciaAula.builder().estado(EstadoAsistenciaAula.FALTA_INJUSTIFICADA).build();

@@ -13,4 +13,7 @@ public interface JpaCompetenciaRepository extends JpaRepository<CompetenciaEntit
 
   @Query("select e from CompetenciaEntity e where e.areaId = :valor order by e.id")
   List<CompetenciaEntity> buscarPorAreaId(@Param("valor") Short valor);
+
+  @Query("select e from CompetenciaEntity e where e.id in :ids order by e.id")
+  List<CompetenciaEntity> buscarPorIds(@Param("ids") java.util.Collection<Short> ids);
 }

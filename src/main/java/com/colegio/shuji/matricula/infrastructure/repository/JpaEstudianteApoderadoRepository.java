@@ -17,4 +17,7 @@ public interface JpaEstudianteApoderadoRepository
 
   @Query("select e from EstudianteApoderadoEntity e where e.apoderadoId = :valor order by e.id")
   List<EstudianteApoderadoEntity> buscarPorApoderadoId(@Param("valor") Long valor);
+
+  @Query("select e from EstudianteApoderadoEntity e where e.estudianteId in :ids order by e.id")
+  List<EstudianteApoderadoEntity> buscarPorEstudianteIds(@Param("ids") java.util.Collection<Long> ids);
 }

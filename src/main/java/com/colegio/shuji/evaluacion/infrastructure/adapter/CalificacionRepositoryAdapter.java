@@ -86,4 +86,8 @@ public class CalificacionRepositoryAdapter implements CalificacionRepositoryPort
   public List<CalificacionCneb> buscarPorCompetenciaId(Short valor) {
     return repository.buscarPorCompetenciaId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<CalificacionCneb> buscarPorAsignacionYPeriodo(Long asigId, Short periodoId) {
+    return repository.buscarPorAsignacionYPeriodo(asigId, periodoId).stream().map(mapper::toDomain).toList();
+  }
 }

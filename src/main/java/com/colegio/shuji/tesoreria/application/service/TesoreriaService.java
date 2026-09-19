@@ -156,17 +156,18 @@ public class TesoreriaService
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(CrearPreferenciaMercadoPagoDto r) {
     var o = requerido(obligaciones.buscarPorId(r.obligacionPagoId()));
     if (actor.tieneRol("ROLE_APODERADO") || actor.tieneRol("APODERADO")) {
-      var apoderado =
-          apoderados.buscarPorUsuarioId(actor.usuarioId()).stream()
-              .findFirst()
-              .orElseThrow(() -> new BusinessException("Usuario sin ficha de apoderado"));
-      var matricula = requerido(matriculas.buscarPorId(o.getMatriculaId()));
+      var apoderadosLista = apoderados.buscarPorUsuarioId(actor.usuarioId());
+      exigir(!apoderadosLista.isEmpty(), "Ficha de apoderado no encontrada");
+      var apoderado = apoderadosLista.getFirst();
+      var m = requerido(matriculas.buscarPorId(o.getMatriculaId()));
+      var vinculos = estudianteApoderados.buscarPorApoderadoId(apoderado.getId());
       boolean autorizado =
-          estudianteApoderados.buscarPorApoderadoId(apoderado.getId()).stream()
-              .anyMatch(ea -> ea.getEstudianteId().equals(matricula.getEstudianteId()));
-      if (!autorizado) {
-        throw new BusinessException("No tiene autorización para generar pagos de este estudiante");
-      }
+          vinculos.stream()
+              .anyMatch(
+                  v ->
+                      v.getEstudianteId().equals(m.getEstudianteId())
+                          && Boolean.TRUE.equals(v.getEsResponsableEconomico()));
+      exigir(autorizado, "Solo el apoderado designado como responsable económico puede gestionar el pago");
     }
     exigir(
         o.getEstado() == EstadoObligacion.PENDIENTE || o.getEstado() == EstadoObligacion.VENCIDO,

@@ -13,7 +13,6 @@ import com.colegio.shuji.tesoreria.domain.enums.EstadoPago;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import com.colegio.shuji.tesoreria.domain.model.ComprobantePago;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +23,7 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
   private final TesoreriaMapper mapper;
   private final ComprobanteRepositoryPort comprobantes;
   private final PagoRepositoryPort pagos;
+  private final com.colegio.shuji.tesoreria.infrastructure.repository.JpaSerieComprobanteRepository seriesRepository;
 
   public ComprobanteResponseDto emitir(EmitirComprobanteRequestDto r) {
     var pago = requerido(pagos.bloquearPorId(r.pagoId()));
@@ -38,34 +38,25 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
   public ComprobanteResponseDto emitirAutomaticoParaPago(Long pagoId, TipoComprobante tipo, String serie) {
     var pago = requerido(pagos.bloquearPorId(pagoId));
     exigir(pago.getEstadoPago() == EstadoPago.APROBADO, "El pago debe estar aprobado");
-    var existentes = comprobantes.buscarPorPagoTransaccionId(pagoId);
-    if (!existentes.isEmpty()) {
-      return mapper.toResponse(existentes.getFirst());
-    }
-    int baseCorrelativo = comprobantes.obtenerUltimoCorrelativo(serie).orElse(0);
-    DataIntegrityViolationException colisionException = null;
-    for (int intento = 0; intento < 3; intento++) {
-      var concurrentes = comprobantes.buscarPorPagoTransaccionId(pagoId);
-      if (!concurrentes.isEmpty()) {
-        return mapper.toResponse(concurrentes.getFirst());
-      }
-      int correlativo = baseCorrelativo + 1 + intento;
-      var c = ComprobantePago.emitir(pago, tipo, serie, correlativo);
-      try {
-        return mapper.toResponse(comprobantes.guardar(c));
-      } catch (DataIntegrityViolationException ex) {
-        colisionException = ex;
-        var despues = comprobantes.buscarPorPagoTransaccionId(pagoId);
-        if (!despues.isEmpty()) {
-          return mapper.toResponse(despues.getFirst());
-        }
-        baseCorrelativo = comprobantes.obtenerUltimoCorrelativo(serie).orElse(baseCorrelativo + intento);
-      }
-    }
-    throw colisionException != null
-        ? colisionException
-        : new com.colegio.shuji.shared.domain.exception.BusinessException(
-            "No se pudo emitir el comprobante tras múltiples intentos");
+    var previos = comprobantes.buscarPorPagoTransaccionId(pagoId);
+    if (!previos.isEmpty()) return mapper.toResponse(previos.getFirst());
+
+    var serieLock =
+        seriesRepository
+            .bloquearPorSerie(serie)
+            .orElseGet(
+                () ->
+                    seriesRepository.saveAndFlush(
+                        com.colegio.shuji.tesoreria.infrastructure.entity.SerieComprobanteEntity.builder()
+                            .serie(serie)
+                            .ultimoCorrelativo(0)
+                            .updatedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
+                            .build()));
+    int correlativo = serieLock.siguienteCorrelativo();
+    seriesRepository.saveAndFlush(serieLock);
+
+    var c = ComprobantePago.emitir(pago, tipo, serie, correlativo);
+    return mapper.toResponse(comprobantes.guardar(c));
   }
 
   @Transactional(readOnly = true)

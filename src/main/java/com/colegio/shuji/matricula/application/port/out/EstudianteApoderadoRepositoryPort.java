@@ -15,4 +15,6 @@ public interface EstudianteApoderadoRepositoryPort {
   List<EstudianteApoderado> buscarPorEstudianteId(Long valor);
 
   List<EstudianteApoderado> buscarPorApoderadoId(Long valor);
+
+  List<EstudianteApoderado> buscarPorEstudianteIds(Collection<Long> ids);
 }

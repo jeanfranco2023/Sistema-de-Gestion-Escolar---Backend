@@ -27,4 +27,6 @@ public interface CalificacionRepositoryPort {
   List<CalificacionCneb> buscarPorDocenteUsuarioId(Long valor);
 
   List<CalificacionCneb> buscarPorCompetenciaId(Short valor);
+
+  List<CalificacionCneb> buscarPorAsignacionYPeriodo(Long asigId, Short periodoId);
 }

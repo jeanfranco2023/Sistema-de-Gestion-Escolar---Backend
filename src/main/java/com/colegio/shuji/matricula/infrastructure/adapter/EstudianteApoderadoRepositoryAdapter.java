@@ -62,4 +62,9 @@ public class EstudianteApoderadoRepositoryAdapter implements EstudianteApoderado
   public List<EstudianteApoderado> buscarPorApoderadoId(Long valor) {
     return repository.buscarPorApoderadoId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<EstudianteApoderado> buscarPorEstudianteIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorEstudianteIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

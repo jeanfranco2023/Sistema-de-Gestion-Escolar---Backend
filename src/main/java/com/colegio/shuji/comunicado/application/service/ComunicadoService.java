@@ -25,9 +25,11 @@ import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.academico.domain.model.Seccion;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.model.Apoderado;
+import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
+import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -64,17 +66,29 @@ public class ComunicadoService
     c.publicar(actor.usuarioId());
     c = comunicados.guardar(c);
     var ids = new TreeSet<Long>();
-    var seccionesCache = new HashMap<Integer, Seccion>();
-    for (var m : matriculas.buscarPorAnioLectivoId(r.anioLectivoId())) {
-      if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO
-          || (r.seccionId() != null && !m.getSeccionId().equals(r.seccionId()))) continue;
-      var s =
-          seccionesCache.computeIfAbsent(
-              m.getSeccionId(), id -> requerido(secciones.buscarPorId(id)));
-      if (r.nivelId() != null && !s.getNivelId().equals(r.nivelId())) continue;
-      vinculos.buscarPorEstudianteId(m.getEstudianteId()).stream()
-          .filter(v -> Boolean.TRUE.equals(v.getTieneCustodia()))
-          .forEach(v -> ids.add(v.getApoderadoId()));
+    var matActivas =
+        matriculas.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
+            .filter(
+                m ->
+                    m.getEstadoMatricula() == EstadoMatricula.MATRICULADO
+                        && (r.seccionId() == null || m.getSeccionId().equals(r.seccionId())))
+            .toList();
+    var seccionesMap =
+        secciones.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
+            .collect(Collectors.toMap(Seccion::getId, Function.identity()));
+    var estIds =
+        matActivas.stream()
+            .map(Matricula::getEstudianteId)
+            .distinct()
+            .toList();
+    var vinculosMap =
+        vinculos.buscarPorEstudianteIds(estIds).stream()
+            .filter(v -> Boolean.TRUE.equals(v.getTieneCustodia()))
+            .collect(Collectors.groupingBy(EstudianteApoderado::getEstudianteId));
+    for (var m : matActivas) {
+      var s = seccionesMap.get(m.getSeccionId());
+      if (s == null || (r.nivelId() != null && !s.getNivelId().equals(r.nivelId()))) continue;
+      vinculosMap.getOrDefault(m.getEstudianteId(), List.of()).forEach(v -> ids.add(v.getApoderadoId()));
     }
     exigir(!ids.isEmpty(), "No hay destinatarios para el filtro seleccionado");
     for (Long id : ids) {

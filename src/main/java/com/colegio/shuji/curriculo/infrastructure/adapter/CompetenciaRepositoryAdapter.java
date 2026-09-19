@@ -58,4 +58,9 @@ public class CompetenciaRepositoryAdapter implements CompetenciaRepositoryPort {
   public List<Competencia> buscarPorAreaId(Short valor) {
     return repository.buscarPorAreaId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<Competencia> buscarPorIds(Collection<Short> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

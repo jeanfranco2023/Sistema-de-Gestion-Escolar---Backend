@@ -13,4 +13,6 @@ public interface CompetenciaRepositoryPort {
   List<Competencia> listar();
 
   List<Competencia> buscarPorAreaId(Short valor);
+
+  List<Competencia> buscarPorIds(Collection<Short> ids);
 }

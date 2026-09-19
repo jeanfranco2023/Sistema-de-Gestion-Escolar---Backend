@@ -35,4 +35,7 @@ public interface JpaCalificacionRepository extends JpaRepository<CalificacionCne
 
   @Query("select e from CalificacionCnebEntity e where e.competenciaId = :valor order by e.id")
   List<CalificacionCnebEntity> buscarPorCompetenciaId(@Param("valor") Short valor);
+
+  @Query("select e from CalificacionCnebEntity e where e.asignacionDocenteId = :asigId and e.periodoAcademicoId = :periodoId order by e.id")
+  List<CalificacionCnebEntity> buscarPorAsignacionYPeriodo(@Param("asigId") Long asigId, @Param("periodoId") Short periodoId);
 }

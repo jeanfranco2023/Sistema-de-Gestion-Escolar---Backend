@@ -60,17 +60,14 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     body.put("external_reference", obligacion.getId().toString());
     body.put("auto_return", "approved");
 
+    validarUrlSegura(backUrlSuccess);
+    validarUrlSegura(backUrlFailure);
+
     Map<String, String> backUrls = new HashMap<>();
     if (backUrlSuccess != null && !backUrlSuccess.isBlank()) {
-      if (!backUrlSuccess.startsWith("http://") && !backUrlSuccess.startsWith("https://")) {
-        throw new BusinessException("Protocolo no permitido en URL de éxito: debe iniciar con http:// o https://");
-      }
       backUrls.put("success", backUrlSuccess);
     }
     if (backUrlFailure != null && !backUrlFailure.isBlank()) {
-      if (!backUrlFailure.startsWith("http://") && !backUrlFailure.startsWith("https://")) {
-        throw new BusinessException("Protocolo no permitido en URL de fallo: debe iniciar con http:// o https://");
-      }
       backUrls.put("failure", backUrlFailure);
     }
     if (!backUrls.isEmpty()) {
@@ -157,5 +154,19 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
 
     return new VerificarPagoPort.PagoVerificado(
         paymentId, obligacionPagoId, monto, currencyId, metodo, aprobado);
+  }
+
+  private void validarUrlSegura(String url) {
+    if (url == null || url.isBlank()) return;
+    try {
+      var uri = java.net.URI.create(url);
+      var host = uri.getHost();
+      boolean esLocal = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+      if (!"https".equalsIgnoreCase(uri.getScheme()) && !esLocal) {
+        throw new BusinessException("Las URLs de retorno deben utilizar el protocolo seguro HTTPS");
+      }
+    } catch (IllegalArgumentException ex) {
+      throw new BusinessException("URL de retorno inválida");
+    }
   }
 }

@@ -100,6 +100,15 @@ public class WebhookController {
       return false;
     }
     try {
+      long tsSeconds = Long.parseLong(ts);
+      long nowSeconds = java.time.Instant.now().getEpochSecond();
+      if (Math.abs(nowSeconds - tsSeconds) > 300) {
+        return false;
+      }
+    } catch (NumberFormatException e) {
+      return false;
+    }
+    try {
       javax.crypto.Mac hmac = javax.crypto.Mac.getInstance("HmacSHA256");
       hmac.init(
           new javax.crypto.spec.SecretKeySpec(
@@ -110,13 +119,19 @@ public class WebhookController {
 
       String manifest = "id:" + txIdVal + ";request-id:" + reqIdVal + ";ts:" + ts + ";";
       byte[] hash = hmac.doFinal(manifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      if (bytesToHex(hash).equalsIgnoreCase(v1)) {
+      String calculatedHash = bytesToHex(hash);
+      if (java.security.MessageDigest.isEqual(
+          calculatedHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+          v1.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
         return true;
       }
       if (reqIdVal.isEmpty()) {
         String altManifest = "id:" + txIdVal + ";ts:" + ts + ";";
         byte[] altHash = hmac.doFinal(altManifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        if (bytesToHex(altHash).equalsIgnoreCase(v1)) {
+        String altCalculatedHash = bytesToHex(altHash);
+        if (java.security.MessageDigest.isEqual(
+            altCalculatedHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            v1.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
           return true;
         }
       }
