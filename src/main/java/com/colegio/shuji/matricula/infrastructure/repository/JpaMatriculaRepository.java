@@ -23,4 +23,7 @@ public interface JpaMatriculaRepository extends JpaRepository<MatriculaEntity, L
 
   @Query("select e from MatriculaEntity e where e.estadoMatricula = :valor order by e.id")
   List<MatriculaEntity> buscarPorEstadoMatricula(@Param("valor") EstadoMatricula valor);
+
+  @Query("select e from MatriculaEntity e where e.id in :ids order by e.id")
+  List<MatriculaEntity> buscarPorIds(@Param("ids") java.util.Collection<Long> ids);
 }

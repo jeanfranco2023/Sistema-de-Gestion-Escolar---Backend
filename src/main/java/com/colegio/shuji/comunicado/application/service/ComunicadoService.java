@@ -18,6 +18,7 @@ import com.colegio.shuji.comunicado.application.port.in.PublicarComunicadoUseCas
 import com.colegio.shuji.comunicado.application.port.out.ComunicadoRepositoryPort;
 import com.colegio.shuji.comunicado.application.port.out.DestinatarioRepositoryPort;
 import com.colegio.shuji.comunicado.domain.model.ComunicadoDestinatario;
+import com.colegio.shuji.comunicado.domain.model.ComunicadoOficial;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
@@ -27,7 +28,10 @@ import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,10 +102,15 @@ public class ComunicadoService
   @Transactional(readOnly = true)
   public BandejaApoderadoResponseDto bandeja() {
     var a = apoderadoActual();
+    var dests = destinatarios.buscarPorApoderadoId(a.getId());
+    var comIds = dests.stream().map(ComunicadoDestinatario::getComunicadoId).distinct().toList();
+    var comMap =
+        comunicados.buscarPorIds(comIds).stream()
+            .collect(Collectors.toMap(ComunicadoOficial::getId, Function.identity()));
     return new BandejaApoderadoResponseDto(
         a.getId(),
-        destinatarios.buscarPorApoderadoId(a.getId()).stream()
-            .map(d -> mapper.toResponse(requerido(comunicados.buscarPorId(d.getComunicadoId()))))
+        dests.stream()
+            .map(d -> mapper.toResponse(requerido(Optional.ofNullable(comMap.get(d.getComunicadoId())))))
             .toList());
   }
 

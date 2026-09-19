@@ -16,4 +16,8 @@ public interface JpaMarcaPorteriaRepository extends JpaRepository<MarcaBiometric
 
   @Query("select e from MarcaBiometricoEntity e where e.estudianteId = :valor order by e.id")
   List<MarcaBiometricoEntity> buscarPorEstudianteId(@Param("valor") Long valor);
+
+  @Query("select e from MarcaBiometricoEntity e where e.fechaHora >= :inicio and e.fechaHora < :fin order by e.id")
+  List<MarcaBiometricoEntity> buscarPorRangoFecha(
+      @Param("inicio") java.time.OffsetDateTime inicio, @Param("fin") java.time.OffsetDateTime fin);
 }

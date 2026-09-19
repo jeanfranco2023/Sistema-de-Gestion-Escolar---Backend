@@ -25,6 +25,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +61,14 @@ public class EvaluacionService
     exigir(a.getAnioLectivoId().equals(periodo.getAnioLectivoId()), "Asignación de otro año");
     var result = new ArrayList<CalificacionResponseDto>();
     var claves = new HashSet<String>();
+    var calificacionesExistentes =
+        calificaciones.buscarPorAsignacionDocenteId(a.getId()).stream()
+            .filter(v -> v.getPeriodoAcademicoId().equals(periodo.getId()))
+            .collect(
+                Collectors.toMap(
+                    c -> c.getMatriculaId() + "/" + c.getCompetenciaId(),
+                    Function.identity(),
+                    (c1, c2) -> c1));
     var matriculasCache = new HashMap<Long, Matricula>();
     var competenciasCache = new HashMap<Short, Competencia>();
     for (var item : r.calificaciones()) {
@@ -77,12 +88,7 @@ public class EvaluacionService
         throw new com.colegio.shuji.evaluacion.domain.exception.CalificacionInvalidaException(
             "La matrícula o competencia no corresponde a la asignación");
       var c =
-          calificaciones.buscarPorMatriculaId(m.getId()).stream()
-              .filter(
-                  v ->
-                      v.getPeriodoAcademicoId().equals(periodo.getId())
-                          && v.getCompetenciaId().equals(comp.getId()))
-              .findFirst()
+          Optional.ofNullable(calificacionesExistentes.get(m.getId() + "/" + comp.getId()))
               .orElseGet(
                   () ->
                       CalificacionCneb.builder()

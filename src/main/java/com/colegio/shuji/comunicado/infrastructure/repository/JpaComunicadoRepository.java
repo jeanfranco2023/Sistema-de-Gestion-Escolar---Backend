@@ -14,4 +14,7 @@ public interface JpaComunicadoRepository extends JpaRepository<ComunicadoOficial
   @Query(
       "select e from ComunicadoOficialEntity e where e.remitenteUsuarioId = :valor order by e.id")
   List<ComunicadoOficialEntity> buscarPorRemitenteUsuarioId(@Param("valor") Long valor);
+
+  @Query("select e from ComunicadoOficialEntity e where e.id in :ids order by e.id desc")
+  List<ComunicadoOficialEntity> buscarPorIds(@Param("ids") java.util.Collection<Long> ids);
 }

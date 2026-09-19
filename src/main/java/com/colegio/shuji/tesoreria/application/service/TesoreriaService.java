@@ -4,8 +4,12 @@ import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import com.colegio.shuji.shared.application.port.out.ActorActualPort;
+import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
 import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnualesRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.ProcesarPagoWebhookRequestDto;
@@ -16,6 +20,7 @@ import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.TransaccionResponseDto;
 import com.colegio.shuji.tesoreria.application.mapper.TesoreriaMapper;
+import com.colegio.shuji.tesoreria.application.port.in.EmitirComprobanteUseCase;
 import com.colegio.shuji.tesoreria.application.port.in.GenerarCronogramaPensionesUseCase;
 import com.colegio.shuji.tesoreria.application.port.in.ProcesarPagoPasarelaUseCase;
 import com.colegio.shuji.tesoreria.application.port.in.RevertirPagoUseCase;
@@ -52,7 +57,10 @@ public class TesoreriaService
   private final AnioLectivoRepositoryPort anios;
   private final VerificarPagoPort verificador;
   private final MercadoPagoPort mercadoPagoPort;
-  private final ComprobanteService comprobantes;
+  private final EmitirComprobanteUseCase comprobantes;
+  private final ActorActualPort actor;
+  private final ApoderadoRepositoryPort apoderados;
+  private final EstudianteApoderadoRepositoryPort estudianteApoderados;
 
   public List<ObligacionResponseDto> generarCronograma(GenerarObligacionesAnualesRequestDto r) {
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
@@ -147,6 +155,19 @@ public class TesoreriaService
 
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(CrearPreferenciaMercadoPagoDto r) {
     var o = requerido(obligaciones.buscarPorId(r.obligacionPagoId()));
+    if (actor.tieneRol("ROLE_APODERADO") || actor.tieneRol("APODERADO")) {
+      var apoderado =
+          apoderados.buscarPorUsuarioId(actor.usuarioId()).stream()
+              .findFirst()
+              .orElseThrow(() -> new BusinessException("Usuario sin ficha de apoderado"));
+      var matricula = requerido(matriculas.buscarPorId(o.getMatriculaId()));
+      boolean autorizado =
+          estudianteApoderados.buscarPorApoderadoId(apoderado.getId()).stream()
+              .anyMatch(ea -> ea.getEstudianteId().equals(matricula.getEstudianteId()));
+      if (!autorizado) {
+        throw new BusinessException("No tiene autorización para generar pagos de este estudiante");
+      }
+    }
     exigir(
         o.getEstado() == EstadoObligacion.PENDIENTE || o.getEstado() == EstadoObligacion.VENCIDO,
         "La obligación no está pendiente de pago");

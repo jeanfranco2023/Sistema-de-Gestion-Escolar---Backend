@@ -71,4 +71,9 @@ public class MatriculaRepositoryAdapter implements MatriculaRepositoryPort {
   public List<Matricula> buscarPorEstadoMatricula(EstadoMatricula valor) {
     return repository.buscarPorEstadoMatricula(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<Matricula> buscarPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

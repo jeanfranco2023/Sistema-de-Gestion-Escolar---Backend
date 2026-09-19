@@ -15,4 +15,6 @@ public interface MarcaPorteriaRepositoryPort {
   List<MarcaPorteria> buscarPorLoteId(Long valor);
 
   List<MarcaPorteria> buscarPorEstudianteId(Long valor);
+ 
+  List<MarcaPorteria> buscarPorRangoFecha(java.time.OffsetDateTime inicio, java.time.OffsetDateTime fin);
 }

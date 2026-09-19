@@ -17,6 +17,7 @@ import com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryP
 import com.colegio.shuji.evaluacion.application.port.out.InscripcionRefuerzoRepositoryPort;
 import com.colegio.shuji.evaluacion.application.port.out.RefuerzoRepositoryPort;
 import com.colegio.shuji.evaluacion.domain.enums.EstadoAsistenciaRefuerzo;
+import com.colegio.shuji.evaluacion.domain.model.CalificacionCneb;
 import com.colegio.shuji.evaluacion.domain.model.InscripcionRefuerzo;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
@@ -25,9 +26,10 @@ import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,15 +83,22 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
     var existentes = inscripciones.buscarPorSesionRefuerzoId(sesionId);
     var inscritos = new HashSet<Long>();
     existentes.forEach(i -> inscritos.add(i.getEstudianteId()));
-    var matriculasCache = new HashMap<Long, Matricula>();
-    for (var c : calificaciones.buscarPorPeriodoAcademicoId(s.getPeriodoAcademicoId())) {
-      if (!c.necesitaRefuerzo()
-          || !c.getAreaCurricularId().equals(s.getAreaCurricularId())
-          || !c.getDocenteUsuarioId().equals(s.getDocenteUsuarioId())) continue;
-      var m =
-          matriculasCache.computeIfAbsent(
-              c.getMatriculaId(), id -> requerido(matriculas.buscarPorId(id)));
-      if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO
+    var candidatos =
+        calificaciones.buscarPorPeriodoAcademicoId(s.getPeriodoAcademicoId()).stream()
+            .filter(
+                c ->
+                    c.necesitaRefuerzo()
+                        && c.getAreaCurricularId().equals(s.getAreaCurricularId())
+                        && c.getDocenteUsuarioId().equals(s.getDocenteUsuarioId()))
+            .toList();
+    var matIds = candidatos.stream().map(CalificacionCneb::getMatriculaId).distinct().toList();
+    var matriculasMap =
+        matriculas.buscarPorIds(matIds).stream()
+            .collect(Collectors.toMap(Matricula::getId, Function.identity()));
+    for (var c : candidatos) {
+      var m = matriculasMap.get(c.getMatriculaId());
+      if (m == null
+          || m.getEstadoMatricula() != EstadoMatricula.MATRICULADO
           || !inscritos.add(m.getEstudianteId())) continue;
       var i =
           InscripcionRefuerzo.builder()

@@ -20,4 +20,6 @@ public interface MatriculaRepositoryPort {
   List<Matricula> buscarPorSeccionId(Integer valor);
 
   List<Matricula> buscarPorEstadoMatricula(EstadoMatricula valor);
+
+  List<Matricula> buscarPorIds(Collection<Long> ids);
 }

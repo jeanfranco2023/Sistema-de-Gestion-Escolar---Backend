@@ -62,4 +62,8 @@ public class MarcaPorteriaRepositoryAdapter implements MarcaPorteriaRepositoryPo
   public List<MarcaPorteria> buscarPorEstudianteId(Long valor) {
     return repository.buscarPorEstudianteId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<MarcaPorteria> buscarPorRangoFecha(java.time.OffsetDateTime inicio, java.time.OffsetDateTime fin) {
+    return repository.buscarPorRangoFecha(inicio, fin).stream().map(mapper::toDomain).toList();
+  }
 }

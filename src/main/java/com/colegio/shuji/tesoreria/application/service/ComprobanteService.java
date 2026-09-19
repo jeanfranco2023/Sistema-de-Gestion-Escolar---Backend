@@ -13,6 +13,7 @@ import com.colegio.shuji.tesoreria.domain.enums.EstadoPago;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import com.colegio.shuji.tesoreria.domain.model.ComprobantePago;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,12 +38,34 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
   public ComprobanteResponseDto emitirAutomaticoParaPago(Long pagoId, TipoComprobante tipo, String serie) {
     var pago = requerido(pagos.bloquearPorId(pagoId));
     exigir(pago.getEstadoPago() == EstadoPago.APROBADO, "El pago debe estar aprobado");
-    if (!comprobantes.buscarPorPagoTransaccionId(pagoId).isEmpty()) {
-      return mapper.toResponse(comprobantes.buscarPorPagoTransaccionId(pagoId).getFirst());
+    var existentes = comprobantes.buscarPorPagoTransaccionId(pagoId);
+    if (!existentes.isEmpty()) {
+      return mapper.toResponse(existentes.getFirst());
     }
-    int correlativo = comprobantes.obtenerUltimoCorrelativo(serie).orElse(0) + 1;
-    var c = ComprobantePago.emitir(pago, tipo, serie, correlativo);
-    return mapper.toResponse(comprobantes.guardar(c));
+    int baseCorrelativo = comprobantes.obtenerUltimoCorrelativo(serie).orElse(0);
+    DataIntegrityViolationException colisionException = null;
+    for (int intento = 0; intento < 3; intento++) {
+      var concurrentes = comprobantes.buscarPorPagoTransaccionId(pagoId);
+      if (!concurrentes.isEmpty()) {
+        return mapper.toResponse(concurrentes.getFirst());
+      }
+      int correlativo = baseCorrelativo + 1 + intento;
+      var c = ComprobantePago.emitir(pago, tipo, serie, correlativo);
+      try {
+        return mapper.toResponse(comprobantes.guardar(c));
+      } catch (DataIntegrityViolationException ex) {
+        colisionException = ex;
+        var despues = comprobantes.buscarPorPagoTransaccionId(pagoId);
+        if (!despues.isEmpty()) {
+          return mapper.toResponse(despues.getFirst());
+        }
+        baseCorrelativo = comprobantes.obtenerUltimoCorrelativo(serie).orElse(baseCorrelativo + intento);
+      }
+    }
+    throw colisionException != null
+        ? colisionException
+        : new com.colegio.shuji.shared.domain.exception.BusinessException(
+            "No se pudo emitir el comprobante tras múltiples intentos");
   }
 
   @Transactional(readOnly = true)

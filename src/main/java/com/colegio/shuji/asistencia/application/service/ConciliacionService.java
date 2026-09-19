@@ -16,6 +16,7 @@ import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
 import com.colegio.shuji.asistencia.domain.enums.TipoDiscrepancia;
 import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.ConciliacionAsistencia;
+import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import java.time.LocalDate;
@@ -50,6 +51,16 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
         !fecha.isAfter(LocalDate.now(ZoneId.of("America/Lima"))), "No se concilian fechas futuras");
     var result = new ArrayList<ConciliacionAsistenciaResponseDto>();
     var zona = ZoneId.of("America/Lima");
+    var inicio = fecha.atStartOfDay(zona).toOffsetDateTime();
+    var fin = fecha.plusDays(1).atStartOfDay(zona).toOffsetDateTime();
+    var marcasDelDia =
+        marcas.buscarPorRangoFecha(inicio, fin).stream()
+            .filter(
+                v ->
+                    v.getEstudianteId() != null
+                        && v.getEstadoProcesamiento() != EstadoMarca.DUPLICADO
+                        && v.getEstadoProcesamiento() != EstadoMarca.DNI_NO_IDENTIFICADO)
+            .collect(Collectors.groupingBy(MarcaPorteria::getEstudianteId));
     var asistenciasDelDia =
         asistencias.buscarPorFechaSesion(fecha).stream()
             .collect(
@@ -66,14 +77,7 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
                     (c1, c2) -> c1));
     for (var m : matriculas.buscarPorAnioLectivoId(anioId)) {
       if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO) continue;
-      var delDia =
-          marcas.buscarPorEstudianteId(m.getEstudianteId()).stream()
-              .filter(
-                  v ->
-                      v.getFechaHora().atZoneSameInstant(zona).toLocalDate().equals(fecha)
-                          && v.getEstadoProcesamiento() != EstadoMarca.DUPLICADO
-                          && v.getEstadoProcesamiento() != EstadoMarca.DNI_NO_IDENTIFICADO)
-              .toList();
+      var delDia = marcasDelDia.getOrDefault(m.getEstudianteId(), List.of());
       boolean porteria = !delDia.isEmpty();
       var lista = Optional.ofNullable(asistenciasDelDia.get(m.getId()));
       boolean presente =

@@ -62,9 +62,15 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
 
     Map<String, String> backUrls = new HashMap<>();
     if (backUrlSuccess != null && !backUrlSuccess.isBlank()) {
+      if (!backUrlSuccess.startsWith("http://") && !backUrlSuccess.startsWith("https://")) {
+        throw new BusinessException("Protocolo no permitido en URL de éxito: debe iniciar con http:// o https://");
+      }
       backUrls.put("success", backUrlSuccess);
     }
     if (backUrlFailure != null && !backUrlFailure.isBlank()) {
+      if (!backUrlFailure.startsWith("http://") && !backUrlFailure.startsWith("https://")) {
+        throw new BusinessException("Protocolo no permitido en URL de fallo: debe iniciar con http:// o https://");
+      }
       backUrls.put("failure", backUrlFailure);
     }
     if (!backUrls.isEmpty()) {
@@ -76,6 +82,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
             .post()
             .uri(apiUrl + "/checkout/preferences")
             .header("Authorization", "Bearer " + accessToken)
+            .header("X-Idempotency-Key", obligacion.getId() + "-" + obligacion.saldo())
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
             .retrieve()

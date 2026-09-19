@@ -58,4 +58,9 @@ public class ComunicadoRepositoryAdapter implements ComunicadoRepositoryPort {
   public List<ComunicadoOficial> buscarPorRemitenteUsuarioId(Long valor) {
     return repository.buscarPorRemitenteUsuarioId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  public List<ComunicadoOficial> buscarPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

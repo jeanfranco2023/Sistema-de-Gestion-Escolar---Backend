@@ -13,4 +13,6 @@ public interface ComunicadoRepositoryPort {
   List<ComunicadoOficial> listar();
 
   List<ComunicadoOficial> buscarPorRemitenteUsuarioId(Long valor);
+
+  List<ComunicadoOficial> buscarPorIds(Collection<Long> ids);
 }
