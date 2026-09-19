@@ -50,7 +50,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
         String username = tokenProvider.getUsernameFromToken(jwt);
         Long userId = tokenProvider.getUserIdFromToken(jwt);
-        List<String> roles = tokenProvider.getRolesFromToken(jwt);
 
         if (userId != null) {
           Optional<Usuario> usuarioOpt = userRepositoryPort.obtenerPorId(userId);
