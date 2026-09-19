@@ -14,7 +14,8 @@ import com.colegio.shuji.curriculo.domain.model.AsignacionDocente;
 import com.colegio.shuji.curriculo.domain.model.BloqueHorario;
 import com.colegio.shuji.curriculo.domain.model.Competencia;
 import com.colegio.shuji.curriculo.domain.model.HorarioSeccion;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface CurriculoMapper {

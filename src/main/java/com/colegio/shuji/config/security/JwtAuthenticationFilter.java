@@ -2,13 +2,16 @@ package com.colegio.shuji.config.security;
 
 import com.colegio.shuji.config.persistence.SupabaseAuditInterceptor;
 import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
+import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.Usuario;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,8 +64,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           Usuario usuario = usuarioOpt.get();
 
           List<SimpleGrantedAuthority> authorities =
-              roles.stream()
-                  .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+              (usuario.getRoles() == null ? Collections.<Rol>emptySet() : usuario.getRoles())
+                  .stream()
+                  .map(Rol::getCodigo)
+                  .filter(Objects::nonNull)
+                  .map(c -> c.startsWith("ROLE_") ? c : "ROLE_" + c)
                   .map(SimpleGrantedAuthority::new)
                   .toList();
 

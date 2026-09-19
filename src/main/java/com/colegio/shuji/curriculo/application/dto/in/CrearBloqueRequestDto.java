@@ -1,7 +1,8 @@
 package com.colegio.shuji.curriculo.application.dto.in;
 
-import jakarta.validation.constraints.*;
-import java.time.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalTime;
 
 public record CrearBloqueRequestDto(
     @NotNull @Min(1) Short numeroBloque,

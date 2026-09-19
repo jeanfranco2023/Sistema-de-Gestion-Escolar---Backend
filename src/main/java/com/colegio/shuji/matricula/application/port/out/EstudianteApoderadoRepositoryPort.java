@@ -1,7 +1,9 @@
 package com.colegio.shuji.matricula.application.port.out;
 
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface EstudianteApoderadoRepositoryPort {
   EstudianteApoderado guardar(EstudianteApoderado valor);

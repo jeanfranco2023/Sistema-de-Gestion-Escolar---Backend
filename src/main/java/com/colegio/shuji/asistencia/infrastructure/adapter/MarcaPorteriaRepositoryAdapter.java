@@ -4,7 +4,10 @@ import com.colegio.shuji.asistencia.application.port.out.MarcaPorteriaRepository
 import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
 import com.colegio.shuji.asistencia.infrastructure.repository.JpaMarcaPorteriaRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

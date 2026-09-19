@@ -5,7 +5,8 @@ import com.colegio.shuji.comunicado.application.dto.out.ComunicadoDestinatarioRe
 import com.colegio.shuji.comunicado.application.dto.out.ComunicadoResponseDto;
 import com.colegio.shuji.comunicado.domain.model.ComunicadoDestinatario;
 import com.colegio.shuji.comunicado.domain.model.ComunicadoOficial;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ComunicadoMapper {

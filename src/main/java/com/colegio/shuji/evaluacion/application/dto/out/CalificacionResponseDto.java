@@ -1,7 +1,7 @@
 package com.colegio.shuji.evaluacion.application.dto.out;
 
-import com.colegio.shuji.evaluacion.domain.enums.*;
-import java.time.*;
+import com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa;
+import java.time.OffsetDateTime;
 
 public record CalificacionResponseDto(
     Long id,

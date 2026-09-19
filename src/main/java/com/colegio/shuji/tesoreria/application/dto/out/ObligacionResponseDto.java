@@ -1,8 +1,9 @@
 package com.colegio.shuji.tesoreria.application.dto.out;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.EstadoObligacion;
+import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
 import java.math.BigDecimal;
-import java.time.*;
+import java.time.LocalDate;
 
 public record ObligacionResponseDto(
     Long id,

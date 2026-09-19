@@ -1,7 +1,8 @@
 package com.colegio.shuji.tesoreria.application.port.out;
 
 import com.colegio.shuji.tesoreria.domain.model.PagoTransaccion;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface PagoRepositoryPort {
   PagoTransaccion guardar(PagoTransaccion valor);

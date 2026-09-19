@@ -1,6 +1,6 @@
 package com.colegio.shuji.evaluacion.application.dto.out;
 
-import com.colegio.shuji.evaluacion.domain.enums.*;
+import com.colegio.shuji.evaluacion.domain.enums.EstadoAsistenciaRefuerzo;
 
 public record InscripcionRefuerzoResponseDto(
     Long id,

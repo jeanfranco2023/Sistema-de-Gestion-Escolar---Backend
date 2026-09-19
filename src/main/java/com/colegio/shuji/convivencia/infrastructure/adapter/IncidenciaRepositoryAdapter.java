@@ -1,11 +1,14 @@
 package com.colegio.shuji.convivencia.infrastructure.adapter;
 
 import com.colegio.shuji.convivencia.application.port.out.IncidenciaRepositoryPort;
-import com.colegio.shuji.convivencia.domain.enums.*;
+import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
 import com.colegio.shuji.convivencia.domain.model.IncidenciaConductual;
 import com.colegio.shuji.convivencia.infrastructure.repository.JpaIncidenciaRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

@@ -12,7 +12,9 @@ import com.colegio.shuji.comunicado.application.port.in.PublicarComunicadoUseCas
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -50,8 +53,17 @@ public class ComunicadoController {
   @GetMapping("/apoderado/bandeja")
   @PreAuthorize("hasRole('APODERADO')")
   @Operation(summary = "consulta.bandeja")
-  public BandejaApoderadoResponseDto consultarBandeja() {
-    return consulta.bandeja();
+  public BandejaApoderadoResponseDto consultarBandeja(
+      @RequestParam(name = "page", defaultValue = "0") @PositiveOrZero int page,
+      @RequestParam(name = "size", defaultValue = "20") @Positive @Max(100) int size) {
+    BandejaApoderadoResponseDto bandeja = consulta.bandeja();
+    if (bandeja == null || bandeja.comunicados() == null || bandeja.comunicados().isEmpty()) {
+      return bandeja;
+    }
+    int start = Math.min(Math.max(0, page) * Math.max(1, size), bandeja.comunicados().size());
+    int end = Math.min(start + Math.max(1, size), bandeja.comunicados().size());
+    return new BandejaApoderadoResponseDto(
+        bandeja.apoderadoId(), bandeja.comunicados().subList(start, end));
   }
 
   @PostMapping("/{id}/acuse")

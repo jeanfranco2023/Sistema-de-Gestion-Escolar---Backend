@@ -1,6 +1,7 @@
 package com.colegio.shuji.tesoreria.application.port.out;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.MetodoPago;
+import com.colegio.shuji.tesoreria.domain.enums.PasarelaProveedor;
 import java.math.BigDecimal;
 
 public interface VerificarPagoPort {

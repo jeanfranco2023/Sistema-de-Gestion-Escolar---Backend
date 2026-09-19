@@ -1,11 +1,27 @@
 package com.colegio.shuji.tesoreria.infrastructure.entity;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
-import jakarta.persistence.*;
+import com.colegio.shuji.tesoreria.domain.enums.EstadoComprobante;
+import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinColumns;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
-import lombok.*;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "comprobantes_pago")

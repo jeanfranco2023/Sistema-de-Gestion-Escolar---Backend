@@ -1,6 +1,6 @@
 package com.colegio.shuji.matricula.application.dto.out;
 
-import com.colegio.shuji.matricula.domain.enums.*;
+import com.colegio.shuji.matricula.domain.enums.Parentesco;
 
 public record EstudianteApoderadoResponseDto(
     Long id,

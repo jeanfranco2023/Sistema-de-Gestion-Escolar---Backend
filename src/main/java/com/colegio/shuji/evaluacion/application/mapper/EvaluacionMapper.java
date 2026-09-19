@@ -7,7 +7,8 @@ import com.colegio.shuji.evaluacion.application.dto.out.SesionRefuerzoResponseDt
 import com.colegio.shuji.evaluacion.domain.model.CalificacionCneb;
 import com.colegio.shuji.evaluacion.domain.model.InscripcionRefuerzo;
 import com.colegio.shuji.evaluacion.domain.model.SesionRefuerzo;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface EvaluacionMapper {

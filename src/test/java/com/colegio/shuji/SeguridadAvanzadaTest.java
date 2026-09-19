@@ -608,5 +608,104 @@ class SeguridadAvanzadaTest {
       // El filterChain no se ejecuta para la petición bloqueada
       verify(filterChain, times(15)).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
     }
+
+    @Test
+    @DisplayName("Cambio de rol se aplica inmediatamente en BD sin esperar la expiración del token JWT")
+    void cambioDeRolSeAplicaInmediatamenteSinEsperarExpiracionDelToken() throws Exception {
+      var tokenProvider = mock(JwtTokenProvider.class);
+      var supabaseAudit = mock(SupabaseAuditInterceptor.class);
+      var userRepo = mock(UserRepositoryPort.class);
+
+      var filter = new JwtAuthenticationFilter(tokenProvider, supabaseAudit, userRepo);
+
+      var request = mock(HttpServletRequest.class);
+      var response = mock(HttpServletResponse.class);
+      var filterChain = mock(FilterChain.class);
+
+      when(request.getServletPath()).thenReturn("/api/v1/usuarios");
+      when(request.getHeader("Authorization")).thenReturn("Bearer token_con_rol_antiguo");
+      when(tokenProvider.validateToken("token_con_rol_antiguo")).thenReturn(true);
+      when(tokenProvider.getUserIdFromToken("token_con_rol_antiguo")).thenReturn(77L);
+      when(tokenProvider.getUsernameFromToken("token_con_rol_antiguo")).thenReturn("docente_degradado");
+      // El token aún declara DIRECCION en los claims desactualizados
+      when(tokenProvider.getRolesFromToken("token_con_rol_antiguo")).thenReturn(List.of("DIRECCION", "DOCENTE"));
+
+      // En BD, Dirección le revocó el rol DIRECCION y ahora sólo tiene DOCENTE
+      var rolDocente = Rol.builder().id((short) 2).codigo("DOCENTE").nombre("Docente").build();
+      var usuarioActualizado = Usuario.builder()
+          .id(77L)
+          .username("docente_degradado")
+          .activo(true)
+          .roles(Set.of(rolDocente))
+          .build();
+      when(userRepo.obtenerPorId(77L)).thenReturn(Optional.of(usuarioActualizado));
+
+      try {
+        filter.doFilter(request, response, filterChain);
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth, "La autenticación debe haber sido establecida en el contexto");
+        var authorities = auth.getAuthorities().stream()
+            .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+            .toList();
+
+        // Debe contener el rol vivo en BD (DOCENTE)
+        assertTrue(authorities.contains("ROLE_DOCENTE"), "Debe tener ROLE_DOCENTE de la BD");
+        // NO debe contener el rol revocado (DIRECCION) a pesar de estar en el JWT
+        assertFalse(authorities.contains("ROLE_DIRECCION"), "No debe conservar ROLE_DIRECCION revocado en BD");
+
+        verify(filterChain, times(1)).doFilter(request, response);
+      } finally {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+      }
+    }
+
+    @Test
+    @DisplayName("RateLimitingFilter no confía en X-Forwarded-For si behindTrustedProxy es false (anti-spoofing)")
+    void rateLimitingNoConfiaEnXForwardedForSinProxyConfiable() {
+      var filter = new RateLimitingFilter(false);
+      var req = mock(HttpServletRequest.class);
+      when(req.getHeader("X-Forwarded-For")).thenReturn("203.0.113.195");
+      when(req.getRemoteAddr()).thenReturn("192.168.1.10");
+
+      String ipResuelta = filter.extractClientIp(req);
+      assertEquals("192.168.1.10", ipResuelta, "Debe ignorar X-Forwarded-For cuando behindTrustedProxy es false");
+
+      filter.setBehindTrustedProxy(true);
+      String ipProxy = filter.extractClientIp(req);
+      assertEquals("203.0.113.195", ipProxy, "Debe extraer la IP de X-Forwarded-For cuando behindTrustedProxy es true");
+    }
+
+    @Test
+    @DisplayName("Rate limiting protege endpoints de pagos y tesorería con umbral de 30 req/min")
+    void rateLimitingProtegeEndpointsDePagosYTesoreria() throws Exception {
+      var rateLimitingFilter = new RateLimitingFilter(false);
+      var filterChain = mock(FilterChain.class);
+      String testIp = "10.10.10.5";
+
+      for (int i = 1; i <= 30; i++) {
+        var req = mock(HttpServletRequest.class);
+        var res = mock(HttpServletResponse.class);
+        when(req.getRequestURI()).thenReturn("/api/v1/pagos/transacciones");
+        when(req.getRemoteAddr()).thenReturn(testIp);
+
+        rateLimitingFilter.doFilter(req, res, filterChain);
+      }
+      verify(filterChain, times(30)).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
+
+      var reqExcedente = mock(HttpServletRequest.class);
+      var resExcedente = mock(HttpServletResponse.class);
+      when(reqExcedente.getRequestURI()).thenReturn("/api/v1/pagos/transacciones");
+      when(reqExcedente.getRemoteAddr()).thenReturn(testIp);
+
+      var stringWriter = new StringWriter();
+      var printWriter = new PrintWriter(stringWriter);
+      when(resExcedente.getWriter()).thenReturn(printWriter);
+
+      rateLimitingFilter.doFilter(reqExcedente, resExcedente, filterChain);
+
+      verify(resExcedente).setStatus(429);
+      verify(filterChain, times(30)).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
+    }
   }
 }

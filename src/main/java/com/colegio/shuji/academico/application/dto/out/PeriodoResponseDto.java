@@ -1,6 +1,6 @@
 package com.colegio.shuji.academico.application.dto.out;
 
-import java.time.*;
+import java.time.LocalDate;
 
 public record PeriodoResponseDto(
     Short id,

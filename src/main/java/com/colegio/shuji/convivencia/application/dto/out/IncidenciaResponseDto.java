@@ -1,7 +1,9 @@
 package com.colegio.shuji.convivencia.application.dto.out;
 
-import com.colegio.shuji.convivencia.domain.enums.*;
-import java.time.*;
+import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
+import com.colegio.shuji.convivencia.domain.enums.TipoFalta;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 public record IncidenciaResponseDto(
     Long id,

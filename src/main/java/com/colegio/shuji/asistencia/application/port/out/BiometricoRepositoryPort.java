@@ -1,7 +1,8 @@
 package com.colegio.shuji.asistencia.application.port.out;
 
 import com.colegio.shuji.asistencia.domain.model.LoteBiometrico;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface BiometricoRepositoryPort {
   LoteBiometrico guardar(LoteBiometrico valor);

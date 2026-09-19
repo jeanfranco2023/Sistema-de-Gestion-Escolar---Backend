@@ -2,7 +2,9 @@ package com.colegio.shuji.tesoreria.infrastructure.adapter;
 
 import com.colegio.shuji.tesoreria.domain.model.PagoTransaccion;
 import com.colegio.shuji.tesoreria.infrastructure.entity.PagoTransaccionEntity;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface PagoTransaccionPersistenceMapper {

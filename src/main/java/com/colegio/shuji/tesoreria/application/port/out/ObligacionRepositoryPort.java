@@ -1,8 +1,10 @@
 package com.colegio.shuji.tesoreria.application.port.out;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.EstadoObligacion;
 import com.colegio.shuji.tesoreria.domain.model.ObligacionPago;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface ObligacionRepositoryPort {
   ObligacionPago guardar(ObligacionPago valor);

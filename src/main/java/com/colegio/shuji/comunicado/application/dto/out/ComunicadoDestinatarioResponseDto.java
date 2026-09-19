@@ -1,6 +1,6 @@
 package com.colegio.shuji.comunicado.application.dto.out;
 
-import java.time.*;
+import java.time.OffsetDateTime;
 
 public record ComunicadoDestinatarioResponseDto(
     Long id,

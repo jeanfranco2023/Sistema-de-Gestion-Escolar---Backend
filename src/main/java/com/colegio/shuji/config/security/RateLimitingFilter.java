@@ -9,13 +9,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Filtro de Rate Limiting para mitigar ataques de fuerza bruta, abuso y denegación de servicio (DoS)
- * en endpoints críticos de autenticación.
+ * en endpoints críticos de autenticación, pagos y webhooks.
  */
 @Slf4j
 @Component
@@ -31,6 +32,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   private final Map<String, RequestCounter> requestCounts = new ConcurrentHashMap<>();
 
+  @Value("${app.security.behind-trusted-proxy:false}")
+  private boolean behindTrustedProxy;
+
   // Límites por endpoint
   private static final String LOGIN_PATH = "/api/v1/auth/login";
   private static final String REGISTER_PATH = "/api/v1/auth/register";
@@ -39,6 +43,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final int LOGIN_LIMIT = 15;
   private static final int REGISTER_LIMIT = 10;
   private static final int REFRESH_LIMIT = 20;
+  private static final int WEBHOOK_PAGOS_LIMIT = 120;
+  private static final int PAGOS_TESORERIA_LIMIT = 30;
+
+  public RateLimitingFilter() {
+    this.behindTrustedProxy = false;
+  }
+
+  public RateLimitingFilter(boolean behindTrustedProxy) {
+    this.behindTrustedProxy = behindTrustedProxy;
+  }
+
+  public void setBehindTrustedProxy(boolean behindTrustedProxy) {
+    this.behindTrustedProxy = behindTrustedProxy;
+  }
 
   @Override
   protected void doFilterInternal(
@@ -83,16 +101,22 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return REGISTER_LIMIT;
     } else if (uri.endsWith(REFRESH_PATH) || uri.equals(REFRESH_PATH)) {
       return REFRESH_LIMIT;
+    } else if (uri.startsWith("/api/v1/pagos/webhook")) {
+      return WEBHOOK_PAGOS_LIMIT;
+    } else if (uri.startsWith("/api/v1/pagos") || uri.startsWith("/api/v1/tesoreria")) {
+      return PAGOS_TESORERIA_LIMIT;
     }
     return null;
   }
 
   public String extractClientIp(HttpServletRequest request) {
-    String xfHeader = request.getHeader("X-Forwarded-For");
-    if (xfHeader != null && !xfHeader.isBlank() && !"unknown".equalsIgnoreCase(xfHeader)) {
-      String firstIp = xfHeader.split(",")[0].trim();
-      if (isValidIp(firstIp)) {
-        return firstIp;
+    if (behindTrustedProxy) {
+      String xfHeader = request.getHeader("X-Forwarded-For");
+      if (xfHeader != null && !xfHeader.isBlank() && !"unknown".equalsIgnoreCase(xfHeader)) {
+        String firstIp = xfHeader.split(",")[0].trim();
+        if (isValidIp(firstIp)) {
+          return firstIp;
+        }
       }
     }
     return request.getRemoteAddr();

@@ -1,7 +1,9 @@
 package com.colegio.shuji.academico.application.port.out;
 
 import com.colegio.shuji.academico.domain.model.Seccion;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface SeccionRepositoryPort {
   Seccion guardar(Seccion valor);

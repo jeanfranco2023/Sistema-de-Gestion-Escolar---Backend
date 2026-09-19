@@ -1,8 +1,9 @@
 package com.colegio.shuji.academico.application.port.out;
 
-import com.colegio.shuji.academico.domain.enums.*;
+import com.colegio.shuji.academico.domain.enums.NivelCodigo;
 import com.colegio.shuji.academico.domain.model.Nivel;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface NivelRepositoryPort {
   Nivel guardar(Nivel valor);

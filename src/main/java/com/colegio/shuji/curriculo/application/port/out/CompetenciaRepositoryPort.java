@@ -1,7 +1,9 @@
 package com.colegio.shuji.curriculo.application.port.out;
 
 import com.colegio.shuji.curriculo.domain.model.Competencia;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface CompetenciaRepositoryPort {
   Competencia guardar(Competencia valor);

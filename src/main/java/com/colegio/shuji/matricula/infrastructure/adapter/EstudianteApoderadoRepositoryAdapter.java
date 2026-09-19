@@ -4,7 +4,11 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaEstudianteApoderadoRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

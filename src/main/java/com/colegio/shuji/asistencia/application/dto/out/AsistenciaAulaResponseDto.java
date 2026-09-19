@@ -1,7 +1,8 @@
 package com.colegio.shuji.asistencia.application.dto.out;
 
-import com.colegio.shuji.asistencia.domain.enums.*;
-import java.time.*;
+import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 public record AsistenciaAulaResponseDto(
     Long id,

@@ -47,6 +47,8 @@ app:
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
     allowed-headers: "*"
     allow-credentials: true
+  security:
+    behind-trusted-proxy: ${APP_SECURITY_BEHIND_TRUSTED_PROXY:false}
   services:
     reniec:
       url: ${RENIEC_API_URL:https://api.reniec.gob.pe/v1}
@@ -65,8 +67,8 @@ logging:
   level:
     root: INFO
     "[com.colegio.shuji]": DEBUG
-    "[org.hibernate.SQL]": DEBUG
-    "[org.hibernate.type.descriptor.sql.BasicBinder]": TRACE
+    "[org.hibernate.SQL]": WARN
+    "[org.hibernate.orm.jdbc.bind]": WARN
 
 integraciones:
   reniec:

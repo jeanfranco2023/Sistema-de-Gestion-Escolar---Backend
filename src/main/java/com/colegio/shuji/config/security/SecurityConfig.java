@@ -2,6 +2,7 @@ package com.colegio.shuji.config.security;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,16 +38,22 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final CorsConfigurationSource corsConfigurationSource;
 
+  @Value("${springdoc.swagger-ui.enabled:true}")
+  private boolean swaggerEnabled;
+
   private static final String[] PUBLIC_ENDPOINTS = {
     "/auth/**",
     "/api/v1/auth/**",
-    "/swagger-ui/**",
-    "/swagger-ui.html",
-    "/v3/api-docs/**",
-    "/api-docs/**",
     "/actuator/health",
     "/actuator/health/**",
     "/actuator/info"
+  };
+
+  private static final String[] SWAGGER_ENDPOINTS = {
+    "/swagger-ui/**",
+    "/swagger-ui.html",
+    "/v3/api-docs/**",
+    "/api-docs/**"
   };
 
   @Bean
@@ -69,17 +76,22 @@ public class SecurityConfig {
                     .authenticationEntryPoint(authenticationEntryPoint())
                     .accessDeniedHandler(accessDeniedHandler()))
         .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers(HttpMethod.OPTIONS, "/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/pagos/webhook/**")
-                    .permitAll()
-                    .requestMatchers("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/**")
-                    .hasAnyRole("DIRECCION", "ACTUATOR")
-                    .requestMatchers(PUBLIC_ENDPOINTS)
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
+            auth -> {
+              auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                  .permitAll()
+                  .requestMatchers(HttpMethod.POST, "/api/v1/pagos/webhook/**")
+                  .permitAll()
+                  .requestMatchers("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/**")
+                  .hasAnyRole("DIRECCION", "ACTUATOR")
+                  .requestMatchers(PUBLIC_ENDPOINTS)
+                  .permitAll();
+              if (swaggerEnabled) {
+                auth.requestMatchers(SWAGGER_ENDPOINTS).permitAll();
+              } else {
+                auth.requestMatchers(SWAGGER_ENDPOINTS).denyAll();
+              }
+              auth.anyRequest().authenticated();
+            })
         .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

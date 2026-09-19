@@ -1,7 +1,9 @@
 package com.colegio.shuji.evaluacion.application.dto.in;
 
-import com.colegio.shuji.evaluacion.domain.enums.*;
-import jakarta.validation.constraints.*;
+import com.colegio.shuji.evaluacion.domain.enums.EstadoAsistenciaRefuerzo;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public record RegistrarAsistenciaRefuerzoRequestDto(
     @NotNull Long inscripcionId,

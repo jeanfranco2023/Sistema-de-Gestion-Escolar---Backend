@@ -1,11 +1,15 @@
 package com.colegio.shuji.matricula.infrastructure.adapter;
 
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
-import com.colegio.shuji.matricula.domain.enums.*;
+import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaMatriculaRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,6 +1,6 @@
 package com.colegio.shuji.curriculo.application.dto.in;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotNull;
 
 public record AsignarDocenteRequestDto(
     @NotNull Long docenteUsuarioId,

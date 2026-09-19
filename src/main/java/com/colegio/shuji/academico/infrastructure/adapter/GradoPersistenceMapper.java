@@ -2,7 +2,9 @@ package com.colegio.shuji.academico.infrastructure.adapter;
 
 import com.colegio.shuji.academico.domain.model.Grado;
 import com.colegio.shuji.academico.infrastructure.entity.GradoEntity;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface GradoPersistenceMapper {

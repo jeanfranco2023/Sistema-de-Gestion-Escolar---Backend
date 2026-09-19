@@ -4,7 +4,10 @@ import com.colegio.shuji.curriculo.application.port.out.BloqueHorarioRepositoryP
 import com.colegio.shuji.curriculo.domain.model.BloqueHorario;
 import com.colegio.shuji.curriculo.infrastructure.repository.JpaBloqueHorarioRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

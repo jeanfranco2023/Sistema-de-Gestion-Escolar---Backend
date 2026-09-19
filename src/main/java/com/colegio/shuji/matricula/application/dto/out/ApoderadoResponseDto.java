@@ -1,8 +1,9 @@
 package com.colegio.shuji.matricula.application.dto.out;
 
-import com.colegio.shuji.matricula.domain.enums.*;
-import java.time.*;
-import java.util.*;
+import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
+import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
 public record ApoderadoResponseDto(
     Long id,

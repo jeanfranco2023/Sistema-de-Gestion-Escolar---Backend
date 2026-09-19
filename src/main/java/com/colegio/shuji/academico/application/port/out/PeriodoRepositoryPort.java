@@ -1,7 +1,8 @@
 package com.colegio.shuji.academico.application.port.out;
 
 import com.colegio.shuji.academico.domain.model.PeriodoAcademico;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface PeriodoRepositoryPort {
   PeriodoAcademico guardar(PeriodoAcademico valor);

@@ -1,6 +1,6 @@
 package com.colegio.shuji.tesoreria.application.dto.out;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
 import java.math.BigDecimal;
 
 public record ConceptoCobroResponseDto(

@@ -9,7 +9,8 @@ import com.colegio.shuji.tesoreria.domain.model.ComprobantePago;
 import com.colegio.shuji.tesoreria.domain.model.ConceptoCobro;
 import com.colegio.shuji.tesoreria.domain.model.ObligacionPago;
 import com.colegio.shuji.tesoreria.domain.model.PagoTransaccion;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface TesoreriaMapper {

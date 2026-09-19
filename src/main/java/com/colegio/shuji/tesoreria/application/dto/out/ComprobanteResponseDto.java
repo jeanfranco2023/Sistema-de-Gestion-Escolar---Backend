@@ -1,9 +1,10 @@
 package com.colegio.shuji.tesoreria.application.dto.out;
 
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.EstadoComprobante;
+import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
 public record ComprobanteResponseDto(
     Long id,

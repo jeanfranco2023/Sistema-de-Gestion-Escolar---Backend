@@ -1,7 +1,10 @@
 package com.colegio.shuji.matricula.application.dto.in;
 
-import jakarta.validation.constraints.*;
-import java.time.*;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.OffsetDateTime;
 
 public record SolicitarMatriculaRequestDto(
     @NotNull Short anioLectivoId,

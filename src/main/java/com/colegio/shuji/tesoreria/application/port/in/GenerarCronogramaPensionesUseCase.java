@@ -1,8 +1,9 @@
 package com.colegio.shuji.tesoreria.application.port.in;
 
-import com.colegio.shuji.tesoreria.application.dto.in.*;
-import com.colegio.shuji.tesoreria.application.dto.out.*;
-import java.util.*;
+import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnualesRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.out.EstadoCuentaEstudianteResponseDto;
+import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
+import java.util.List;
 
 public interface GenerarCronogramaPensionesUseCase {
   List<ObligacionResponseDto> generarCronograma(GenerarObligacionesAnualesRequestDto r);

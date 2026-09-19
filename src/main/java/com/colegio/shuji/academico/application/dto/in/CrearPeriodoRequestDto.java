@@ -1,7 +1,11 @@
 package com.colegio.shuji.academico.application.dto.in;
 
-import jakarta.validation.constraints.*;
-import java.time.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 
 public record CrearPeriodoRequestDto(
     @NotNull Short anioLectivoId,

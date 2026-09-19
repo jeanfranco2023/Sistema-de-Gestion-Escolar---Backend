@@ -1,6 +1,6 @@
 package com.colegio.shuji.matricula.application.dto.out;
 
-import java.util.*;
+import java.util.List;
 
 public record FichaMatriculaResponseDto(
     MatriculaResponseDto matricula,

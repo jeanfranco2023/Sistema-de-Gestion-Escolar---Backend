@@ -1,8 +1,10 @@
 package com.colegio.shuji.matricula.application.port.out;
 
-import com.colegio.shuji.matricula.domain.enums.*;
+import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.model.Matricula;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface MatriculaRepositoryPort {
   Matricula guardar(Matricula valor);

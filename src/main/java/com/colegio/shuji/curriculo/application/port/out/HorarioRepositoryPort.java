@@ -1,7 +1,8 @@
 package com.colegio.shuji.curriculo.application.port.out;
 
 import com.colegio.shuji.curriculo.domain.model.HorarioSeccion;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface HorarioRepositoryPort {
   HorarioSeccion guardar(HorarioSeccion valor);

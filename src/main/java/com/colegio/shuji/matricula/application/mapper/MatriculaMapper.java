@@ -12,7 +12,8 @@ import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.matricula.domain.model.Estudiante;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface MatriculaMapper {

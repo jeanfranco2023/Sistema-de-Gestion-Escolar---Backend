@@ -1,6 +1,6 @@
 package com.colegio.shuji.asistencia.application.dto.out;
 
-import java.time.*;
+import java.time.OffsetDateTime;
 
 public record LoteBiometricoResponseDto(
     Long id,

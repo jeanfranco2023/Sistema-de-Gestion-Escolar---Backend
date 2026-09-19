@@ -1,8 +1,8 @@
 package com.colegio.shuji.matricula.application.dto.out;
 
-import com.colegio.shuji.matricula.domain.enums.*;
-import java.time.*;
-import java.util.*;
+import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
 public record MatriculaResponseDto(
     Long id,

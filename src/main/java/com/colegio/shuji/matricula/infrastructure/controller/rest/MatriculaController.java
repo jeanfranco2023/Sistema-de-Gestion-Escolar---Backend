@@ -9,7 +9,10 @@ import com.colegio.shuji.matricula.application.port.in.ProcesarMatriculaUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,6 +52,16 @@ public class MatriculaController {
   @Operation(summary = "matriculas.ficha")
   public FichaMatriculaResponseDto consultarFicha(@PathVariable @Positive Long id) {
     return matriculas.ficha(id);
+  }
+
+  @GetMapping("/seccion/{seccionId}")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "matriculas.listarPorSeccion")
+  public List<MatriculaResponseDto> listarPorSeccion(
+      @PathVariable @Positive Integer seccionId,
+      @RequestParam(name = "page", defaultValue = "0") @PositiveOrZero int page,
+      @RequestParam(name = "size", defaultValue = "20") @Positive @Max(100) int size) {
+    return matriculas.listarPorSeccion(seccionId, page, size);
   }
 
   @PostMapping("/reservas/liberar")

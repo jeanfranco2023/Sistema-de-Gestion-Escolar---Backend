@@ -1,8 +1,9 @@
 package com.colegio.shuji.convivencia.application.port.out;
 
-import com.colegio.shuji.convivencia.domain.enums.*;
+import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
 import com.colegio.shuji.convivencia.domain.model.IncidenciaConductual;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface IncidenciaRepositoryPort {
   IncidenciaConductual guardar(IncidenciaConductual valor);

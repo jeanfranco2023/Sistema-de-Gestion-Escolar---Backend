@@ -4,7 +4,10 @@ import com.colegio.shuji.tesoreria.application.port.out.ComprobanteRepositoryPor
 import com.colegio.shuji.tesoreria.domain.model.ComprobantePago;
 import com.colegio.shuji.tesoreria.infrastructure.repository.JpaComprobanteRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

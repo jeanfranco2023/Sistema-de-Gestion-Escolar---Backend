@@ -9,7 +9,8 @@ import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.ConciliacionAsistencia;
 import com.colegio.shuji.asistencia.domain.model.LoteBiometrico;
 import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface AsistenciaMapper {

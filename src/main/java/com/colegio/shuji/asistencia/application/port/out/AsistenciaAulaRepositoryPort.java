@@ -1,9 +1,10 @@
 package com.colegio.shuji.asistencia.application.port.out;
 
-import com.colegio.shuji.asistencia.domain.enums.*;
+import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
-import java.time.*;
-import java.util.*;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
 public interface AsistenciaAulaRepositoryPort {
   AsistenciaAula guardar(AsistenciaAula valor);

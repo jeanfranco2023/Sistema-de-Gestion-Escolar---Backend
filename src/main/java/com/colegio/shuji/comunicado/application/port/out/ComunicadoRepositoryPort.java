@@ -1,7 +1,9 @@
 package com.colegio.shuji.comunicado.application.port.out;
 
 import com.colegio.shuji.comunicado.domain.model.ComunicadoOficial;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface ComunicadoRepositoryPort {
   ComunicadoOficial guardar(ComunicadoOficial valor);

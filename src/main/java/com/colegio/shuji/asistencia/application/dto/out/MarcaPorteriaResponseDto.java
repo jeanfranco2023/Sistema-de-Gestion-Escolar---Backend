@@ -1,7 +1,7 @@
 package com.colegio.shuji.asistencia.application.dto.out;
 
-import com.colegio.shuji.asistencia.domain.enums.*;
-import java.time.*;
+import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
+import java.time.OffsetDateTime;
 
 public record MarcaPorteriaResponseDto(
     Long id,

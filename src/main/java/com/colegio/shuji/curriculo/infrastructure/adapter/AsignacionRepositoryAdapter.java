@@ -4,7 +4,10 @@ import com.colegio.shuji.curriculo.application.port.out.AsignacionRepositoryPort
 import com.colegio.shuji.curriculo.domain.model.AsignacionDocente;
 import com.colegio.shuji.curriculo.infrastructure.repository.JpaAsignacionRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

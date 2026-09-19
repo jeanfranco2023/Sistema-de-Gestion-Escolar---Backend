@@ -1,8 +1,12 @@
 package com.colegio.shuji.convivencia.application.dto.in;
 
-import com.colegio.shuji.convivencia.domain.enums.*;
-import jakarta.validation.constraints.*;
-import java.time.*;
+import com.colegio.shuji.convivencia.domain.enums.TipoFalta;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 
 public record RegistrarIncidenciaRequestDto(
     @NotNull Long matriculaId,

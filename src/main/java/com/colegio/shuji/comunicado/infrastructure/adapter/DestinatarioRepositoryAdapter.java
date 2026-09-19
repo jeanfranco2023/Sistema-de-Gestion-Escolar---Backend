@@ -4,7 +4,10 @@ import com.colegio.shuji.comunicado.application.port.out.DestinatarioRepositoryP
 import com.colegio.shuji.comunicado.domain.model.ComunicadoDestinatario;
 import com.colegio.shuji.comunicado.infrastructure.repository.JpaDestinatarioRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

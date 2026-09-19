@@ -1,8 +1,9 @@
 package com.colegio.shuji.asistencia.application.port.in;
 
-import com.colegio.shuji.asistencia.application.dto.out.*;
-import java.time.*;
-import java.util.*;
+import com.colegio.shuji.asistencia.application.dto.out.ConciliacionAsistenciaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.DiscrepanciaAlertaResponseDto;
+import java.time.LocalDate;
+import java.util.List;
 
 public interface EjecutarConciliacionDiariaUseCase {
   List<ConciliacionAsistenciaResponseDto> conciliar(

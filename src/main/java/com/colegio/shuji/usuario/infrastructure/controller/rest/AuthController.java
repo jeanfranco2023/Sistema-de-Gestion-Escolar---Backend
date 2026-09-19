@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,9 @@ public class AuthController {
   private final LoginUseCase loginUseCase;
   private final RegisterUserUseCase registerUserUseCase;
   private final RefreshTokenUseCase refreshTokenUseCase;
+
+  @Value("${app.security.behind-trusted-proxy:false}")
+  private boolean behindTrustedProxy;
 
   @Operation(
       summary = "Iniciar sesión",
@@ -83,11 +87,13 @@ public class AuthController {
       java.util.regex.Pattern.compile("^[0-9a-fA-F:]+$");
 
   private String extractClientIp(HttpServletRequest request) {
-    String xfHeader = request.getHeader("X-Forwarded-For");
-    if (xfHeader != null && !xfHeader.isBlank() && !"unknown".equalsIgnoreCase(xfHeader)) {
-      String candidate = xfHeader.split(",")[0].trim();
-      if (isValidIp(candidate)) {
-        return candidate;
+    if (behindTrustedProxy) {
+      String xfHeader = request.getHeader("X-Forwarded-For");
+      if (xfHeader != null && !xfHeader.isBlank() && !"unknown".equalsIgnoreCase(xfHeader)) {
+        String candidate = xfHeader.split(",")[0].trim();
+        if (isValidIp(candidate)) {
+          return candidate;
+        }
       }
     }
     return request.getRemoteAddr();

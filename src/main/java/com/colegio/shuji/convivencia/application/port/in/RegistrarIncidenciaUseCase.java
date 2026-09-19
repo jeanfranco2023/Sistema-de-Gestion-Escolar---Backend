@@ -1,7 +1,7 @@
 package com.colegio.shuji.convivencia.application.port.in;
 
-import com.colegio.shuji.convivencia.application.dto.in.*;
-import com.colegio.shuji.convivencia.application.dto.out.*;
+import com.colegio.shuji.convivencia.application.dto.in.RegistrarIncidenciaRequestDto;
+import com.colegio.shuji.convivencia.application.dto.out.IncidenciaResponseDto;
 
 public interface RegistrarIncidenciaUseCase {
   IncidenciaResponseDto registrar(RegistrarIncidenciaRequestDto r);

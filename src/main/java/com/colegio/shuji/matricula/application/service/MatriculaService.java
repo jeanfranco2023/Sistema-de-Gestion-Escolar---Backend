@@ -102,4 +102,15 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
             .map(v -> mapper.toResponse(requerido(java.util.Optional.ofNullable(apoderadosMap.get(v.getApoderadoId())))))
             .toList());
   }
+
+  @Transactional(readOnly = true)
+  public java.util.List<MatriculaResponseDto> listarPorSeccion(Integer seccionId, int page, int size) {
+    var todas = matriculas.buscarPorSeccionId(seccionId);
+    if (todas == null || todas.isEmpty()) {
+      return java.util.List.of();
+    }
+    int start = Math.min(Math.max(0, page) * Math.max(1, size), todas.size());
+    int end = Math.min(start + Math.max(1, size), todas.size());
+    return todas.subList(start, end).stream().map(mapper::toResponse).toList();
+  }
 }

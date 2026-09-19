@@ -1,8 +1,11 @@
 package com.colegio.shuji.matricula.application.dto.out;
 
-import com.colegio.shuji.matricula.domain.enums.*;
-import java.time.*;
-import java.util.*;
+import com.colegio.shuji.matricula.domain.enums.Genero;
+import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
+import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
 public record EstudianteResponseDto(
     Long id,

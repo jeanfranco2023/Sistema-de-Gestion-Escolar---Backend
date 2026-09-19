@@ -69,8 +69,16 @@ jobs:
       - name: 7. Suite Completa de Verificación y Cobertura JaCoCo
         run: ./mvnw verify -B
 
+      - name: Cache OWASP Dependency-Check NVD Database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: ${{ runner.os }}-owasp-nvd-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-owasp-nvd-
+
       - name: 8. Análisis de Vulnerabilidades y Dependencias
-        run: ./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=8 -DskipProvidedScope=true -DskipRuntimeScope=false -B || true
+        run: ./mvnw org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=8 -DskipProvidedScope=true -DskipRuntimeScope=false -B
 
       - name: Publicar Reportes de Pruebas JUnit
         if: always()

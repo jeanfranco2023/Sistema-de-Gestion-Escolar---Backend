@@ -1,8 +1,10 @@
 package com.colegio.shuji.academico.application.port.in;
 
-import com.colegio.shuji.academico.application.dto.in.*;
-import com.colegio.shuji.academico.application.dto.out.*;
-import java.util.*;
+import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
+import com.colegio.shuji.academico.application.dto.in.CrearPeriodoRequestDto;
+import com.colegio.shuji.academico.application.dto.out.AnioLectivoResponseDto;
+import com.colegio.shuji.academico.application.dto.out.PeriodoResponseDto;
+import java.util.List;
 
 public interface GestionarAnioLectivoUseCase {
   AnioLectivoResponseDto crearAnio(CrearAnioLectivoRequestDto r);

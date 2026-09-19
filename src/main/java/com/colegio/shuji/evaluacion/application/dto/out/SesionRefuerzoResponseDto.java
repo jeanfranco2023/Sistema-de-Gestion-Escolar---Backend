@@ -1,6 +1,7 @@
 package com.colegio.shuji.evaluacion.application.dto.out;
 
-import java.time.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 public record SesionRefuerzoResponseDto(
     Long id,

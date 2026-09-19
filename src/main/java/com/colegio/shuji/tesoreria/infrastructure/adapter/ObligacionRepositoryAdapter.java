@@ -1,11 +1,15 @@
 package com.colegio.shuji.tesoreria.infrastructure.adapter;
 
 import com.colegio.shuji.tesoreria.application.port.out.ObligacionRepositoryPort;
-import com.colegio.shuji.tesoreria.domain.enums.*;
+import com.colegio.shuji.tesoreria.domain.enums.EstadoObligacion;
 import com.colegio.shuji.tesoreria.domain.model.ObligacionPago;
 import com.colegio.shuji.tesoreria.infrastructure.repository.JpaObligacionRepository;
 import jakarta.persistence.EntityManager;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
