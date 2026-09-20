@@ -1,7 +1,6 @@
 package com.colegio.shuji.evaluacion.application.dto.in;
 
 import com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

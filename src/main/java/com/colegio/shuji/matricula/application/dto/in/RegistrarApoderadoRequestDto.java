@@ -2,7 +2,6 @@ package com.colegio.shuji.matricula.application.dto.in;
 
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

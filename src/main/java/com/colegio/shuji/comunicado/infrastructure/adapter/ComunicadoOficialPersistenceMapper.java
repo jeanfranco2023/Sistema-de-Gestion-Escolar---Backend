@@ -3,7 +3,6 @@ package com.colegio.shuji.comunicado.infrastructure.adapter;
 import com.colegio.shuji.comunicado.domain.model.ComunicadoOficial;
 import com.colegio.shuji.comunicado.infrastructure.entity.ComunicadoOficialEntity;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)

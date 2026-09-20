@@ -3,7 +3,6 @@ package com.colegio.shuji.tesoreria.application.dto.in;
 import com.colegio.shuji.tesoreria.domain.enums.MetodoPago;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

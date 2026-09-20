@@ -1,7 +1,6 @@
 package com.colegio.shuji.convivencia.application.dto.in;
 
 import com.colegio.shuji.convivencia.domain.enums.TipoFalta;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
