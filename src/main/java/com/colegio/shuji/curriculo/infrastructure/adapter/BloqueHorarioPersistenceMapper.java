@@ -3,7 +3,6 @@ package com.colegio.shuji.curriculo.infrastructure.adapter;
 import com.colegio.shuji.curriculo.domain.model.BloqueHorario;
 import com.colegio.shuji.curriculo.infrastructure.entity.BloqueHorarioEntity;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
