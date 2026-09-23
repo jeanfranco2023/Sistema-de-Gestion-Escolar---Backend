@@ -78,7 +78,7 @@ integraciones:
     api-token: ${PAGOS_API_TOKEN:}
     webhook-secret: ${PAGOS_WEBHOOK_SECRET:}
     mercadopago:
-      public-key: ${MERCADOPAGO_PUBLIC_KEY:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}
+      public-key: ${MERCADOPAGO_PUBLIC_KEY:}
       access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
       webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
       return-url-hosts: ${MERCADOPAGO_RETURN_URL_HOSTS:}

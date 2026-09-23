@@ -34,7 +34,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   public MercadoPagoHttpAdapter(
       @Value("${integraciones.pagos.mercadopago.api-url:https://api.mercadopago.com}") String apiUrl,
       @Value("${integraciones.pagos.mercadopago.access-token:}") String accessToken,
-      @Value("${integraciones.pagos.mercadopago.public-key:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}") String publicKey,
+      @Value("${integraciones.pagos.mercadopago.public-key:}") String publicKey,
       @Value("${integraciones.pagos.mercadopago.return-url-hosts:}") String returnUrlHosts) {
     this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
     this.accessToken = accessToken;

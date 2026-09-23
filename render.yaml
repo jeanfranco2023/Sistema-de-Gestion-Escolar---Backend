@@ -13,7 +13,7 @@ services:
       generation: off
     envVars:
       - key: SPRING_PROFILES_ACTIVE
-        value: prod
+        value: render-test
       - key: SUPABASE_DB_HOST
         sync: false
       - key: SUPABASE_DB_PORT
