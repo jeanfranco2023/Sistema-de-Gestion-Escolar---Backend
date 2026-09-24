@@ -20,9 +20,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatriculaPort {
+  private static final Logger log = LoggerFactory.getLogger(GeminiDocumentoMatriculaAdapter.class);
   private final String apiKey;
   private final String model;
   private final String fallbackModel;
@@ -84,15 +87,19 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
 
     Map<String, Object> response;
     try {
-      response = generar(body, model);
+      response = generarConReintento(body, model);
     } catch (RestClientException principalError) {
       if (!esTransitorio(principalError) || fallbackModel == null || fallbackModel.isBlank()
           || fallbackModel.equalsIgnoreCase(model)) {
         throw errorProveedor(principalError);
       }
+      log.warn("Gemini principal {} no disponible ({}); usando respaldo {}",
+          model, estadoProveedor(principalError), fallbackModel);
       try {
-        response = generar(body, fallbackModel);
+        response = generarConReintento(body, fallbackModel);
       } catch (RestClientException respaldoError) {
+        log.warn("Gemini de respaldo {} tampoco está disponible ({})",
+            fallbackModel, estadoProveedor(respaldoError));
         throw errorProveedor(respaldoError);
       }
     }
@@ -128,10 +135,41 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
         .body(new ParameterizedTypeReference<>() {});
   }
 
+  private Map<String, Object> generarConReintento(Map<String, Object> body, String modelo) {
+    try {
+      return generar(body, modelo);
+    } catch (RestClientException primerError) {
+      if (!esRespuestaTransitoria(primerError)) throw primerError;
+      try {
+        Thread.sleep(900);
+      } catch (InterruptedException interrumpido) {
+        Thread.currentThread().interrupt();
+        primerError.addSuppressed(interrumpido);
+        throw primerError;
+      }
+      try {
+        return generar(body, modelo);
+      } catch (RestClientException segundoError) {
+        segundoError.addSuppressed(primerError);
+        throw segundoError;
+      }
+    }
+  }
+
   private boolean esTransitorio(RestClientException error) {
-    if (!(error instanceof RestClientResponseException responseError)) return true;
+    return !(error instanceof RestClientResponseException) || esRespuestaTransitoria(error);
+  }
+
+  private boolean esRespuestaTransitoria(RestClientException error) {
+    if (!(error instanceof RestClientResponseException responseError)) return false;
     HttpStatusCode status = responseError.getStatusCode();
     return status.value() == 408 || status.value() == 429 || status.is5xxServerError();
+  }
+
+  private String estadoProveedor(RestClientException error) {
+    return error instanceof RestClientResponseException responseError
+        ? "HTTP " + responseError.getStatusCode().value()
+        : error.getClass().getSimpleName();
   }
 
   private org.springframework.web.server.ResponseStatusException errorProveedor(RestClientException error) {
