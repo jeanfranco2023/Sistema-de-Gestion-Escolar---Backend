@@ -36,3 +36,6 @@ Thumbs.db
 # Temporary tools & scrap
 tools/
 scratch/
+
+# Frontend is maintained in the sibling ../frontend project.
+/frontend/
