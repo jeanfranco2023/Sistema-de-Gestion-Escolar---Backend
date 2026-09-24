@@ -32,7 +32,7 @@ public class GradoEntity {
   @Column(name = "numero_grado", nullable = false)
   private Short numeroGrado;
 
-  @Column(name = "nombre", nullable = false, length = 50)
+  @Column(name = "nombre", nullable = false, length = 30)
   private String nombre;
 
   @ManyToOne(fetch = FetchType.LAZY)

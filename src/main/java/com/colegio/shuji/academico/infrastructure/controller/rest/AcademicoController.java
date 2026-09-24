@@ -1,6 +1,7 @@
 package com.colegio.shuji.academico.infrastructure.controller.rest;
 
 import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
+import com.colegio.shuji.academico.application.dto.in.CambiarEstadoPeriodoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearAulaRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearGradoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearPeriodoRequestDto;
@@ -98,6 +99,14 @@ public class AcademicoController {
   @Operation(summary = "calendario.cerrarPeriodo")
   public void cerrarPeriodo(@PathVariable @Positive Short id) {
     calendario.cerrarPeriodo(id);
+  }
+
+  @PutMapping("/periodos/{id}/estado")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "calendario.cambiarEstadoPeriodo")
+  public void cambiarEstadoPeriodo(
+      @PathVariable @Positive Short id, @Valid @RequestBody CambiarEstadoPeriodoRequestDto request) {
+    calendario.cambiarEstadoPeriodo(id, request.activo());
   }
 
   @GetMapping("/niveles")

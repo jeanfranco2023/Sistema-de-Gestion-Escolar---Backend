@@ -9,4 +9,5 @@ public record PeriodoResponseDto(
     String nombre,
     LocalDate fechaInicio,
     LocalDate fechaFin,
-    Boolean cerrado) {}
+    Boolean cerrado,
+    Boolean activo) {}

@@ -31,7 +31,7 @@ public class RolEntity {
   @Column(nullable = false, unique = true, length = 30)
   private String codigo;
 
-  @Column(nullable = false, length = 50)
+  @Column(nullable = false, length = 30)
   private String nombre;
 
   @Column(length = 255)

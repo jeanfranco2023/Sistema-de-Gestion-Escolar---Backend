@@ -29,7 +29,7 @@ public class NivelEntity {
   @Column(name = "codigo", nullable = false, length = 20)
   private NivelCodigo codigo;
 
-  @Column(name = "nombre", nullable = false, length = 50)
+  @Column(name = "nombre", nullable = false, length = 30)
   private String nombre;
 
   @PrePersist

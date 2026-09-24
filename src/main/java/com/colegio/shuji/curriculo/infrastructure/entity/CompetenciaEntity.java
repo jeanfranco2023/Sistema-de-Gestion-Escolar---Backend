@@ -32,7 +32,7 @@ public class CompetenciaEntity {
   @Column(name = "numero_orden", nullable = false)
   private Short numeroOrden;
 
-  @Column(name = "nombre", nullable = false, length = 150)
+  @Column(name = "nombre", nullable = false, length = 50)
   private String nombre;
 
   @Column(name = "descripcion", columnDefinition = "text")

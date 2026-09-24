@@ -18,4 +18,6 @@ public interface GestionarAnioLectivoUseCase {
   List<PeriodoResponseDto> listarPeriodos(Short anioId);
 
   void cerrarPeriodo(Short id);
+
+  void cambiarEstadoPeriodo(Short id, Boolean activo);
 }

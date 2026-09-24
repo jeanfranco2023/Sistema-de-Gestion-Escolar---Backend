@@ -82,6 +82,7 @@ public class EvaluacionService
     var snapshot = requerido(periodos.buscarPorId(r.periodoAcademicoId()));
     requerido(anios.bloquearPorId(snapshot.getAnioLectivoId())).verificarAbierto();
     var periodo = requerido(periodos.bloquearPorId(r.periodoAcademicoId()));
+    periodo.verificarActivo();
     try {
       periodo.verificarAbierto();
     } catch (com.colegio.shuji.shared.domain.exception.BusinessException ex) {

@@ -45,13 +45,13 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "numero_documento_estudiante", nullable = false, length = 8)
   private String numeroDocumentoEstudiante;
 
-  @Column(name = "nombres_estudiante", nullable = false, length = 100)
+  @Column(name = "nombres_estudiante", nullable = false, length = 20)
   private String nombresEstudiante;
 
-  @Column(name = "apellido_paterno_estudiante", nullable = false, length = 80)
+  @Column(name = "apellido_paterno_estudiante", nullable = false, length = 20)
   private String apellidoPaternoEstudiante;
 
-  @Column(name = "apellido_materno_estudiante", nullable = false, length = 80)
+  @Column(name = "apellido_materno_estudiante", nullable = false, length = 20)
   private String apellidoMaternoEstudiante;
 
   @Column(name = "fecha_nacimiento_estudiante", nullable = false)
@@ -64,19 +64,19 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "numero_documento_apoderado", nullable = false, length = 8)
   private String numeroDocumentoApoderado;
 
-  @Column(name = "nombres_apoderado", nullable = false, length = 100)
+  @Column(name = "nombres_apoderado", nullable = false, length = 20)
   private String nombresApoderado;
 
-  @Column(name = "apellido_paterno_apoderado", nullable = false, length = 80)
+  @Column(name = "apellido_paterno_apoderado", nullable = false, length = 20)
   private String apellidoPaternoApoderado;
 
-  @Column(name = "apellido_materno_apoderado", nullable = false, length = 80)
+  @Column(name = "apellido_materno_apoderado", nullable = false, length = 20)
   private String apellidoMaternoApoderado;
 
   @Column(name = "celular_apoderado", nullable = false, length = 9)
   private String celularApoderado;
 
-  @Column(name = "email_apoderado", length = 100)
+  @Column(name = "email_apoderado", length = 254)
   private String emailApoderado;
 
   @Column(name = "direccion_apoderado", nullable = false, length = 200)

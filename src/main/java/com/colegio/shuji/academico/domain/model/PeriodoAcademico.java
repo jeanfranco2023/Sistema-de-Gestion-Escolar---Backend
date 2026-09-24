@@ -21,6 +21,7 @@ public class PeriodoAcademico {
   private LocalDate fechaInicio;
   private LocalDate fechaFin;
   private Boolean cerrado;
+  private Boolean activo;
 
   public void verificarAbierto() {
     if (Boolean.TRUE.equals(cerrado)) {
@@ -40,6 +41,21 @@ public class PeriodoAcademico {
 
   public boolean estaCerrado() {
     return Boolean.TRUE.equals(this.cerrado);
+  }
+
+  public void activar() {
+    this.activo = true;
+  }
+
+  public void desactivar() {
+    this.activo = false;
+  }
+
+  public void verificarActivo() {
+    if (Boolean.FALSE.equals(activo)) {
+      throw new com.colegio.shuji.shared.domain.exception.BusinessException(
+          "El período académico está inactivo");
+    }
   }
 
   public void actualizar(String nuevoNombre, LocalDate nuevoInicio, LocalDate nuevoFin) {

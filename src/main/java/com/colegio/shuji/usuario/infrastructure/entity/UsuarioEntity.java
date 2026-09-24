@@ -44,7 +44,7 @@ public class UsuarioEntity {
   @Column(nullable = false, unique = true, length = 50)
   private String username;
 
-  @Column(nullable = false, unique = true, length = 100)
+  @Column(nullable = false, unique = true, length = 254)
   private String email;
 
   @Column(name = "password_hash", nullable = false, length = 60)

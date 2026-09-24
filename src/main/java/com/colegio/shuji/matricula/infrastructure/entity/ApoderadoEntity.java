@@ -49,16 +49,16 @@ public class ApoderadoEntity {
   @Column(name = "nombres", nullable = false, length = 100)
   private String nombres;
 
-  @Column(name = "apellido_paterno", nullable = false, length = 80)
+  @Column(name = "apellido_paterno", nullable = false, length = 20)
   private String apellidoPaterno;
 
-  @Column(name = "apellido_materno", nullable = false, length = 80)
+  @Column(name = "apellido_materno", nullable = false, length = 20)
   private String apellidoMaterno;
 
   @Column(name = "celular", nullable = false, length = 9)
   private String celular;
 
-  @Column(name = "email", length = 100)
+  @Column(name = "email", length = 254)
   private String email;
 
   @Column(name = "direccion", nullable = false, length = 200)

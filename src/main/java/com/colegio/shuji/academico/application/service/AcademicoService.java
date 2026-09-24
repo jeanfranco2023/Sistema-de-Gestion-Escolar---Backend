@@ -97,6 +97,13 @@ public class AcademicoService
     periodos.guardar(p);
   }
 
+  public void cambiarEstadoPeriodo(Short id, Boolean activo) {
+    var periodo = requerido(periodos.bloquearPorId(id));
+    if (Boolean.TRUE.equals(activo)) periodo.activar();
+    else periodo.desactivar();
+    periodos.guardar(periodo);
+  }
+
   public SeccionResponseDto crearSeccion(CrearSeccionRequestDto r) {
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
     var grado = requerido(grados.buscarPorId(r.gradoId()));

@@ -7,6 +7,6 @@ import jakarta.validation.constraints.Size;
 
 public record CrearAulaRequestDto(
     @NotBlank @Size(max = 30) String codigo,
-    @NotBlank @Size(max = 100) String nombre,
+    @NotBlank @Size(max = 40) String nombre,
     @Size(max = 150) String ubicacion,
     @NotNull @Min(1) Short capacidad) {}

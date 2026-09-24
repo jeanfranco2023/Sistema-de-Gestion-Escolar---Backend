@@ -1,15 +1,18 @@
--- ==============================================================================
--- COLEGIO SHUJI KITAMURA - ESQUEMA COMPLETO POSTGRESQL / SUPABASE
--- Generado: 2026-09-20
--- Consolidación ordenada de migraciones Flyway V1 a V5.
--- Uso: importadores con gramática PostgreSQL anterior (por ejemplo, conversores a DBML).
--- Para ejecución real se recomienda schema_completo_colegio_shuji.sql.
--- La aplicación debe seguir usando Flyway en entornos existentes.
--- ==============================================================================
+-- COLEGIO SHUJI KITAMURA: CONSOLIDADO PostgreSQL/Supabase V1-V12
+
+-- Ejecutar solo sobre una base vacía. No registra versiones en flyway_schema_history.
+
+-- Para bases existentes, continuar con Flyway; no ejecutar este consolidado sobre datos reales.
+
+-- Importador compatible: CREATE TRIGGER simple, sin CREATE OR REPLACE TRIGGER.
+
+-- Seguridad: se omite el usuario administrador de práctica y la contraseña fija de V7.
+
+-- Los catálogos base de V6 sí se conservan; crear el primer administrador con credencial segura.
+
 
 
 -- >>> INICIO V1__schema_colegio_shuji.sql
-
 -- ==============================================================================
 -- Proyecto Integrador II: Plataforma Web I.E.P. Shuji Kitamura
 -- Script de Migración V1 (Versión Definitiva con Integridad Relacional Máxima)
@@ -868,24 +871,9 @@ INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALU
     ('PENSION_MENSUAL', 'Pensión Escolar de Enseñanza (Cuotas 1 a 10)', 'PENSION', 380.00),
     ('CONSTANCIA_ESTUDIOS', 'Emisión de Constancia de Estudios', 'CERTIFICADO', 25.00)
 ON CONFLICT (codigo) DO NOTHING;
-
--- Contraseña sin hash para el usuario de práctica (cambiar antes de cualquier uso real): Admin2026!
-INSERT INTO usuarios (username, email, password_hash, activo)
-VALUES ('fq94289@gmail.com', 'fq94289@gmail.com', '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2', TRUE)
-ON CONFLICT (email) DO NOTHING;
-
-INSERT INTO usuario_roles (usuario_id, rol_id)
-SELECT u.id, r.id
-FROM usuarios u
-JOIN roles r ON r.codigo = 'DIRECCION'
-WHERE u.email = 'fq94289@gmail.com'
-ON CONFLICT (usuario_id, rol_id) DO NOTHING;
-
-
 -- <<< FIN V1__schema_colegio_shuji.sql
 
 -- >>> INICIO V2__series_indices_seguridad_y_rls.sql
-
 -- ==============================================================================
 -- MIGRACIÓN FLYWAY V2: SERIES ATÓMICAS, ÍNDICES DE CONCURRENCIA, SEGURIDAD Y RLS
 -- ==============================================================================
@@ -947,11 +935,9 @@ BEGIN
     END LOOP;
 END
 $$;
-
 -- <<< FIN V2__series_indices_seguridad_y_rls.sql
 
 -- >>> INICIO V3__aulas_e_idempotencia_biometrica.sql
-
 -- Catálogo institucional de ambientes físicos sin cambiar el contrato actual de secciones.
 CREATE TABLE aulas (
     id SERIAL PRIMARY KEY,
@@ -1034,11 +1020,9 @@ BEGIN
     END IF;
 END
 $$;
-
 -- <<< FIN V3__aulas_e_idempotencia_biometrica.sql
 
 -- >>> INICIO V4__default_privileges_supabase.sql
-
 -- ==============================================================================
 -- MIGRACIÓN FLYWAY V4: REVOCACIÓN DE PRIVILEGIOS POR DEFECTO PARA POSTGREST
 -- ==============================================================================
@@ -1057,11 +1041,9 @@ BEGIN
     END IF;
 END
 $$;
-
 -- <<< FIN V4__default_privileges_supabase.sql
 
 -- >>> INICIO V5__indices_claves_foraneas.sql
-
 -- =============================================================================
 -- MIGRACIÓN FLYWAY V5: ÍNDICES DE SOPORTE PARA CLAVES FORÁNEAS
 -- =============================================================================
@@ -1107,5 +1089,343 @@ CREATE INDEX IF NOT EXISTS idx_sesiones_refuerzo_docente_id
 
 CREATE INDEX IF NOT EXISTS idx_inscripciones_calificacion_origen_id
     ON inscripciones_refuerzo (calificacion_origen_id);
-
 -- <<< FIN V5__indices_claves_foraneas.sql
+
+-- >>> INICIO V6__bootstrap_direccion_account.sql
+-- Datos base y administrador inicial para la instancia de práctica.
+-- Solo se almacena BCrypt; los inserts son idempotentes y no reemplazan cuentas existentes.
+INSERT INTO roles (codigo, nombre, descripcion) VALUES
+    ('DIRECCION', 'Dirección General', 'Acceso estratégico, reportería y configuración institucional'),
+    ('SECRETARIA', 'Secretaría Académica', 'Gestión de matrículas, vacantes, expedientes y caja'),
+    ('DOCENTE', 'Plana Docente', 'Registro de notas CNEB, asistencia a refuerzo y comunicados'),
+    ('AUXILIAR', 'Auxiliar de Educación', 'Pase de lista diario, importación biométrica e incidencias'),
+    ('TUTOR', 'Tutor de Aula', 'Seguimiento formativo, conciliación de ausencias y citaciones'),
+    ('APODERADO', 'Padre de Familia / Tutor', 'Acceso al portal para pago de pensiones y boletas')
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO niveles (codigo, nombre) VALUES
+    ('INICIAL', 'Educación Inicial'),
+    ('PRIMARIA', 'Educación Primaria'),
+    ('SECUNDARIA', 'Educación Secundaria')
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALUES
+    ('MATRICULA_ANUAL', 'Derecho de Matrícula y Admisión Anual', 'MATRICULA', 350.00),
+    ('PENSION_MENSUAL', 'Pensión Escolar de Enseñanza (Cuotas 1 a 10)', 'PENSION', 380.00),
+    ('CONSTANCIA_ESTUDIOS', 'Emisión de Constancia de Estudios', 'CERTIFICADO', 25.00)
+ON CONFLICT (codigo) DO NOTHING;
+
+-- La creación del usuario administrador se omite por seguridad.
+-- <<< FIN V6__bootstrap_direccion_account.sql
+
+-- >>> V7 OMITIDA: solo fija la contraseña conocida de la cuenta de práctica.
+-- No ejecutar ese cambio de credenciales en una instalación nueva.
+-- <<< FIN V7 (omitida)
+
+-- >>> INICIO V8__matricula_publica_por_etapas.sql
+-- Solicitud anónima con revisión documental, reserva temporal de vacante y pago verificado.
+-- Los bytes de los documentos no se guardan en la base; solo se conserva el resultado de revisión.
+CREATE TABLE IF NOT EXISTS solicitudes_matricula_publica (
+    id UUID PRIMARY KEY,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    estado VARCHAR(30) NOT NULL CHECK (estado IN (
+        'DOCUMENTOS_PENDIENTES', 'DOCUMENTOS_OBSERVADOS', 'DOCUMENTOS_VALIDADOS',
+        'PAGO_PENDIENTE', 'MATRICULADA', 'RECHAZADA'
+    )),
+    anio_lectivo_id SMALLINT NOT NULL REFERENCES anios_lectivos(id) ON DELETE RESTRICT,
+    seccion_id INT NOT NULL,
+    numero_documento_estudiante VARCHAR(8) NOT NULL CHECK (numero_documento_estudiante ~ '^[0-9]{8}$'),
+    nombres_estudiante VARCHAR(100) NOT NULL,
+    apellido_paterno_estudiante VARCHAR(80) NOT NULL,
+    apellido_materno_estudiante VARCHAR(80) NOT NULL,
+    fecha_nacimiento_estudiante DATE NOT NULL,
+    genero_estudiante CHAR(1) NOT NULL CHECK (genero_estudiante IN ('M', 'F')),
+    numero_documento_apoderado VARCHAR(8) NOT NULL CHECK (numero_documento_apoderado ~ '^[0-9]{8}$'),
+    nombres_apoderado VARCHAR(100) NOT NULL,
+    apellido_paterno_apoderado VARCHAR(80) NOT NULL,
+    apellido_materno_apoderado VARCHAR(80) NOT NULL,
+    celular_apoderado VARCHAR(9) NOT NULL CHECK (celular_apoderado ~ '^9[0-9]{8}$'),
+    email_apoderado VARCHAR(100),
+    direccion_apoderado VARCHAR(200) NOT NULL,
+    ubigeo_apoderado VARCHAR(6) NOT NULL CHECK (ubigeo_apoderado ~ '^[0-9]{6}$'),
+    parentesco VARCHAR(30) NOT NULL CHECK (parentesco IN ('PADRE', 'MADRE', 'TUTOR_LEGAL', 'ABUELO_A', 'OTRO')),
+    consentimiento_gemini BOOLEAN NOT NULL CHECK (consentimiento_gemini IS TRUE),
+    estado_partida VARCHAR(15) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado_partida IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO')),
+    observacion_partida VARCHAR(500),
+    estado_dni_c4 VARCHAR(15) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado_dni_c4 IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO')),
+    observacion_dni_c4 VARCHAR(500),
+    estado_recibo VARCHAR(15) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado_recibo IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO')),
+    observacion_recibo VARCHAR(500),
+    pago_preferencia_id VARCHAR(100),
+    pago_enlace VARCHAR(1000),
+    pago_id VARCHAR(100),
+    pago_monto NUMERIC(10,2) NOT NULL DEFAULT 1.00 CHECK (pago_monto = 1.00),
+    pago_expira_at TIMESTAMPTZ,
+    vacante_reservada BOOLEAN NOT NULL DEFAULT FALSE,
+    estudiante_id BIGINT REFERENCES estudiantes(id) ON DELETE RESTRICT,
+    apoderado_id BIGINT REFERENCES apoderados(id) ON DELETE RESTRICT,
+    matricula_id BIGINT REFERENCES matriculas(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version BIGINT NOT NULL DEFAULT 0,
+    FOREIGN KEY (seccion_id, anio_lectivo_id) REFERENCES secciones(id, anio_lectivo_id) ON DELETE RESTRICT,
+    CHECK (NOT vacante_reservada OR pago_expira_at IS NOT NULL),
+    CHECK (estado != 'MATRICULADA' OR (estudiante_id IS NOT NULL AND apoderado_id IS NOT NULL AND matricula_id IS NOT NULL AND pago_id IS NOT NULL))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_matricula_dni_activa
+    ON solicitudes_matricula_publica (numero_documento_estudiante)
+    WHERE estado NOT IN ('MATRICULADA', 'RECHAZADA');
+CREATE INDEX IF NOT EXISTS idx_solicitudes_matricula_estado_fecha
+    ON solicitudes_matricula_publica (estado, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitudes_matricula_reservas
+    ON solicitudes_matricula_publica (pago_expira_at)
+    WHERE vacante_reservada IS TRUE;
+-- <<< FIN V8__matricula_publica_por_etapas.sql
+
+-- >>> INICIO V9__alinear_token_hash_matricula_publica.sql
+-- Hibernate maps String columns as VARCHAR. V8 created this column as CHAR,
+-- which makes schema validation fail on databases that already applied V8.
+-- rtrim removes only CHAR padding and keeps the stored token hash unchanged.
+ALTER TABLE solicitudes_matricula_publica
+    ALTER COLUMN token_hash TYPE VARCHAR(64)
+    USING rtrim(token_hash::text);
+-- <<< FIN V9__alinear_token_hash_matricula_publica.sql
+
+-- >>> INICIO V10__documentos_emision_matricula_publica.sql
+ALTER TABLE solicitudes_matricula_publica
+    ADD COLUMN comprobante_pago_codigo VARCHAR(40),
+    ADD COLUMN documentos_emitidos_at TIMESTAMPTZ;
+
+-- Preserve completed applications while assigning an internal receipt reference.
+UPDATE solicitudes_matricula_publica
+SET comprobante_pago_codigo = 'REC-MAT-' || matricula_id::text,
+    documentos_emitidos_at = updated_at
+WHERE estado = 'MATRICULADA'
+  AND matricula_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_solicitud_matricula_comprobante
+    ON solicitudes_matricula_publica (comprobante_pago_codigo)
+    WHERE comprobante_pago_codigo IS NOT NULL;
+
+ALTER TABLE solicitudes_matricula_publica
+    ADD CONSTRAINT chk_solicitud_matricula_documentos_emitidos
+    CHECK ((comprobante_pago_codigo IS NULL) = (documentos_emitidos_at IS NULL));
+
+ALTER TABLE solicitudes_matricula_publica
+    ADD CONSTRAINT chk_solicitud_matricula_comprobante_confirmada
+    CHECK (estado <> 'MATRICULADA' OR comprobante_pago_codigo IS NOT NULL);
+-- <<< FIN V10__documentos_emision_matricula_publica.sql
+
+-- >>> INICIO V11__oferta_matricula_2026_y_documentos.sql
+-- Oferta 2026 necesaria para el flujo público de admisión. Inserciones idempotentes.
+INSERT INTO anios_lectivos (anio, fecha_inicio, fecha_fin, abierto)
+VALUES (2026, DATE '2026-03-01', DATE '2026-12-20', TRUE)
+ON CONFLICT (anio) DO NOTHING;
+
+INSERT INTO periodos_academicos (anio_lectivo_id, numero_periodo, nombre, fecha_inicio, fecha_fin, cerrado)
+SELECT a.id, p.numero, p.nombre, p.inicio, p.fin, FALSE
+FROM anios_lectivos a
+CROSS JOIN (VALUES
+  (1::SMALLINT, 'I Bimestre', DATE '2026-03-01', DATE '2026-05-08'),
+  (2::SMALLINT, 'II Bimestre', DATE '2026-05-18', DATE '2026-07-24'),
+  (3::SMALLINT, 'III Bimestre', DATE '2026-08-10', DATE '2026-10-09'),
+  (4::SMALLINT, 'IV Bimestre', DATE '2026-10-19', DATE '2026-12-18')
+) AS p(numero, nombre, inicio, fin)
+WHERE a.anio = 2026
+ON CONFLICT (anio_lectivo_id, numero_periodo) DO NOTHING;
+
+INSERT INTO grados (nivel_id, numero_grado, nombre)
+SELECT n.id, g.numero, g.nombre
+FROM (VALUES
+  ('INICIAL', 1::SMALLINT, 'Inicial 3 años'),
+  ('INICIAL', 2::SMALLINT, 'Inicial 4 años'),
+  ('INICIAL', 3::SMALLINT, 'Inicial 5 años'),
+  ('PRIMARIA', 1::SMALLINT, '1° de Primaria'),
+  ('PRIMARIA', 2::SMALLINT, '2° de Primaria'),
+  ('PRIMARIA', 3::SMALLINT, '3° de Primaria'),
+  ('PRIMARIA', 4::SMALLINT, '4° de Primaria'),
+  ('PRIMARIA', 5::SMALLINT, '5° de Primaria'),
+  ('PRIMARIA', 6::SMALLINT, '6° de Primaria'),
+  ('SECUNDARIA', 1::SMALLINT, '1° de Secundaria'),
+  ('SECUNDARIA', 2::SMALLINT, '2° de Secundaria'),
+  ('SECUNDARIA', 3::SMALLINT, '3° de Secundaria'),
+  ('SECUNDARIA', 4::SMALLINT, '4° de Secundaria'),
+  ('SECUNDARIA', 5::SMALLINT, '5° de Secundaria')
+) AS g(codigo, numero, nombre)
+JOIN niveles n ON n.codigo = g.codigo
+ON CONFLICT (nivel_id, numero_grado) DO NOTHING;
+
+INSERT INTO aulas (codigo, nombre, ubicacion, capacidad, activa)
+VALUES
+  ('AULA_I_01', 'Pabellón Inicial - Aula 1', 'Pabellón A - Piso 1', 30, TRUE),
+  ('AULA_I_02', 'Pabellón Inicial - Aula 2', 'Pabellón A - Piso 1', 30, TRUE),
+  ('AULA_I_03', 'Pabellón Inicial - Aula 3', 'Pabellón A - Piso 1', 30, TRUE),
+  ('AULA_P_101', 'Pabellón Primaria - Aula 101', 'Pabellón B - Piso 1', 35, TRUE),
+  ('AULA_P_102', 'Pabellón Primaria - Aula 102', 'Pabellón B - Piso 1', 35, TRUE),
+  ('AULA_P_103', 'Pabellón Primaria - Aula 103', 'Pabellón B - Piso 2', 35, TRUE),
+  ('AULA_P_104', 'Pabellón Primaria - Aula 104', 'Pabellón B - Piso 2', 35, TRUE),
+  ('AULA_P_105', 'Pabellón Primaria - Aula 105', 'Pabellón B - Piso 3', 35, TRUE),
+  ('AULA_P_106', 'Pabellón Primaria - Aula 106', 'Pabellón B - Piso 3', 35, TRUE),
+  ('AULA_S_201', 'Pabellón Secundaria - Aula 201', 'Pabellón C - Piso 1', 35, TRUE),
+  ('AULA_S_202', 'Pabellón Secundaria - Aula 202', 'Pabellón C - Piso 1', 35, TRUE),
+  ('AULA_S_203', 'Pabellón Secundaria - Aula 203', 'Pabellón C - Piso 2', 35, TRUE),
+  ('AULA_S_204', 'Pabellón Secundaria - Aula 204', 'Pabellón C - Piso 2', 35, TRUE),
+  ('AULA_S_205', 'Pabellón Secundaria - Aula 205', 'Pabellón C - Piso 3', 35, TRUE)
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO secciones (anio_lectivo_id, grado_id, nivel_id, letra, cupo_maximo,
+                       vacantes_ocupadas, aula_fisica, aula_id)
+SELECT anio.id, grado.id, nivel.id, 'A',
+       CASE WHEN nivel.codigo = 'INICIAL' THEN 30 ELSE 35 END,
+       0, aulas.codigo, aulas.id
+FROM (VALUES
+  ('INICIAL', 1::SMALLINT, 'AULA_I_01'),
+  ('INICIAL', 2::SMALLINT, 'AULA_I_02'),
+  ('INICIAL', 3::SMALLINT, 'AULA_I_03'),
+  ('PRIMARIA', 1::SMALLINT, 'AULA_P_101'),
+  ('PRIMARIA', 2::SMALLINT, 'AULA_P_102'),
+  ('PRIMARIA', 3::SMALLINT, 'AULA_P_103'),
+  ('PRIMARIA', 4::SMALLINT, 'AULA_P_104'),
+  ('PRIMARIA', 5::SMALLINT, 'AULA_P_105'),
+  ('PRIMARIA', 6::SMALLINT, 'AULA_P_106'),
+  ('SECUNDARIA', 1::SMALLINT, 'AULA_S_201'),
+  ('SECUNDARIA', 2::SMALLINT, 'AULA_S_202'),
+  ('SECUNDARIA', 3::SMALLINT, 'AULA_S_203'),
+  ('SECUNDARIA', 4::SMALLINT, 'AULA_S_204'),
+  ('SECUNDARIA', 5::SMALLINT, 'AULA_S_205')
+) AS oferta(codigo_nivel, numero_grado, codigo_aula)
+JOIN anios_lectivos anio ON anio.anio = 2026 AND anio.abierto IS TRUE
+JOIN niveles nivel ON nivel.codigo = oferta.codigo_nivel
+JOIN grados grado ON grado.nivel_id = nivel.id AND grado.numero_grado = oferta.numero_grado
+JOIN aulas ON aulas.codigo = oferta.codigo_aula AND aulas.activa IS TRUE
+ON CONFLICT (anio_lectivo_id, grado_id, letra) DO NOTHING;
+
+-- Solo se persisten referencias y metadatos; los archivos viven en un bucket privado de Supabase Storage.
+CREATE TABLE IF NOT EXISTS solicitudes_matricula_documentos (
+    solicitud_id UUID NOT NULL REFERENCES solicitudes_matricula_publica(id) ON DELETE CASCADE,
+    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('PARTIDA_NACIMIENTO', 'DNI_C4', 'RECIBO_SERVICIO')),
+    bucket VARCHAR(100) NOT NULL,
+    object_key VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL CHECK (mime_type IN ('application/pdf', 'image/jpeg', 'image/png', 'image/webp')),
+    tamano_bytes BIGINT NOT NULL CHECK (tamano_bytes BETWEEN 1 AND 5242880),
+    sha256 CHAR(64) NOT NULL,
+    actualizado_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (solicitud_id, tipo),
+    UNIQUE (bucket, object_key)
+);
+ALTER TABLE solicitudes_matricula_documentos ENABLE ROW LEVEL SECURITY;
+-- <<< FIN V11__oferta_matricula_2026_y_documentos.sql
+
+-- >>> INICIO V12__limites_texto_periodos_activos_y_aula_refuerzo.sql
+-- V12: ajustar límites de texto, controlar períodos y vincular refuerzos con aulas.
+-- No elimina ni trunca filas: aborta si datos actuales superan los nuevos límites.
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM apoderados WHERE char_length(apellido_paterno) > 20 OR char_length(apellido_materno) > 20)
+       OR EXISTS (SELECT 1 FROM estudiantes WHERE char_length(apellido_paterno) > 20 OR char_length(apellido_materno) > 20)
+       OR EXISTS (SELECT 1 FROM solicitudes_matricula_publica
+                  WHERE char_length(apellido_paterno_estudiante) > 20
+                     OR char_length(apellido_materno_estudiante) > 20
+                     OR char_length(apellido_paterno_apoderado) > 20
+                     OR char_length(apellido_materno_apoderado) > 20) THEN
+        RAISE EXCEPTION 'V12 cancelada: existen apellidos de más de 20 caracteres. Revise longitudes antes de migrar; no se truncó ningún dato.';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM solicitudes_matricula_publica
+               WHERE char_length(nombres_estudiante) > 20 OR char_length(nombres_apoderado) > 20) THEN
+        RAISE EXCEPTION 'V12 cancelada: existen nombres de solicitud pública de más de 20 caracteres. Revise los datos antes de migrar; no se truncó ningún dato.';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM competencias WHERE char_length(nombre) > 50)
+       OR EXISTS (SELECT 1 FROM comunicados_oficiales WHERE char_length(titulo) > 40)
+       OR EXISTS (SELECT 1 FROM sesiones_refuerzo WHERE char_length(tema) > 40)
+       OR EXISTS (SELECT 1 FROM roles WHERE char_length(nombre) > 30)
+       OR EXISTS (SELECT 1 FROM niveles WHERE char_length(nombre) > 30)
+       OR EXISTS (SELECT 1 FROM grados WHERE char_length(nombre) > 30)
+       OR EXISTS (SELECT 1 FROM aulas WHERE char_length(nombre) > 40) THEN
+        RAISE EXCEPTION 'V12 cancelada: hay textos que exceden los nuevos límites. Revise los valores antes de migrar; no se truncó ningún dato.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM sesiones_refuerzo s
+        WHERE s.aula_asignada IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM aulas a
+              WHERE lower(btrim(a.codigo)) = lower(btrim(s.aula_asignada))
+          )
+    ) THEN
+        RAISE EXCEPTION 'V12 cancelada: aula_asignada contiene valores sin aula correspondiente. Cree o corrija el aula antes de migrar; no se eliminó ningún dato.';
+    END IF;
+
+    IF EXISTS (
+        SELECT s.id
+        FROM sesiones_refuerzo s
+        JOIN aulas a ON lower(btrim(a.codigo)) = lower(btrim(s.aula_asignada))
+        WHERE s.aula_asignada IS NOT NULL
+        GROUP BY s.id
+        HAVING COUNT(*) > 1
+    ) THEN
+        RAISE EXCEPTION 'V12 cancelada: un aula_asignada coincide con más de un código de aula al normalizar mayúsculas y espacios. Resuelva la ambigüedad antes de migrar.';
+    END IF;
+END
+$$;
+
+-- Normaliza únicamente espacios/mayúsculas en claves de aula que ya existen.
+UPDATE sesiones_refuerzo s
+SET aula_asignada = a.codigo
+FROM aulas a
+WHERE s.aula_asignada IS NOT NULL
+  AND lower(btrim(a.codigo)) = lower(btrim(s.aula_asignada))
+  AND s.aula_asignada <> a.codigo;
+
+ALTER TABLE roles
+    ALTER COLUMN nombre TYPE VARCHAR(30);
+ALTER TABLE competencias
+    ALTER COLUMN nombre TYPE VARCHAR(50);
+ALTER TABLE comunicados_oficiales
+    ALTER COLUMN titulo TYPE VARCHAR(40);
+ALTER TABLE sesiones_refuerzo
+    ALTER COLUMN tema TYPE VARCHAR(40);
+ALTER TABLE apoderados
+    ALTER COLUMN apellido_paterno TYPE VARCHAR(20),
+    ALTER COLUMN apellido_materno TYPE VARCHAR(20),
+    ALTER COLUMN email TYPE VARCHAR(254);
+ALTER TABLE estudiantes
+    ALTER COLUMN apellido_paterno TYPE VARCHAR(20),
+    ALTER COLUMN apellido_materno TYPE VARCHAR(20);
+ALTER TABLE solicitudes_matricula_publica
+    ALTER COLUMN nombres_estudiante TYPE VARCHAR(20),
+    ALTER COLUMN apellido_paterno_estudiante TYPE VARCHAR(20),
+    ALTER COLUMN apellido_materno_estudiante TYPE VARCHAR(20),
+    ALTER COLUMN nombres_apoderado TYPE VARCHAR(20),
+    ALTER COLUMN apellido_paterno_apoderado TYPE VARCHAR(20),
+    ALTER COLUMN apellido_materno_apoderado TYPE VARCHAR(20),
+    ALTER COLUMN email_apoderado TYPE VARCHAR(254);
+ALTER TABLE usuarios
+    ALTER COLUMN email TYPE VARCHAR(254);
+ALTER TABLE niveles
+    ALTER COLUMN nombre TYPE VARCHAR(30);
+ALTER TABLE grados
+    ALTER COLUMN nombre TYPE VARCHAR(30);
+ALTER TABLE aulas
+    ALTER COLUMN nombre TYPE VARCHAR(40);
+
+-- El período puede estar inactivo sin borrar su fila ni su historial académico.
+-- cerrado conserva su significado independiente: bloqueo de edición de notas.
+ALTER TABLE periodos_academicos
+    ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- aula_asignada conserva el contrato actual (código de aula) y ahora referencia
+-- la clave única aulas.codigo. RESTRICT protege referencias históricas.
+ALTER TABLE sesiones_refuerzo
+    ADD CONSTRAINT fk_sesiones_refuerzo_aula_codigo
+    FOREIGN KEY (aula_asignada) REFERENCES aulas(codigo)
+    ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+CREATE INDEX idx_sesiones_refuerzo_aula_asignada
+    ON sesiones_refuerzo (aula_asignada);
+
+-- <<< FIN V12__limites_texto_periodos_activos_y_aula_refuerzo.sql

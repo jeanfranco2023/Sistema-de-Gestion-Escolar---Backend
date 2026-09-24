@@ -45,6 +45,9 @@ public class PeriodoAcademicoEntity {
   @Column(name = "cerrado", nullable = false)
   private Boolean cerrado;
 
+  @Column(name = "activo", nullable = false)
+  private Boolean activo;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
     @JoinColumn(
@@ -58,5 +61,6 @@ public class PeriodoAcademicoEntity {
   @PrePersist
   void inicializar() {
     if (cerrado == null) cerrado = false;
+    if (activo == null) activo = true;
   }
 }

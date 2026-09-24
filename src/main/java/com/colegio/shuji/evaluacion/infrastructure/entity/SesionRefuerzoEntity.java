@@ -1,5 +1,6 @@
 package com.colegio.shuji.evaluacion.infrastructure.entity;
 
+import com.colegio.shuji.academico.infrastructure.entity.AulaEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -40,7 +41,7 @@ public class SesionRefuerzoEntity {
   @Column(name = "docente_usuario_id", nullable = false)
   private Long docenteUsuarioId;
 
-  @Column(name = "tema", nullable = false, length = 150)
+  @Column(name = "tema", nullable = false, length = 40)
   private String tema;
 
   @Column(name = "fecha_programada", nullable = false)
@@ -54,6 +55,14 @@ public class SesionRefuerzoEntity {
 
   @Column(name = "aula_asignada", length = 30)
   private String aulaAsignada;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(
+      name = "aula_asignada",
+      referencedColumnName = "codigo",
+      insertable = false,
+      updatable = false)
+  private AulaEntity aula;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({

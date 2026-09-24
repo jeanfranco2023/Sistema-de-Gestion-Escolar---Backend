@@ -5,6 +5,7 @@ import static com.colegio.shuji.shared.domain.model.Reglas.horas;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.academico.application.port.out.AulaRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.PeriodoRepositoryPort;
 import com.colegio.shuji.curriculo.application.port.out.AsignacionRepositoryPort;
 import com.colegio.shuji.evaluacion.application.dto.in.ProgramarRefuerzoRequestDto;
@@ -44,13 +45,21 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
   private final CalificacionRepositoryPort calificaciones;
   private final MatriculaRepositoryPort matriculas;
   private final PeriodoRepositoryPort periodos;
+  private final AulaRepositoryPort aulas;
   private final AnioLectivoRepositoryPort anios;
   private final AsignacionRepositoryPort asignaciones;
   private final ActorActualPort actor;
 
   public SesionRefuerzoResponseDto programar(ProgramarRefuerzoRequestDto r) {
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
-    var p = requerido(periodos.buscarPorId(r.periodoAcademicoId()));
+    var p = requerido(periodos.bloquearPorId(r.periodoAcademicoId()));
+    p.verificarActivo();
+    String codigoAula = null;
+    if (r.aulaAsignada() != null && !r.aulaAsignada().isBlank()) {
+      var aula = requerido(aulas.buscarPorCodigo(r.aulaAsignada().trim()));
+      exigir(Boolean.TRUE.equals(aula.getActiva()), "El aula no está activa");
+      codigoAula = aula.getCodigo();
+    }
     exigir(p.getAnioLectivoId().equals(r.anioLectivoId()), "Período de otro año");
     horas(r.horaInicio(), r.horaFin());
     actor.verificarDocente(r.docenteUsuarioId());
@@ -61,6 +70,7 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
                     a.getAnioLectivoId().equals(r.anioLectivoId())
                         && a.getAreaCurricularId().equals(r.areaCurricularId())),
         "Docente sin asignación para el área");
+    String aulaValidada = codigoAula;
     exigir(
         refuerzos.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
             .noneMatch(
@@ -69,11 +79,12 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
                         && s.getHoraInicio().isBefore(r.horaFin())
                         && s.getHoraFin().isAfter(r.horaInicio())
                         && (s.getDocenteUsuarioId().equals(r.docenteUsuarioId())
-                            || (r.aulaAsignada() != null
-                                && !r.aulaAsignada().isBlank()
-                                && r.aulaAsignada().equals(s.getAulaAsignada())))),
+                            || (aulaValidada != null
+                                && aulaValidada.equals(s.getAulaAsignada())))),
         "Horario de refuerzo ocupado");
-    return mapper.toResponse(refuerzos.guardar(mapper.toDomain(r)));
+    var sesion = mapper.toDomain(r);
+    sesion.setAulaAsignada(codigoAula);
+    return mapper.toResponse(refuerzos.guardar(sesion));
   }
 
   public List<InscripcionRefuerzoResponseDto> derivar(Long sesionId) {

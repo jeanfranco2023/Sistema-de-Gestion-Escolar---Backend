@@ -44,10 +44,10 @@ public class EstudianteEntity {
   @Column(name = "nombres", nullable = false, length = 100)
   private String nombres;
 
-  @Column(name = "apellido_paterno", nullable = false, length = 80)
+  @Column(name = "apellido_paterno", nullable = false, length = 20)
   private String apellidoPaterno;
 
-  @Column(name = "apellido_materno", nullable = false, length = 80)
+  @Column(name = "apellido_materno", nullable = false, length = 20)
   private String apellidoMaterno;
 
   @Column(name = "fecha_nacimiento", nullable = false)

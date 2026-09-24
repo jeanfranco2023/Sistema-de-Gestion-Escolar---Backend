@@ -23,7 +23,7 @@ public class AulaEntity {
   @Column(nullable = false, unique = true, length = 30)
   private String codigo;
 
-  @Column(nullable = false, length = 100)
+  @Column(nullable = false, length = 40)
   private String nombre;
 
   @Column(length = 150)

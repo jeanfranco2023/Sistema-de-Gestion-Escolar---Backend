@@ -8,5 +8,5 @@ import jakarta.validation.constraints.Size;
 public record CrearCompetenciaRequestDto(
     @NotNull Short areaId,
     @NotNull @Min(1) Short numeroOrden,
-    @NotBlank @Size(max = 150) String nombre,
+    @NotBlank @Size(max = 50) String nombre,
     @Size(max = 4000) String descripcion) {}

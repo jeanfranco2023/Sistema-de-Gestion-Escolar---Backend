@@ -9,4 +9,4 @@ import jakarta.validation.constraints.Size;
 public record CrearGradoRequestDto(
     @NotNull Short nivelId,
     @NotNull @Min(1) @Max(6) Short numeroGrado,
-    @NotBlank @Size(max = 50) String nombre) {}
+    @NotBlank @Size(max = 30) String nombre) {}

@@ -12,7 +12,7 @@ public record ProgramarRefuerzoRequestDto(
     @NotNull Short periodoAcademicoId,
     @NotNull Short areaCurricularId,
     @NotNull Long docenteUsuarioId,
-    @NotBlank @Size(max = 150) String tema,
+    @NotBlank @Size(max = 40) String tema,
     @NotNull @FutureOrPresent LocalDate fechaProgramada,
     @NotNull LocalTime horaInicio,
     @NotNull LocalTime horaFin,
