@@ -68,6 +68,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping("/public")
+  @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto crear(
       @Valid @RequestBody CrearSolicitudMatriculaPublicaRequestDto request) {
     return solicitudes.crear(request);
@@ -102,10 +103,10 @@ public class SolicitudMatriculaPublicaController {
       int separador = declarados.lastIndexOf('|');
       var resultado = gemini.validar(
           tipo, bytes, mimeType, declarados.substring(0, separador), declarados.substring(separador + 1));
-      var archivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
+      var referenciaArchivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
       String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
       return solicitudes.guardarResultadoDocumento(
-          id, token, tipo, resultado, archivo.bucket(), archivo.objectKey(), mimeType, bytes.length, sha256);
+          id, token, tipo, resultado, referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
     } catch (NoSuchAlgorithmException ex) {
       throw new IllegalStateException("SHA-256 no está disponible", ex);
     } finally {

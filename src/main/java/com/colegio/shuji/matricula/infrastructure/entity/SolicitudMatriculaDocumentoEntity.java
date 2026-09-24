@@ -8,6 +8,8 @@ import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "solicitudes_matricula_documentos")
@@ -30,6 +32,7 @@ public class SolicitudMatriculaDocumentoEntity {
   @Column(name = "tamano_bytes", nullable = false)
   private long tamanoBytes;
 
+  @JdbcTypeCode(SqlTypes.CHAR)
   @Column(nullable = false, length = 64)
   private String sha256;
 

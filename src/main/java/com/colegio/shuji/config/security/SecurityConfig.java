@@ -82,6 +82,9 @@ public class SecurityConfig {
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/api/v1/pagos/webhook/**")
                   .permitAll()
+                  // The root POST creates the anonymous enrollment before any upload/token exists.
+                  .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-matricula/public")
+                  .permitAll()
                   .requestMatchers("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/**")
                   .hasAnyRole("DIRECCION", "ACTUATOR")
                   .requestMatchers(PUBLIC_ENDPOINTS)
