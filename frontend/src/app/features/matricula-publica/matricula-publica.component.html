@@ -1,0 +1,136 @@
+<main class="public-page">
+  <nav class="public-nav">
+    <a class="public-brand" href="/" aria-label="Shuji Kitamura, inicio">
+      <span class="brand-mark">SK</span>
+      <span><strong>Shuji Kitamura</strong><small>Institución educativa</small></span>
+    </a>
+    <span class="nav-caption">Admisión y matrícula</span>
+  </nav>
+
+  <section class="hero-shell">
+    <div class="hero-copy">
+      <span class="eyebrow"><i></i> PROCESO DE ADMISIÓN</span>
+      <h1>Un buen comienzo<br><em>abre nuevos caminos.</em></h1>
+      <p>Realiza la solicitud de matrícula en línea, presenta tus documentos y sigue cada etapa desde un solo lugar.</p>
+      <button class="button button-gold" type="button" (click)="abrirSolicitud()" [disabled]="cargandoCatalogo()">
+        {{ cargandoCatalogo() ? 'Cargando vacantes…' : solicitud() ? 'Continuar mi trámite' : 'Iniciar matrícula' }}
+        <span aria-hidden="true">→</span>
+      </button>
+      @if (solicitud()) {
+        <div class="application-status"><span class="status-dot"></span>{{ estadoLabel(solicitud()!.estado) }}</div>
+      }
+      @if (error() && !modal()) { <p class="inline-error">{{ error() }}</p> }
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
+      <div class="art-seal"><span>SK</span><small>EXCELENCIA<br>Y COMUNIDAD</small></div>
+      <div class="art-card card-top"><span>01</span><b>Identidad</b><i>✓</i></div>
+      <div class="art-card card-bottom"><span>02</span><b>Aprendizaje</b><i>✦</i></div>
+    </div>
+  </section>
+
+  <section class="steps-section" aria-labelledby="steps-title">
+    <div class="section-heading"><span class="eyebrow">SENCILLO Y TRANSPARENTE</span><h2 id="steps-title">Tu matrícula, paso a paso</h2><p>Sin crear una cuenta. Te acompañamos desde la solicitud hasta la confirmación.</p></div>
+    <div class="steps-grid">
+      <article class="step-card"><span class="step-number">01</span><div class="step-icon">▤</div><h3>Presenta documentos</h3><p>Completa los datos del estudiante y apoderado y adjunta los tres documentos solicitados.</p></article>
+      <article class="step-card"><span class="step-number">02</span><div class="step-icon">✧</div><h3>Revisión documental</h3><p>Gemini comprueba el tipo, legibilidad y coherencia básica. Si hay una observación, podrás corregir ese archivo.</p></article>
+      <article class="step-card"><span class="step-number">03</span><div class="step-icon">◇</div><h3>Pago de prueba y confirmación</h3><p>Continúa a Mercado Pago. La matrícula aparece confirmada únicamente al validar el pago recibido.</p></article>
+    </div>
+  </section>
+
+  <section class="documents-band">
+    <div><span class="eyebrow">PREPARA ANTES DE EMPEZAR</span><h2>Documentos necesarios</h2></div>
+    <div class="document-pills"><span>Partida de nacimiento</span><span>DNI o C4 del estudiante</span><span>Recibo de luz o agua</span></div>
+    <p>PDF, JPG, PNG o WebP · Máximo 5 MB por archivo</p>
+  </section>
+
+  <footer class="public-footer"><span>Shuji Kitamura · Gestión escolar</span><span>La solicitud y el seguimiento no requieren una cuenta.</span></footer>
+</main>
+
+@if (modal()) {
+  <div class="modal-backdrop" (click)="cerrarModal()" (keydown.escape)="cerrarModal()">
+    @if (modal() === 'documentos') {
+      <section class="enrollment-modal wide-modal" role="dialog" aria-modal="true" aria-labelledby="documents-title" (click)="$event.stopPropagation()">
+        <header class="modal-header"><div><span class="eyebrow">ETAPA 1 DE 3</span><h2 id="documents-title">{{ solicitud() ? 'Corrige tus documentos' : 'Datos y documentos' }}</h2><p>Completa la solicitud una sola vez. No se crea una matrícula hasta confirmar el pago.</p></div><button type="button" class="icon-close" aria-label="Cerrar" (click)="cerrarModal()">×</button></header>
+        <div class="modal-body">
+          @if (!solicitud()) {
+            <div class="form-section-title"><span>01</span><div><b>Datos del estudiante</b><small>Información que se contrastará con los documentos.</small></div></div>
+            <div class="form-grid">
+              <label>Año lectivo<select [ngModel]="anioId()" (ngModelChange)="anioId.set(+$event); seccionId.set(null)" name="anioLectivo" required><option [ngValue]="null">Selecciona</option>@for (anio of catalogo().anios; track anio.id) {<option [ngValue]="anio.id">{{ anio.anio }}</option>}</select></label>
+              <label>Grado y sección<select [ngModel]="seccionId()" (ngModelChange)="seccionId.set(+$event)" name="seccion" required><option [ngValue]="null">Selecciona</option>@for (seccion of seccionesDisponibles; track seccion.id) {<option [ngValue]="seccion.id">{{ seccion.nivel }} · {{ seccion.grado }} · {{ seccion.letra }} ({{ seccion.vacantesDisponibles }} vacantes)</option>}</select></label>
+              <label class="span-2">Nombres<input [(ngModel)]="nombresEstudiante" name="nombresEstudiante" autocomplete="given-name" maxlength="100" required></label>
+              <label>Apellido paterno<input [(ngModel)]="apellidoPaternoEstudiante" name="apellidoPaternoEstudiante" autocomplete="family-name" maxlength="80" required></label>
+              <label>Apellido materno<input [(ngModel)]="apellidoMaternoEstudiante" name="apellidoMaternoEstudiante" maxlength="80" required></label>
+              <label>DNI del estudiante<input [(ngModel)]="documentoEstudiante" name="documentoEstudiante" inputmode="numeric" maxlength="8" minlength="8" placeholder="8 dígitos" required></label>
+              <label>Fecha de nacimiento<input type="date" [(ngModel)]="nacimientoEstudiante" name="nacimientoEstudiante" required></label>
+              <label>Género<select [(ngModel)]="generoEstudiante" name="genero"><option value="M">Masculino</option><option value="F">Femenino</option></select></label>
+            </div>
+            <div class="form-section-title section-spaced"><span>02</span><div><b>Datos del apoderado</b><small>Contacto responsable para la comunicación institucional.</small></div></div>
+            <div class="form-grid">
+              <label>Nombres<input [(ngModel)]="nombresApoderado" name="nombresApoderado" maxlength="100" required></label>
+              <label>Apellido paterno<input [(ngModel)]="apellidoPaternoApoderado" name="apellidoPaternoApoderado" maxlength="80" required></label>
+              <label>Apellido materno<input [(ngModel)]="apellidoMaternoApoderado" name="apellidoMaternoApoderado" maxlength="80" required></label>
+              <label>DNI<input [(ngModel)]="documentoApoderado" name="documentoApoderado" inputmode="numeric" maxlength="8" minlength="8" required></label>
+              <label>Celular<input [(ngModel)]="celularApoderado" name="celularApoderado" inputmode="tel" maxlength="9" placeholder="9 dígitos" required></label>
+              <label>Correo electrónico<input type="email" [(ngModel)]="emailApoderado" name="emailApoderado" maxlength="100"></label>
+              <label>Parentesco<select [(ngModel)]="parentesco" name="parentesco"><option value="MADRE">Madre</option><option value="PADRE">Padre</option><option value="TUTOR_LEGAL">Tutor legal</option><option value="ABUELO_A">Abuelo/a</option><option value="OTRO">Otro</option></select></label>
+              <label>Ubigeo INEI<input [(ngModel)]="ubigeoApoderado" name="ubigeo" inputmode="numeric" maxlength="6" minlength="6" placeholder="6 dígitos" required></label>
+              <label class="span-2">Dirección<input [(ngModel)]="direccionApoderado" name="direccion" maxlength="200" required></label>
+            </div>
+          }
+
+          <div class="form-section-title section-spaced"><span>03</span><div><b>Documentos del estudiante</b><small>Sube una imagen nítida, completa y sin reflejos.</small></div></div>
+          <div class="upload-grid">
+            @for (tipo of documentTypes; track tipo) {
+              <label class="upload-card" [class.upload-observed]="estadoDocumento(tipo)?.estado === 'OBSERVADO'">
+                <span class="upload-glyph">{{ estadoDocumento(tipo)?.estado === 'VALIDADO' ? '✓' : '↑' }}</span>
+                <b>{{ etiquetaDocumento(tipo) }}</b>
+                <small>{{ estadoDocumento(tipo)?.estado === 'OBSERVADO' ? estadoDocumento(tipo)?.observacion : archivos[tipo]?.name || 'Seleccionar archivo' }}</small>
+                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" (change)="seleccionarArchivo(tipo, $event)" [attr.aria-label]="'Adjuntar ' + etiquetaDocumento(tipo)">
+              </label>
+            }
+          </div>
+          @if (!solicitud()) {
+            <label class="consent-row"><input type="checkbox" [(ngModel)]="consentimientoGemini" name="consentimientoGemini"><span>Autorizo el envío temporal de estos documentos a Google Gemini para revisar su tipo, legibilidad y coherencia. Los archivos no se almacenan en el sistema; conservaremos únicamente el resultado y las observaciones.</span></label>
+          }
+          @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+        </div>
+        <footer class="modal-footer"><button type="button" class="button button-quiet" (click)="cerrarModal()">Cancelar</button><button type="button" class="button button-primary" (click)="validarYEnviarDocumentos()" [disabled]="procesando()">{{ procesando() ? 'Enviando…' : 'Enviar a revisión' }}<span>→</span></button></footer>
+      </section>
+    }
+
+    @if (modal() === 'validacion') {
+      <section class="enrollment-modal compact-modal" role="dialog" aria-modal="true" aria-labelledby="review-title" (click)="$event.stopPropagation()">
+        <header class="modal-header"><div><span class="eyebrow">ETAPA 2 DE 3</span><h2 id="review-title">Revisión documental</h2><p>Estamos revisando la legibilidad y correspondencia básica de los archivos.</p></div><button type="button" class="icon-close" aria-label="Cerrar" (click)="cerrarModal()">×</button></header>
+        <div class="modal-body">
+          @if (procesando()) { <div class="validation-loading"><span class="spinner"></span><b>Validando documentos…</b><small>Los archivos se procesan de forma temporal.</small></div> }
+          @else {
+            <div class="review-list">
+              @for (doc of solicitud()?.documentos ?? []; track doc.tipo) {
+                <div class="review-item"><span class="review-state" [class.good]="doc.estado === 'VALIDADO'" [class.bad]="doc.estado === 'OBSERVADO'">{{ doc.estado === 'VALIDADO' ? '✓' : doc.estado === 'OBSERVADO' ? '!' : '·' }}</span><div><b>{{ etiquetaDocumento(doc.tipo) }}</b><small>{{ doc.observacion || 'Pendiente de revisión' }}</small></div></div>
+              }
+            </div>
+            @if (documentosAprobados()) { <div class="notice-success">Los tres documentos pasaron la revisión automatizada. La revisión no sustituye la validación oficial del colegio.</div> }
+            @else { <div class="notice-warning">Corrige únicamente los documentos observados. Las partes correctas no necesitan volver a cargarse.</div> }
+            @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+          }
+        </div>
+        @if (!procesando()) { <footer class="modal-footer"><button type="button" class="button button-quiet" (click)="modal.set('documentos')">{{ documentosAprobados() ? 'Volver' : 'Corregir documentos' }}</button>@if (documentosAprobados()) {<button type="button" class="button button-primary" (click)="continuarAlPago()" [disabled]="procesando()">Continuar al pago <span>→</span></button>}</footer> }
+      </section>
+    }
+
+    @if (modal() === 'pago') {
+      <section class="enrollment-modal compact-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title" (click)="$event.stopPropagation()">
+        <header class="modal-header"><div><span class="eyebrow">ETAPA 3 DE 3</span><h2 id="payment-title">Derecho de matrícula</h2><p>Entorno de prueba. No se realizará un cobro real.</p></div><button type="button" class="icon-close" aria-label="Cerrar" (click)="cerrarModal()">×</button></header>
+        <div class="modal-body payment-body"><div class="payment-total"><span>Total de prueba</span><strong>S/ {{ montoPago() | number:'1.2-2' }}</strong><small>Mercado Pago · Soles peruanos (PEN)</small></div><p class="payment-notice">Tu solicitud todavía no es una matrícula. Se confirmará y aparecerá en el padrón únicamente cuando el backend verifique el pago aprobado.</p><a class="button button-primary payment-link" [href]="enlacePago()" target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba <span>↗</span></a><p class="payment-poll">{{ estadoPago() }}</p>@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }</div>
+        <footer class="modal-footer"><button type="button" class="button button-quiet" (click)="actualizarEstadoPago()">Ya pagué · consultar estado</button></footer>
+      </section>
+    }
+
+    @if (modal() === 'exito') {
+      <section class="enrollment-modal success-modal" role="dialog" aria-modal="true" aria-labelledby="success-title" (click)="$event.stopPropagation()">
+        <div class="success-emblem">✓</div><span class="eyebrow">PROCESO COMPLETADO</span><h2 id="success-title">Matrícula confirmada</h2><p>{{ solicitud()?.nombreEstudiante }} ya aparece registrado en el padrón de estudiantes.</p><div class="success-reference"><span>Código de matrícula</span><b>#{{ solicitud()?.matriculaId }}</b></div><button type="button" class="button button-primary" (click)="modal.set(null)">Volver al inicio</button>
+      </section>
+    }
+  </div>
+}
