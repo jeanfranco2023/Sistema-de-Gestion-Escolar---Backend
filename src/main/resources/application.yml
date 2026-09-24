@@ -62,6 +62,7 @@ app:
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-3.8-flash}
+      fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-2.5-flash}
 
 # Documentación OpenAPI 3 / Swagger
 springdoc:
