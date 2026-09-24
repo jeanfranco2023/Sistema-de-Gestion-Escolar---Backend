@@ -42,7 +42,7 @@ public class SeccionEntity {
   @Column(name = "cupo_maximo", nullable = false)
   private Short cupoMaximo;
 
-  @Column(name = "vacantes_ocupadas", nullable = false, insertable = false, updatable = false)
+  @Column(name = "vacantes_ocupadas", nullable = false, insertable = false)
   private Short vacantesOcupadas;
 
   @Column(name = "aula_id", nullable = false)

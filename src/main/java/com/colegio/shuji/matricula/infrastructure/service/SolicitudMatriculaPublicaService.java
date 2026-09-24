@@ -1,4 +1,4 @@
-package com.colegio.shuji.matricula.application.service;
+package com.colegio.shuji.matricula.infrastructure.service;
 
 import com.colegio.shuji.academico.application.dto.out.AnioLectivoResponseDto;
 import com.colegio.shuji.academico.infrastructure.repository.JpaAnioLectivoRepository;
@@ -24,11 +24,14 @@ import com.colegio.shuji.matricula.infrastructure.entity.EstudianteApoderadoEnti
 import com.colegio.shuji.matricula.infrastructure.entity.EstudianteEntity;
 import com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity;
 import com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity;
+import com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocumentoEntity;
+import com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocumentoId;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaApoderadoRepository;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaEstudianteApoderadoRepository;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaEstudianteRepository;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaMatriculaRepository;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaSolicitudMatriculaPublicaRepository;
+import com.colegio.shuji.matricula.infrastructure.repository.JpaSolicitudMatriculaDocumentoRepository;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.tesoreria.application.port.out.MercadoPagoPort;
 import com.colegio.shuji.tesoreria.application.port.out.VerificarPagoPort.PagoVerificado;
@@ -36,8 +39,10 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.ZoneId;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -62,6 +67,7 @@ public class SolicitudMatriculaPublicaService {
       EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
 
   private final JpaSolicitudMatriculaPublicaRepository solicitudes;
+  private final JpaSolicitudMatriculaDocumentoRepository documentos;
   private final JpaAnioLectivoRepository anios;
   private final JpaSeccionRepository secciones;
   private final JpaEstudianteRepository estudiantes;
@@ -169,12 +175,22 @@ public class SolicitudMatriculaPublicaService {
 
   @Transactional
   public SolicitudMatriculaPublicaResponseDto guardarResultadoDocumento(
-      UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado) {
+      UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
+      String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
     var s = solicitudConTokenBloqueada(id, token);
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud cambió mientras se validaba el archivo");
     }
+    var archivo = new SolicitudMatriculaDocumentoEntity();
+    archivo.setId(new SolicitudMatriculaDocumentoId(id, tipo));
+    archivo.setBucket(bucket);
+    archivo.setObjectKey(objectKey);
+    archivo.setMimeType(mimeType);
+    archivo.setTamanoBytes(tamanoBytes);
+    archivo.setSha256(sha256);
+    archivo.setActualizadoAt(OffsetDateTime.now(ZoneOffset.UTC));
+    documentos.save(archivo);
     s.actualizarDocumento(tipo,
         resultado.valido() ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
         resultado.observacion());
@@ -189,6 +205,66 @@ public class SolicitudMatriculaPublicaService {
   @Transactional(readOnly = true)
   public SolicitudMatriculaPublicaResponseDto consultar(UUID id, String token) {
     return respuesta(solicitudConToken(id, token), null);
+  }
+
+  @Transactional(readOnly = true)
+  public DocumentoDescargaAdmin documentoDescargaAdmin(UUID id, TipoDocumentoSolicitud tipo) {
+    var archivo = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo))
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento no disponible"));
+    return new DocumentoDescargaAdmin(
+        archivo.getBucket(), archivo.getObjectKey(), archivo.getMimeType(), archivo.getTamanoBytes(),
+        archivo.getActualizadoAt());
+  }
+
+  public record DocumentoDescargaAdmin(
+      String bucket, String objectKey, String mimeType, long tamanoBytes, OffsetDateTime actualizadoAt) {}
+
+  @Transactional(readOnly = true)
+  public String generarComprobanteHtml(UUID id, String token) {
+    var s = solicitudConToken(id, token);
+    validarDocumentosEmitidos(s);
+    String filas = fila("Estudiante", nombreEstudiante(s))
+        + fila("DNI del estudiante", s.getNumeroDocumentoEstudiante())
+        + fila("Código de matrícula", "FIC-MAT-" + s.getMatriculaId())
+        + fila("Referencia de pago Mercado Pago", s.getPagoId())
+        + fila("Importe pagado", "S/ " + s.getPagoMonto().toPlainString() + " PEN")
+        + fila("Estado", "PAGO APROBADO Y VERIFICADO")
+        + fila("Emitido", fechaDocumento(s.getDocumentosEmitidosAt()));
+    String aviso = "Comprobante interno de pago. No es una boleta electrónica ni reemplaza un comprobante tributario emitido ante SUNAT.";
+    return documentoHtml("Comprobante de pago de matrícula", s.getComprobantePagoCodigo(), filas, aviso);
+  }
+
+  @Transactional(readOnly = true)
+  public String generarFichaMatriculaHtml(UUID id, String token) {
+    var s = solicitudConToken(id, token);
+    validarDocumentosEmitidos(s);
+    var anio = anios.findById(s.getAnioLectivoId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Año lectivo de la matrícula no disponible"));
+    var seccion = secciones.findById(s.getSeccionId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Sección de la matrícula no disponible"));
+    var grado = seccion.getRelacion1();
+    var nivel = grado == null ? null : grado.getRelacion0();
+    String seccionLabel = (nivel == null ? "Nivel" : nivel.getNombre()) + " · "
+        + (grado == null ? "Grado" : grado.getNombre()) + " " + seccion.getLetra();
+    String fichaCodigo = "FIC-MAT-" + s.getMatriculaId();
+    String filas = fila("Ficha", fichaCodigo)
+        + fila("Matrícula", "#" + s.getMatriculaId())
+        + fila("Año lectivo", String.valueOf(anio.getAnio()))
+        + fila("Nivel, grado y sección", seccionLabel)
+        + fila("Estudiante", nombreEstudiante(s))
+        + fila("DNI", s.getNumeroDocumentoEstudiante())
+        + fila("Fecha de nacimiento", s.getFechaNacimientoEstudiante().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+        + fila("Género", s.getGeneroEstudiante() == Genero.M ? "Masculino" : "Femenino")
+        + fila("Apoderado", nombreApoderado(s))
+        + fila("DNI del apoderado", s.getNumeroDocumentoApoderado())
+        + fila("Parentesco", s.getParentesco().name().replace('_', ' '))
+        + fila("Celular", s.getCelularApoderado())
+        + fila("Correo", s.getEmailApoderado())
+        + fila("Dirección", s.getDireccionApoderado())
+        + fila("Estado", "MATRÍCULA CONFIRMADA")
+        + fila("Emitida", fechaDocumento(s.getDocumentosEmitidosAt()));
+    return documentoHtml("Ficha de matrícula", fichaCodigo, filas,
+        "Documento informativo generado al confirmar el pago y registrar la matrícula.");
   }
 
   @Transactional
@@ -320,6 +396,8 @@ public class SolicitudMatriculaPublicaService {
     s.setEstudianteId(estudiante.getId());
     s.setApoderadoId(apoderado.getId());
     s.setMatriculaId(matricula.getId());
+    s.setComprobantePagoCodigo("REC-MAT-" + matricula.getId());
+    s.setDocumentosEmitidosAt(OffsetDateTime.now(ZoneOffset.UTC));
     s.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
     s.setPagoExpiraAt(null);
     return respuesta(solicitudes.saveAndFlush(s), null);
@@ -472,6 +550,74 @@ public class SolicitudMatriculaPublicaService {
 
   private String nombreApoderado(SolicitudMatriculaPublicaEntity s) {
     return s.getNombresApoderado() + " " + s.getApellidoPaternoApoderado() + " " + s.getApellidoMaternoApoderado();
+  }
+
+  private void validarDocumentosEmitidos(SolicitudMatriculaPublicaEntity solicitud) {
+    if (solicitud.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
+        || solicitud.getMatriculaId() == null
+        || solicitud.getPagoId() == null
+        || solicitud.getComprobantePagoCodigo() == null
+        || solicitud.getDocumentosEmitidosAt() == null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "Los documentos estarán disponibles al confirmar el pago y la matrícula");
+    }
+  }
+
+  private String documentoHtml(String titulo, String codigo, String filas, String aviso) {
+    String template = """
+        <!doctype html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>__TITULO__</title>
+          <style>
+            @page { size: A4; margin: 18mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; background: #f1f5f9; color: #172b4d; font: 15px Arial, sans-serif; }
+            main { max-width: 800px; margin: 36px auto; padding: 42px; background: #fff; border: 1px solid #dbe3ee; border-radius: 16px; }
+            header { display: flex; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 2px solid #d9b96f; color: #52647e; font-size: 12px; }
+            header strong { color: #172b4d; font-size: 16px; }
+            h1 { margin: 30px 0 8px; font-size: 27px; }
+            .code { margin-bottom: 22px; color: #245dcc; font-weight: 700; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 12px 10px; border-bottom: 1px solid #e6ebf2; text-align: left; vertical-align: top; }
+            th { width: 38%; color: #687991; font-size: 12px; font-weight: 600; }
+            td { color: #1b304c; overflow-wrap: anywhere; }
+            .notice { margin-top: 24px; padding: 14px; border: 1px solid #e5eaf1; border-radius: 10px; color: #64748b; font-size: 12px; line-height: 1.6; }
+            .print { margin-top: 24px; padding: 11px 16px; border: 0; border-radius: 9px; background: #245dcc; color: white; font-weight: 700; cursor: pointer; }
+            @media print { body { background: white; } main { max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; } .print { display: none; } }
+            @media (max-width: 560px) { main { margin: 12px; padding: 22px 16px; } h1 { font-size: 22px; } th, td { padding: 10px 6px; } }
+          </style>
+        </head>
+        <body><main>
+          <header><strong>Shuji Kitamura · Gestión Escolar</strong><span>Documento generado desde el portal</span></header>
+          <h1>__TITULO__</h1>
+          <div class="code">__CODIGO__</div>
+          <table><tbody>__FILAS__</tbody></table>
+          <p class="notice">__AVISO__</p>
+          <button class="print" onclick="window.print()">Imprimir / Guardar como PDF</button>
+        </main></body></html>
+        """;
+    return template.replace("__TITULO__", escaparHtml(titulo))
+        .replace("__CODIGO__", escaparHtml(codigo))
+        .replace("__FILAS__", filas)
+        .replace("__AVISO__", escaparHtml(aviso));
+  }
+
+  private String fila(String etiqueta, String valor) {
+    return "<tr><th>" + escaparHtml(etiqueta) + "</th><td>" + escaparHtml(valor) + "</td></tr>";
+  }
+
+  private String escaparHtml(String valor) {
+    if (valor == null || valor.isBlank()) return "—";
+    return valor.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\"", "&quot;").replace("'", "&#39;");
+  }
+
+  private String fechaDocumento(OffsetDateTime fecha) {
+    return fecha.atZoneSameInstant(ZoneId.of("America/Lima"))
+        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + " (hora de Perú)";
   }
 
   private void liberarReserva(SolicitudMatriculaPublicaEntity s) {

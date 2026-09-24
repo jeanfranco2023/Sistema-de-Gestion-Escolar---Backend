@@ -39,10 +39,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final String LOGIN_PATH = "/api/v1/auth/login";
   private static final String REGISTER_PATH = "/api/v1/auth/register";
   private static final String REFRESH_PATH = "/api/v1/auth/refresh";
+  private static final String MATRICULA_DNI_PATH = "/api/v1/solicitudes-matricula/public/dni/";
 
   private static final int LOGIN_LIMIT = 15;
   private static final int REGISTER_LIMIT = 10;
   private static final int REFRESH_LIMIT = 20;
+  private static final int MATRICULA_DNI_LIMIT = 8;
   private static final int WEBHOOK_PAGOS_LIMIT = 120;
   private static final int PAGOS_TESORERIA_LIMIT = 30;
 
@@ -101,6 +103,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return REGISTER_LIMIT;
     } else if (uri.endsWith(REFRESH_PATH) || uri.equals(REFRESH_PATH)) {
       return REFRESH_LIMIT;
+    } else if (uri.startsWith(MATRICULA_DNI_PATH)) {
+      return MATRICULA_DNI_LIMIT;
     } else if (uri.startsWith("/api/v1/pagos/webhook")) {
       return WEBHOOK_PAGOS_LIMIT;
     } else if (uri.startsWith("/api/v1/pagos") || uri.startsWith("/api/v1/tesoreria")) {

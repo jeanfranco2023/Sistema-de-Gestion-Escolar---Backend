@@ -13,7 +13,7 @@
       <h1>Un buen comienzo<br><em>abre nuevos caminos.</em></h1>
       <p>Realiza la solicitud de matrícula en línea, presenta tus documentos y sigue cada etapa desde un solo lugar.</p>
       <button class="button button-gold" type="button" (click)="abrirSolicitud()" [disabled]="cargandoCatalogo()">
-        {{ cargandoCatalogo() ? 'Cargando vacantes…' : solicitud() ? 'Continuar mi trámite' : 'Iniciar matrícula' }}
+        {{ cargandoCatalogo() ? 'Cargando vacantes…' : solicitud()?.estado === 'MATRICULADA' || solicitud()?.estado === 'RECHAZADA' ? 'Iniciar otra solicitud' : solicitud() ? 'Continuar mi trámite' : 'Iniciar matrícula' }}
         <span aria-hidden="true">→</span>
       </button>
       @if (solicitud()) {
@@ -58,25 +58,27 @@
             <div class="form-grid">
               <label>Año lectivo<select [ngModel]="anioId()" (ngModelChange)="anioId.set(+$event); seccionId.set(null)" name="anioLectivo" required><option [ngValue]="null">Selecciona</option>@for (anio of catalogo().anios; track anio.id) {<option [ngValue]="anio.id">{{ anio.anio }}</option>}</select></label>
               <label>Grado y sección<select [ngModel]="seccionId()" (ngModelChange)="seccionId.set(+$event)" name="seccion" required><option [ngValue]="null">Selecciona</option>@for (seccion of seccionesDisponibles; track seccion.id) {<option [ngValue]="seccion.id">{{ seccion.nivel }} · {{ seccion.grado }} · {{ seccion.letra }} ({{ seccion.vacantesDisponibles }} vacantes)</option>}</select></label>
+              <div class="dni-lookup span-2"><label>DNI del estudiante<input [(ngModel)]="documentoEstudiante" name="documentoEstudiante" inputmode="numeric" maxlength="8" minlength="8" placeholder="8 dígitos" required></label><button class="button button-quiet" type="button" (click)="consultarDni('estudiante')" [disabled]="consultandoDniEstudiante()">{{ consultandoDniEstudiante() ? 'Consultando…' : 'Consultar DNI' }}</button></div>
               <label class="span-2">Nombres<input [(ngModel)]="nombresEstudiante" name="nombresEstudiante" autocomplete="given-name" maxlength="100" required></label>
               <label>Apellido paterno<input [(ngModel)]="apellidoPaternoEstudiante" name="apellidoPaternoEstudiante" autocomplete="family-name" maxlength="80" required></label>
               <label>Apellido materno<input [(ngModel)]="apellidoMaternoEstudiante" name="apellidoMaternoEstudiante" maxlength="80" required></label>
-              <label>DNI del estudiante<input [(ngModel)]="documentoEstudiante" name="documentoEstudiante" inputmode="numeric" maxlength="8" minlength="8" placeholder="8 dígitos" required></label>
+              <p class="span-2 form-hint">La consulta solo completa nombres y apellidos. Fecha de nacimiento y género deben coincidir con la partida.</p>
               <label>Fecha de nacimiento<input type="date" [(ngModel)]="nacimientoEstudiante" name="nacimientoEstudiante" required></label>
               <label>Género<select [(ngModel)]="generoEstudiante" name="genero"><option value="M">Masculino</option><option value="F">Femenino</option></select></label>
             </div>
             <div class="form-section-title section-spaced"><span>02</span><div><b>Datos del apoderado</b><small>Contacto responsable para la comunicación institucional.</small></div></div>
             <div class="form-grid">
+              <div class="dni-lookup span-2"><label>DNI del apoderado<input [(ngModel)]="documentoApoderado" name="documentoApoderado" inputmode="numeric" maxlength="8" minlength="8" placeholder="8 dígitos" required></label><button class="button button-quiet" type="button" (click)="consultarDni('apoderado')" [disabled]="consultandoDniApoderado()">{{ consultandoDniApoderado() ? 'Consultando…' : 'Consultar DNI' }}</button></div>
               <label>Nombres<input [(ngModel)]="nombresApoderado" name="nombresApoderado" maxlength="100" required></label>
               <label>Apellido paterno<input [(ngModel)]="apellidoPaternoApoderado" name="apellidoPaternoApoderado" maxlength="80" required></label>
               <label>Apellido materno<input [(ngModel)]="apellidoMaternoApoderado" name="apellidoMaternoApoderado" maxlength="80" required></label>
-              <label>DNI<input [(ngModel)]="documentoApoderado" name="documentoApoderado" inputmode="numeric" maxlength="8" minlength="8" required></label>
               <label>Celular<input [(ngModel)]="celularApoderado" name="celularApoderado" inputmode="tel" maxlength="9" placeholder="9 dígitos" required></label>
               <label>Correo electrónico<input type="email" [(ngModel)]="emailApoderado" name="emailApoderado" maxlength="100"></label>
               <label>Parentesco<select [(ngModel)]="parentesco" name="parentesco"><option value="MADRE">Madre</option><option value="PADRE">Padre</option><option value="TUTOR_LEGAL">Tutor legal</option><option value="ABUELO_A">Abuelo/a</option><option value="OTRO">Otro</option></select></label>
               <label>Ubigeo INEI<input [(ngModel)]="ubigeoApoderado" name="ubigeo" inputmode="numeric" maxlength="6" minlength="6" placeholder="6 dígitos" required></label>
               <label class="span-2">Dirección<input [(ngModel)]="direccionApoderado" name="direccion" maxlength="200" required></label>
             </div>
+            @if (mensajeDni()) { <p class="form-hint" role="status">{{ mensajeDni() }}</p> }
           }
 
           <div class="form-section-title section-spaced"><span>03</span><div><b>Documentos del estudiante</b><small>Sube una imagen nítida, completa y sin reflejos.</small></div></div>
@@ -85,13 +87,13 @@
               <label class="upload-card" [class.upload-observed]="estadoDocumento(tipo)?.estado === 'OBSERVADO'">
                 <span class="upload-glyph">{{ estadoDocumento(tipo)?.estado === 'VALIDADO' ? '✓' : '↑' }}</span>
                 <b>{{ etiquetaDocumento(tipo) }}</b>
-                <small>{{ estadoDocumento(tipo)?.estado === 'OBSERVADO' ? estadoDocumento(tipo)?.observacion : archivos[tipo]?.name || 'Seleccionar archivo' }}</small>
-                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" (change)="seleccionarArchivo(tipo, $event)" [attr.aria-label]="'Adjuntar ' + etiquetaDocumento(tipo)">
+                <small>{{ estadoDocumento(tipo)?.estado === 'OBSERVADO' ? estadoDocumento(tipo)?.observacion : estadoDocumento(tipo)?.estado === 'VALIDADO' ? 'Validado · no requiere reemplazo' : archivos[tipo]?.name || 'Seleccionar archivo' }}</small>
+                <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" (change)="seleccionarArchivo(tipo, $event)" [disabled]="estadoDocumento(tipo)?.estado === 'VALIDADO'" [attr.aria-label]="'Adjuntar ' + etiquetaDocumento(tipo)">
               </label>
             }
           </div>
           @if (!solicitud()) {
-            <label class="consent-row"><input type="checkbox" [(ngModel)]="consentimientoGemini" name="consentimientoGemini"><span>Autorizo el envío temporal de estos documentos a Google Gemini para revisar su tipo, legibilidad y coherencia. Los archivos no se almacenan en el sistema; conservaremos únicamente el resultado y las observaciones.</span></label>
+            <label class="consent-row"><input type="checkbox" [(ngModel)]="consentimientoGemini" name="consentimientoGemini"><span>Autorizo guardar estos archivos en almacenamiento privado de la institución y enviarlos a Google Gemini para revisar tipo, legibilidad y coherencia. La revisión automática no sustituye la validación oficial.</span></label>
           }
           @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
         </div>
@@ -122,14 +124,18 @@
     @if (modal() === 'pago') {
       <section class="enrollment-modal compact-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title" (click)="$event.stopPropagation()">
         <header class="modal-header"><div><span class="eyebrow">ETAPA 3 DE 3</span><h2 id="payment-title">Derecho de matrícula</h2><p>Entorno de prueba. No se realizará un cobro real.</p></div><button type="button" class="icon-close" aria-label="Cerrar" (click)="cerrarModal()">×</button></header>
-        <div class="modal-body payment-body"><div class="payment-total"><span>Total de prueba</span><strong>S/ {{ montoPago() | number:'1.2-2' }}</strong><small>Mercado Pago · Soles peruanos (PEN)</small></div><p class="payment-notice">Tu solicitud todavía no es una matrícula. Se confirmará y aparecerá en el padrón únicamente cuando el backend verifique el pago aprobado.</p><a class="button button-primary payment-link" [href]="enlacePago()" target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba <span>↗</span></a><p class="payment-poll">{{ estadoPago() }}</p>@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }</div>
+        <div class="modal-body payment-body"><div class="payment-total"><span>Total de prueba</span><strong>S/ {{ montoPago() | number:'1.2-2' }}</strong><small>Mercado Pago · Soles peruanos (PEN)</small></div><p class="payment-notice">Tu solicitud todavía no es una matrícula. Se confirmará y aparecerá en el padrón únicamente cuando el backend verifique el pago aprobado.</p><a class="button button-primary payment-link" [href]="enlacePago()">Abrir Mercado Pago de prueba <span>↗</span></a><p class="payment-poll">Al terminar, Mercado Pago te devolverá a esta página para verificar el resultado. {{ estadoPago() }}</p>@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }</div>
         <footer class="modal-footer"><button type="button" class="button button-quiet" (click)="actualizarEstadoPago()">Ya pagué · consultar estado</button></footer>
       </section>
     }
 
     @if (modal() === 'exito') {
       <section class="enrollment-modal success-modal" role="dialog" aria-modal="true" aria-labelledby="success-title" (click)="$event.stopPropagation()">
-        <div class="success-emblem">✓</div><span class="eyebrow">PROCESO COMPLETADO</span><h2 id="success-title">Matrícula confirmada</h2><p>{{ solicitud()?.nombreEstudiante }} ya aparece registrado en el padrón de estudiantes.</p><div class="success-reference"><span>Código de matrícula</span><b>#{{ solicitud()?.matriculaId }}</b></div><button type="button" class="button button-primary" (click)="modal.set(null)">Volver al inicio</button>
+        <div class="success-emblem">✓</div><span class="eyebrow">PROCESO COMPLETADO</span><h2 id="success-title">Matrícula confirmada</h2><p>{{ solicitud()?.nombreEstudiante }} ya aparece registrado en el padrón de estudiantes.</p><div class="success-reference"><span>Código de matrícula</span><b>#{{ solicitud()?.matriculaId }}</b></div>
+        <div class="success-document-actions"><button type="button" class="button button-primary" (click)="descargarComprobante()" [disabled]="procesando()">Descargar comprobante de pago</button><button type="button" class="button button-quiet" (click)="descargarFicha()" [disabled]="procesando()">Descargar ficha de matrícula</button></div>
+        <p class="success-document-note">Archivos HTML imprimibles; desde el navegador puedes guardarlos como PDF. El comprobante es interno y no reemplaza una boleta electrónica SUNAT.</p>
+        @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+        <button type="button" class="button button-quiet" (click)="iniciarNuevaSolicitud()">Iniciar otra solicitud</button>
       </section>
     }
   </div>

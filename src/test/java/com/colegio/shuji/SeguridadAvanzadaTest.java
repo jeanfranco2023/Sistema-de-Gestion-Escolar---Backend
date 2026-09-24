@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.colegio.shuji.config.security.JwtTokenProvider;
 import com.colegio.shuji.config.security.ProductionSecurityConfigurationValidator;
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
@@ -141,7 +142,7 @@ class SeguridadAvanzadaTest {
     @DisplayName("Rechaza protocolo HTTP inseguro")
     void rechazaProtocoloInseguroHttp() {
       var adapter = new MercadoPagoHttpAdapter(
-          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe,localhost");
+          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe,localhost", "");
 
       var obligacion = crearObligacionEjemplo();
 
@@ -159,7 +160,7 @@ class SeguridadAvanzadaTest {
     @DisplayName("Rechaza dominios no autorizados fuera de la lista blanca")
     void rechazaDominioNoAutorizado() {
       var adapter = new MercadoPagoHttpAdapter(
-          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe");
+          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe", "");
 
       var obligacion = crearObligacionEjemplo();
 
@@ -177,7 +178,7 @@ class SeguridadAvanzadaTest {
     @DisplayName("Rechaza URLs que incluyan credenciales o user-info en la URL")
     void rechazaUserInfoEnUrl() {
       var adapter = new MercadoPagoHttpAdapter(
-          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe,localhost");
+          "https://api.mercadopago.com", "token", "key", "colegio.edu.pe,localhost", "");
 
       var obligacion = crearObligacionEjemplo();
 
@@ -213,7 +214,7 @@ class SeguridadAvanzadaTest {
       var service = new TesoreriaService(
           mapper, obligaciones, pagos, conceptos, matriculas,
           anios, verificador, mercadoPago, comprobantes, actor,
-          apoderados, estudianteApoderados);
+          apoderados, estudianteApoderados, mock(GestionarPagoMatriculaPublicaUseCase.class));
 
       Long obligacionId = 55L;
       Long matriculaId = 10L;
@@ -270,7 +271,7 @@ class SeguridadAvanzadaTest {
       var service = new TesoreriaService(
           mapper, obligaciones, pagos, conceptos, matriculas,
           anios, verificador, mercadoPago, comprobantes, actor,
-          apoderados, estudianteApoderados);
+          apoderados, estudianteApoderados, mock(GestionarPagoMatriculaPublicaUseCase.class));
 
       Long obligacionId = 55L;
       Long matriculaId = 10L;

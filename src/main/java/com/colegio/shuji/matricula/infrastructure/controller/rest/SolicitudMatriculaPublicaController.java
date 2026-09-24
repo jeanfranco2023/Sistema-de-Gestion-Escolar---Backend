@@ -6,18 +6,27 @@ import com.colegio.shuji.matricula.application.dto.out.CatalogoMatriculaPublicaR
 import com.colegio.shuji.matricula.application.dto.out.PagoMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaAdminResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto;
+import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
-import com.colegio.shuji.matricula.application.service.PagoMatriculaPublicaService;
-import com.colegio.shuji.matricula.application.service.SolicitudMatriculaPublicaService;
+import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
+import com.colegio.shuji.matricula.application.port.out.AlmacenDocumentosMatriculaPort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
+import com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,12 +50,21 @@ public class SolicitudMatriculaPublicaController {
   private static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
 
   private final SolicitudMatriculaPublicaService solicitudes;
-  private final PagoMatriculaPublicaService pagos;
+  private final GestionarPagoMatriculaPublicaUseCase pagos;
   private final GeminiDocumentoMatriculaPort gemini;
+  private final ReniecServicePort consultaDni;
+  private final AlmacenDocumentosMatriculaPort almacenDocumentos;
 
   @GetMapping("/public/catalogo")
   public CatalogoMatriculaPublicaResponseDto catalogo() {
     return solicitudes.catalogo();
+  }
+
+  @GetMapping("/public/dni/{dni}")
+  public ReniecServicePort.Identidad consultarDni(@PathVariable @jakarta.validation.constraints.Pattern(regexp = "[0-9]{8}") String dni) {
+    return consultaDni.consultar(dni)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+            "No se encontraron nombres para el DNI o el proveedor no está disponible"));
   }
 
   @PostMapping("/public")
@@ -78,12 +96,18 @@ public class SolicitudMatriculaPublicaController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo leer el documento");
     }
     try {
+      almacenDocumentos.validarConfiguracion();
       String mimeType = detectarMime(bytes);
       String declarados = solicitudes.prepararValidacion(id, token, tipo);
       int separador = declarados.lastIndexOf('|');
       var resultado = gemini.validar(
           tipo, bytes, mimeType, declarados.substring(0, separador), declarados.substring(separador + 1));
-      return solicitudes.guardarResultadoDocumento(id, token, tipo, resultado);
+      var archivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
+      String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+      return solicitudes.guardarResultadoDocumento(
+          id, token, tipo, resultado, archivo.bucket(), archivo.objectKey(), mimeType, bytes.length, sha256);
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 no está disponible", ex);
     } finally {
       java.util.Arrays.fill(bytes, (byte) 0);
     }
@@ -102,6 +126,20 @@ public class SolicitudMatriculaPublicaController {
       @RequestHeader(value = TOKEN_HEADER, required = false) String token,
       @Valid @RequestBody ConfirmarPagoPublicoRequest request) {
     return pagos.confirmarRetorno(id, token, request.paymentId());
+  }
+
+  @GetMapping(value = "/public/{id}/comprobante", produces = MediaType.TEXT_HTML_VALUE)
+  public ResponseEntity<byte[]> descargarComprobante(
+      @PathVariable UUID id,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+    return documentoHtml("comprobante-matricula-" + id + ".html", solicitudes.generarComprobanteHtml(id, token));
+  }
+
+  @GetMapping(value = "/public/{id}/ficha", produces = MediaType.TEXT_HTML_VALUE)
+  public ResponseEntity<byte[]> descargarFicha(
+      @PathVariable UUID id,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+    return documentoHtml("ficha-matricula-" + id + ".html", solicitudes.generarFichaMatriculaHtml(id, token));
   }
 
   @GetMapping("/admin")
@@ -124,6 +162,19 @@ public class SolicitudMatriculaPublicaController {
     solicitudes.rechazarAdmin(id);
   }
 
+  @GetMapping("/admin/{id}/documentos/{tipo}/url")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  public DocumentoAdminDescarga descargarDocumentoAdmin(
+      @PathVariable UUID id, @PathVariable TipoDocumentoSolicitud tipo) {
+    var documento = solicitudes.documentoDescargaAdmin(id, tipo);
+    return new DocumentoAdminDescarga(
+        almacenDocumentos.urlFirmada(documento.bucket(), documento.objectKey()),
+        documento.mimeType(), documento.tamanoBytes(), documento.actualizadoAt());
+  }
+
+  public record DocumentoAdminDescarga(String url, String mimeType, long tamanoBytes,
+                                       java.time.OffsetDateTime actualizadoAt) {}
+
   private String detectarMime(byte[] bytes) {
     if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F' && bytes[4] == '-') {
       return MediaType.APPLICATION_PDF_VALUE;
@@ -142,4 +193,12 @@ public class SolicitudMatriculaPublicaController {
   }
 
   public record ConfirmarPagoPublicoRequest(@NotBlank String paymentId) {}
+
+  private ResponseEntity<byte[]> documentoHtml(String nombre, String contenido) {
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(nombre, StandardCharsets.UTF_8).build().toString())
+        .body(contenido.getBytes(StandardCharsets.UTF_8));
+  }
 }

@@ -122,6 +122,12 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "pago_id", length = 100)
   private String pagoId;
 
+  @Column(name = "comprobante_pago_codigo", length = 40, unique = true)
+  private String comprobantePagoCodigo;
+
+  @Column(name = "documentos_emitidos_at")
+  private OffsetDateTime documentosEmitidosAt;
+
   @Column(name = "pago_monto", precision = 10, scale = 2, nullable = false)
   private BigDecimal pagoMonto = new BigDecimal("1.00");
 

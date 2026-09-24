@@ -10,8 +10,10 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(AuthStore);
   const auth = inject(AuthService);
 
-  // Skip auth header for authentication endpoints
-  if (req.url.includes('/api/v1/auth/')) {
+  // The public enrollment flow uses its own one-time request token, not a user session.
+  // Avoid attaching stale admin credentials or logging a family out on public API errors.
+  if (req.url.includes('/api/v1/auth/')
+      || /\/api\/v1\/solicitudes-matricula\/public(?:\/|$)/.test(req.url)) {
     return next(req);
   }
 

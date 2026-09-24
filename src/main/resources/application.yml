@@ -93,7 +93,15 @@ integraciones:
       access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
       webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
       return-url-hosts: ${MERCADOPAGO_RETURN_URL_HOSTS:}
+      matricula-return-url: ${MERCADOPAGO_MATRICULA_RETURN_URL:}
       api-url: ${MERCADOPAGO_API_URL:https://api.mercadopago.com}
+
+supabase:
+  storage:
+    url: ${SUPABASE_URL:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+    bucket: ${SUPABASE_DOCUMENTOS_BUCKET:matricula-documentos}
+    signed-url-seconds: ${SUPABASE_DOCUMENTOS_SIGNED_URL_SECONDS:60}
 
 management:
   endpoints:

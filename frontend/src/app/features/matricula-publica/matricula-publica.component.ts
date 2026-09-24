@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { finalize, firstValueFrom } from 'rxjs';
 import { MatriculaPublicaService } from '../../core/services/matricula-publica.service';
 import {
   CatalogoMatriculaPublicaDto,
@@ -24,6 +25,8 @@ type ModalEtapa = 'documentos' | 'validacion' | 'pago' | 'exito' | null;
 })
 export class MatriculaPublicaComponent implements OnInit, OnDestroy {
   private readonly api = inject(MatriculaPublicaService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private pollHandle: number | null = null;
 
   readonly catalogo = signal<CatalogoMatriculaPublicaDto>({ anios: [], secciones: [] });
@@ -31,12 +34,15 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
   readonly modal = signal<ModalEtapa>(null);
   readonly cargandoCatalogo = signal(true);
   readonly procesando = signal(false);
+  readonly consultandoDniEstudiante = signal(false);
+  readonly consultandoDniApoderado = signal(false);
   readonly error = signal('');
   readonly estadoPago = signal('');
   readonly enlacePago = signal('');
   readonly montoPago = signal(1);
   readonly anioId = signal<number | null>(null);
   readonly seccionId = signal<number | null>(null);
+  readonly mensajeDni = signal('');
 
   nombresEstudiante = '';
   apellidoPaternoEstudiante = '';
@@ -71,13 +77,13 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.restaurarSolicitud();
     this.api.catalogo().subscribe({
       next: data => {
         this.catalogo.set(data);
         const activo = data.anios.find(a => a.abierto);
         if (activo) this.anioId.set(activo.id);
         this.cargandoCatalogo.set(false);
-        this.restaurarSolicitud();
       },
       error: () => {
         this.cargandoCatalogo.set(false);
@@ -104,7 +110,89 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
     this.archivos[tipo] = archivo;
   }
 
+  consultarDni(tipo: 'estudiante' | 'apoderado'): void {
+    const dni = tipo === 'estudiante' ? this.documentoEstudiante : this.documentoApoderado;
+    if (!/^\d{8}$/.test(dni)) {
+      this.mensajeDni.set('Ingresa un DNI de 8 dígitos.');
+      return;
+    }
+    const indicador = tipo === 'estudiante' ? this.consultandoDniEstudiante : this.consultandoDniApoderado;
+    indicador.set(true);
+    this.mensajeDni.set('');
+    this.api.consultarDni(dni).pipe(finalize(() => indicador.set(false))).subscribe({
+      next: identidad => {
+        if (tipo === 'estudiante') {
+          this.nombresEstudiante = identidad.nombres;
+          this.apellidoPaternoEstudiante = identidad.apellidoPaterno;
+          this.apellidoMaternoEstudiante = identidad.apellidoMaterno;
+        } else {
+          this.nombresApoderado = identidad.nombres;
+          this.apellidoPaternoApoderado = identidad.apellidoPaterno;
+          this.apellidoMaternoApoderado = identidad.apellidoMaterno;
+        }
+        this.mensajeDni.set('Nombres y apellidos consultados. Contrástalos con el documento adjunto.');
+      },
+      error: error => this.mensajeDni.set(this.mensajeError(error, 'No fue posible consultar este DNI; verifica el número o inténtalo luego.'))
+    });
+  }
+
   abrirSolicitud(): void {
+    this.error.set('');
+    const actual = this.solicitud();
+    if (actual?.estado === 'MATRICULADA' || actual?.estado === 'RECHAZADA') {
+      this.iniciarNuevaSolicitud();
+      return;
+    }
+
+    const id = sessionStorage.getItem('shuji-solicitud-matricula-id');
+    const token = this.leerToken();
+    if (!id || !token) {
+      this.modal.set(actual?.estado === 'DOCUMENTOS_VALIDADOS' ? 'validacion' : 'documentos');
+      return;
+    }
+
+    this.procesando.set(true);
+    this.api.consultar(id, token).pipe(finalize(() => this.procesando.set(false))).subscribe({
+      next: solicitud => {
+        this.solicitud.set(solicitud);
+        this.abrirEtapaActualizada(solicitud);
+      },
+      error: error => {
+        if (error?.status === 404) {
+          this.limpiarCredencial();
+          this.solicitud.set(null);
+          this.modal.set('documentos');
+          return;
+        }
+        this.error.set(this.mensajeError(error, 'No se pudo actualizar el estado del trámite.'));
+      }
+    });
+  }
+
+  iniciarNuevaSolicitud(): void {
+    this.detenerSeguimientoPago();
+    this.limpiarCredencial();
+    this.solicitud.set(null);
+    this.archivos = { PARTIDA_NACIMIENTO: null, DNI_C4: null, RECIBO_SERVICIO: null };
+    this.nombresEstudiante = '';
+    this.apellidoPaternoEstudiante = '';
+    this.apellidoMaternoEstudiante = '';
+    this.documentoEstudiante = '';
+    this.nacimientoEstudiante = '';
+    this.generoEstudiante = 'M';
+    this.nombresApoderado = '';
+    this.apellidoPaternoApoderado = '';
+    this.apellidoMaternoApoderado = '';
+    this.documentoApoderado = '';
+    this.celularApoderado = '';
+    this.emailApoderado = '';
+    this.direccionApoderado = '';
+    this.ubigeoApoderado = '';
+    this.parentesco = 'MADRE';
+    this.consentimientoGemini = false;
+    this.seccionId.set(null);
+    this.enlacePago.set('');
+    this.estadoPago.set('');
     this.error.set('');
     this.modal.set('documentos');
   }
@@ -136,7 +224,7 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
           apellidoPaternoApoderado: this.apellidoPaternoApoderado.trim(),
           apellidoMaternoApoderado: this.apellidoMaternoApoderado.trim(),
           celularApoderado: this.celularApoderado.trim(),
-          emailApoderado: this.emailApoderado.trim(),
+          emailApoderado: this.emailApoderado.trim() || null,
           direccionApoderado: this.direccionApoderado.trim(),
           ubigeoApoderado: this.ubigeoApoderado.trim(),
           parentesco: this.parentesco,
@@ -246,6 +334,14 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
     return labels[estado];
   }
 
+  descargarComprobante(): void {
+    this.descargarDocumento('comprobante');
+  }
+
+  descargarFicha(): void {
+    this.descargarDocumento('ficha');
+  }
+
   private validarFormulario(): boolean {
     if (!this.anioId() || !this.seccionId()) return this.error.set('Selecciona año lectivo y sección.'), false;
     const required = [this.documentoEstudiante, this.nombresEstudiante, this.apellidoPaternoEstudiante,
@@ -259,6 +355,9 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
     if (!/^9\d{8}$/.test(this.celularApoderado) || !/^\d{6}$/.test(this.ubigeoApoderado)) {
       return this.error.set('Verifica el celular (9 dígitos) y el ubigeo (6 dígitos).'), false;
     }
+    if (this.emailApoderado.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.emailApoderado.trim())) {
+      return this.error.set('Ingresa un correo electrónico válido o deja el campo vacío.'), false;
+    }
     if (!this.consentimientoGemini) return this.error.set('Autoriza el procesamiento de documentos para continuar.'), false;
     if (this.documentTypes.some(type => !this.archivos[type])) return this.error.set('Adjunta los tres documentos requeridos.'), false;
     return true;
@@ -267,18 +366,114 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
   private restaurarSolicitud(): void {
     const id = sessionStorage.getItem('shuji-solicitud-matricula-id');
     const token = sessionStorage.getItem('shuji-solicitud-matricula-token');
-    if (!id || !token) return;
+    const paymentId = this.paymentIdFromReturn();
+    if (!id || !token) {
+      if (paymentId) {
+        this.limpiarParametrosPago();
+        this.error.set('No se encontró la sesión privada de la solicitud para verificar el retorno del pago.');
+      }
+      return;
+    }
     this.api.consultar(id, token).subscribe({
       next: solicitud => {
         this.solicitud.set(solicitud);
+        if (paymentId) {
+          if (solicitud.estado === 'MATRICULADA') {
+            this.limpiarParametrosPago();
+            this.mostrarExito(solicitud);
+          } else {
+            this.procesarRetornoPago(id, token, paymentId);
+          }
+          return;
+        }
         if (solicitud.estado === 'MATRICULADA') this.mostrarExito(solicitud);
         else if (solicitud.estado === 'PAGO_PENDIENTE' && solicitud.enlacePago) {
           this.enlacePago.set(solicitud.enlacePago);
+          this.montoPago.set(solicitud.montoPago);
           this.modal.set('pago');
           this.iniciarSeguimientoPago();
         }
       },
-      error: () => this.limpiarCredencial()
+      error: () => {
+        this.limpiarCredencial();
+        if (paymentId) {
+          this.limpiarParametrosPago();
+          this.error.set('No se pudo recuperar la solicitud para verificar el pago.');
+        }
+      }
+    });
+  }
+
+  private abrirEtapaActualizada(solicitud: SolicitudMatriculaPublicaDto): void {
+    switch (solicitud.estado) {
+      case 'MATRICULADA':
+        this.mostrarExito(solicitud);
+        return;
+      case 'RECHAZADA':
+        this.iniciarNuevaSolicitud();
+        return;
+      case 'PAGO_PENDIENTE':
+        this.enlacePago.set(solicitud.enlacePago ?? '');
+        this.montoPago.set(solicitud.montoPago);
+        this.modal.set('pago');
+        this.estadoPago.set('Completa el pago de prueba o consulta su confirmación.');
+        this.iniciarSeguimientoPago();
+        return;
+      case 'DOCUMENTOS_VALIDADOS':
+        this.modal.set('validacion');
+        return;
+      default:
+        this.modal.set('documentos');
+    }
+  }
+
+  private paymentIdFromReturn(): string | null {
+    const paymentId = this.route.snapshot.queryParamMap.get('payment_id')
+      ?? this.route.snapshot.queryParamMap.get('collection_id');
+    return paymentId && paymentId.toLowerCase() !== 'null' ? paymentId : null;
+  }
+
+  private procesarRetornoPago(id: string, token: string, paymentId: string): void {
+    this.limpiarParametrosPago();
+    this.modal.set('pago');
+    if (!/^\d{1,32}$/.test(paymentId)) {
+      this.estadoPago.set('Mercado Pago devolvió un identificador de pago inválido.');
+      return;
+    }
+
+    this.procesando.set(true);
+    this.estadoPago.set('Verificando el pago directamente con Mercado Pago…');
+    this.api.confirmarPago(id, token, paymentId)
+      .pipe(finalize(() => this.procesando.set(false)))
+      .subscribe({
+        next: solicitud => {
+          this.solicitud.set(solicitud);
+          if (solicitud.estado === 'MATRICULADA') {
+            this.mostrarExito(solicitud);
+            return;
+          }
+          if (solicitud.enlacePago) this.enlacePago.set(solicitud.enlacePago);
+          this.estadoPago.set('El pago aún no figura aprobado. Seguiremos consultando la confirmación segura.');
+          this.iniciarSeguimientoPago();
+        },
+        error: error => {
+          this.estadoPago.set(this.mensajeError(error, 'No se pudo verificar el pago con Mercado Pago.'));
+          this.iniciarSeguimientoPago();
+        }
+      });
+  }
+
+  private limpiarParametrosPago(): void {
+    const parametrosMercadoPago = [
+      'payment_id', 'collection_id', 'status', 'collection_status',
+      'external_reference', 'preference_id', 'merchant_order_id'
+    ];
+    const queryParams = Object.fromEntries(parametrosMercadoPago.map(parametro => [parametro, null]));
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams,
+      queryParamsHandling: 'merge',
+      replaceUrl: true
     });
   }
 
@@ -311,7 +506,36 @@ export class MatriculaPublicaComponent implements OnInit, OnDestroy {
     this.detenerSeguimientoPago();
     this.solicitud.set(solicitud);
     this.modal.set('exito');
-    this.limpiarCredencial();
+  }
+
+  private descargarDocumento(tipo: 'comprobante' | 'ficha'): void {
+    const id = sessionStorage.getItem('shuji-solicitud-matricula-id');
+    const token = this.leerToken();
+    if (!id || !token) {
+      this.error.set('No se encontró el acceso privado para descargar los documentos.');
+      return;
+    }
+    const solicitud = this.solicitud();
+    if (!solicitud || solicitud.estado !== 'MATRICULADA') return;
+
+    this.error.set('');
+    this.procesando.set(true);
+    const descarga = tipo === 'comprobante'
+      ? this.api.descargarComprobante(id, token)
+      : this.api.descargarFicha(id, token);
+    descarga.pipe(finalize(() => this.procesando.set(false))).subscribe({
+      next: archivo => {
+        const url = URL.createObjectURL(archivo);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = `${tipo}-matricula-${solicitud.matriculaId}.html`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: error => this.error.set(this.mensajeError(error, 'No se pudo generar el documento.'))
+    });
   }
 
   private mensajeError(error: unknown, fallback: string): string {

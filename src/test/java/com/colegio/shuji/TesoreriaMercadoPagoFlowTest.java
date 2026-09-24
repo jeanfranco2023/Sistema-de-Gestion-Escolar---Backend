@@ -13,6 +13,7 @@ import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPor
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
+import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
@@ -47,7 +48,8 @@ class TesoreriaMercadoPagoFlowTest {
   private final TesoreriaService service = new TesoreriaService(
       mapper, obligaciones, mock(PagoRepositoryPort.class), conceptos, matriculas,
       mock(AnioLectivoRepositoryPort.class), mock(VerificarPagoPort.class), mercadoPago,
-      mock(EmitirComprobanteUseCase.class), actor, apoderados, vinculos);
+      mock(EmitirComprobanteUseCase.class), actor, apoderados, vinculos,
+      mock(GestionarPagoMatriculaPublicaUseCase.class));
 
   @Test
   void apoderadoSoloConsultaObligacionesDeSuResponsabilidadEconomica() {

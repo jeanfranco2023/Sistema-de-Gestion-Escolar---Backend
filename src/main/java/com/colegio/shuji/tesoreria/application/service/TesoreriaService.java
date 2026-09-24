@@ -7,7 +7,7 @@ import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPor
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
-import com.colegio.shuji.matricula.application.service.PagoMatriculaPublicaService;
+import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
@@ -62,7 +62,7 @@ public class TesoreriaService
   private final ActorActualPort actor;
   private final ApoderadoRepositoryPort apoderados;
   private final EstudianteApoderadoRepositoryPort estudianteApoderados;
-  private final PagoMatriculaPublicaService matriculasPublicas;
+  private final GestionarPagoMatriculaPublicaUseCase matriculasPublicas;
 
   @Transactional(readOnly = true)
   public List<ConceptoCobroResponseDto> listarConceptos() {

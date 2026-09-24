@@ -74,4 +74,31 @@ class ReniecHttpAdapterTest {
       server.stop(0);
     }
   }
+
+  @Test
+  void consultaDniIndicadoYContrastaElNumeroDeRespuesta() throws Exception {
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext("/dni", exchange -> {
+      String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+      assertTrue(request.contains("\"dni\":\"73602651\""));
+      var json = "{\"success\":true,\"data\":{\"numero\":\"73602651\","
+          + "\"nombres\":\"Persona de prueba\",\"apellido_paterno\":\"Muestra\","
+          + "\"apellido_materno\":\"Controlada\"}}";
+      byte[] data = json.getBytes(StandardCharsets.UTF_8);
+      exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+      exchange.sendResponseHeaders(200, data.length);
+      try (var output = exchange.getResponseBody()) { output.write(data); }
+    });
+    server.start();
+    try {
+      var adapter = new ReniecHttpAdapter(
+          "http://127.0.0.1:" + server.getAddress().getPort() + "/dni", "token-test", "");
+      var identidad = adapter.consultar("73602651");
+      assertTrue(identidad.isPresent());
+      assertEquals("73602651", identidad.get().numeroDocumento());
+      assertEquals("Persona de prueba", identidad.get().nombres());
+    } finally {
+      server.stop(0);
+    }
+  }
 }

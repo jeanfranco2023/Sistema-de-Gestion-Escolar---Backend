@@ -13,11 +13,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface JpaSeccionRepository extends JpaRepository<SeccionEntity, Integer> {
   @Modifying
-  @Query(value = "update secciones set vacantes_ocupadas = vacantes_ocupadas + 1 where id = :id and vacantes_ocupadas < cupo_maximo", nativeQuery = true)
+  @Query("""
+      update SeccionEntity e
+      set e.vacantesOcupadas = e.vacantesOcupadas + 1
+      where e.id = :id and e.vacantesOcupadas < e.cupoMaximo
+      """)
   int reservarVacante(@Param("id") Integer id);
 
   @Modifying
-  @Query(value = "update secciones set vacantes_ocupadas = vacantes_ocupadas - 1 where id = :id and vacantes_ocupadas > 0", nativeQuery = true)
+  @Query("""
+      update SeccionEntity e
+      set e.vacantesOcupadas = e.vacantesOcupadas - 1
+      where e.id = :id and e.vacantesOcupadas > 0
+      """)
   int liberarVacante(@Param("id") Integer id);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)

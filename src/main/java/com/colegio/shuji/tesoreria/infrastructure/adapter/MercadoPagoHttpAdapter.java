@@ -29,13 +29,15 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   private final String accessToken;
   private final String publicKey;
   private final Set<String> returnUrlHosts;
+  private final String matriculaReturnUrl;
   private final RestClient client;
 
   public MercadoPagoHttpAdapter(
       @Value("${integraciones.pagos.mercadopago.api-url:https://api.mercadopago.com}") String apiUrl,
       @Value("${integraciones.pagos.mercadopago.access-token:}") String accessToken,
       @Value("${integraciones.pagos.mercadopago.public-key:APP_USR-86474939-d202-45ae-a7f3-eaeeb7b5606a}") String publicKey,
-      @Value("${integraciones.pagos.mercadopago.return-url-hosts:}") String returnUrlHosts) {
+      @Value("${integraciones.pagos.mercadopago.return-url-hosts:}") String returnUrlHosts,
+      @Value("${integraciones.pagos.mercadopago.matricula-return-url:}") String matriculaReturnUrl) {
     this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
     this.accessToken = accessToken;
     this.publicKey = publicKey;
@@ -45,6 +47,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
             .filter(v -> !v.isBlank())
             .map(v -> v.toLowerCase(java.util.Locale.ROOT))
             .collect(Collectors.toUnmodifiableSet());
+    this.matriculaReturnUrl = matriculaReturnUrl == null ? "" : matriculaReturnUrl.trim();
     var factory =
         new JdkClientHttpRequestFactory(
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
@@ -127,6 +130,14 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     body.put("expires", true);
     body.put("expiration_date_from", java.time.OffsetDateTime.now().toString());
     body.put("expiration_date_to", java.time.OffsetDateTime.now().plusMinutes(30).toString());
+    if (!matriculaReturnUrl.isBlank()) {
+      validarUrlSegura(matriculaReturnUrl);
+      body.put("back_urls", Map.of(
+          "success", matriculaReturnUrl,
+          "failure", matriculaReturnUrl,
+          "pending", matriculaReturnUrl));
+      body.put("auto_return", "approved");
+    }
 
     var response =
         client

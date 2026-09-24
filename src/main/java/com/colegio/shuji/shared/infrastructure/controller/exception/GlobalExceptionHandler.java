@@ -16,6 +16,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Manejador global centralizado de excepciones para la API REST. */
 @Slf4j
@@ -121,6 +122,16 @@ public class GlobalExceptionHandler {
             ex.getMessage(),
             request.getRequestURI());
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+  }
+
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<ErrorResponse> handleResponseStatusException(
+      ResponseStatusException ex, HttpServletRequest request) {
+    int status = ex.getStatusCode().value();
+    String message = ex.getReason() == null ? "La solicitud no pudo completarse" : ex.getReason();
+    log.warn("Solicitud rechazada en {} con HTTP {}: {}", request.getRequestURI(), status, message);
+    ErrorResponse errorResponse = ErrorResponse.of(status, "HTTP_" + status, message, request.getRequestURI());
+    return ResponseEntity.status(ex.getStatusCode()).body(errorResponse);
   }
 
   @ExceptionHandler(Exception.class)

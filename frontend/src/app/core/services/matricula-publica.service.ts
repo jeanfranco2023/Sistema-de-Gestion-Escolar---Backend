@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
   CatalogoMatriculaPublicaDto,
   CrearSolicitudMatriculaPublicaDto,
+  IdentidadDniDto,
   PagoMatriculaPublicaDto,
   SolicitudMatriculaPublicaAdminDto,
   SolicitudMatriculaPublicaDto,
@@ -18,6 +19,10 @@ export class MatriculaPublicaService {
 
   catalogo(): Observable<CatalogoMatriculaPublicaDto> {
     return this.http.get<CatalogoMatriculaPublicaDto>(`${this.baseUrl}/public/catalogo`);
+  }
+
+  consultarDni(dni: string): Observable<IdentidadDniDto> {
+    return this.http.get<IdentidadDniDto>(`${this.baseUrl}/public/dni/${encodeURIComponent(dni)}`);
   }
 
   crear(payload: CrearSolicitudMatriculaPublicaDto): Observable<SolicitudMatriculaPublicaDto> {
@@ -57,6 +62,20 @@ export class MatriculaPublicaService {
       { paymentId },
       { headers: this.tokenHeaders(token) }
     );
+  }
+
+  descargarComprobante(id: string, token: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/public/${encodeURIComponent(id)}/comprobante`, {
+      headers: this.tokenHeaders(token),
+      responseType: 'blob'
+    });
+  }
+
+  descargarFicha(id: string, token: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/public/${encodeURIComponent(id)}/ficha`, {
+      headers: this.tokenHeaders(token),
+      responseType: 'blob'
+    });
   }
 
   listarAdmin(): Observable<SolicitudMatriculaPublicaAdminDto[]> {
