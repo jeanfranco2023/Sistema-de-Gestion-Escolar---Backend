@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: shuji-backend
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
   datasource:
     url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/postgres?sslmode=${SUPABASE_DB_SSLMODE:require}
@@ -52,6 +56,12 @@ app:
     reniec:
       url: ${RENIEC_API_URL:https://api.reniec.gob.pe/v1}
       token: ${RENIEC_API_TOKEN:}
+  matricula-publica:
+    monto-prueba: ${MATRICULA_PAGO_PRUEBA_MONTO:1.00}
+    duracion-reserva-minutos: ${MATRICULA_RESERVA_MINUTOS:30}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.8-flash}
 
 # Documentación OpenAPI 3 / Swagger
 springdoc:

@@ -11,7 +11,8 @@ public interface VerificarPagoPort {
       BigDecimal monto,
       String moneda,
       MetodoPago metodo,
-      boolean aprobado) {}
+      boolean aprobado,
+      String referenciaExterna) {}
 
   PagoVerificado verificar(PasarelaProveedor proveedor, String transaccionId, String credencial);
 }

@@ -108,6 +108,50 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   }
 
   @Override
+  public PreferenciaMercadoPagoResponseDto crearPreferenciaMatriculaPublica(
+      String referencia, BigDecimal monto, String descripcion) {
+    if (accessToken == null || !accessToken.startsWith("TEST-")) {
+      throw new BusinessException(
+          "La matrícula pública está habilitada solo con credenciales de prueba de Mercado Pago");
+    }
+    Map<String, Object> item = new HashMap<>();
+    item.put("title", descripcion);
+    item.put("quantity", 1);
+    item.put("unit_price", monto.setScale(2, RoundingMode.HALF_UP));
+    item.put("currency_id", "PEN");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("items", List.of(item));
+    body.put("external_reference", referencia);
+    body.put("statement_descriptor", "SHUJI MATRICULA");
+    body.put("expires", true);
+    body.put("expiration_date_from", java.time.OffsetDateTime.now().toString());
+    body.put("expiration_date_to", java.time.OffsetDateTime.now().plusMinutes(30).toString());
+
+    var response =
+        client
+            .post()
+            .uri(apiUrl + "/checkout/preferences")
+            .header("Authorization", "Bearer " + accessToken)
+            .header("X-Idempotency-Key", referencia)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+
+    if (response == null || response.get("id") == null) {
+      throw new BusinessException("Respuesta inválida al crear pago de matrícula");
+    }
+    String preferenceId = response.get("id").toString();
+    String initPoint = response.get("init_point") == null ? "" : response.get("init_point").toString();
+    String sandboxInitPoint = response.get("sandbox_init_point") == null
+        ? "" : response.get("sandbox_init_point").toString();
+    String checkout = !sandboxInitPoint.isBlank() ? sandboxInitPoint : initPoint;
+    if (checkout.isBlank()) throw new BusinessException("Mercado Pago no devolvió el enlace de pago");
+    return new PreferenciaMercadoPagoResponseDto(preferenceId, checkout, sandboxInitPoint, publicKey);
+  }
+
+  @Override
   public VerificarPagoPort.PagoVerificado consultarPago(String paymentId) {
     if (accessToken == null || accessToken.isBlank()) {
       throw new BusinessException("Mercado Pago no configurado (access token ausente)");
@@ -125,7 +169,13 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
       throw new BusinessException("Respuesta incompleta de Mercado Pago para el pago: " + paymentId);
     }
 
-    Long obligacionPagoId = Long.valueOf(response.get("external_reference").toString());
+    String referenciaExterna = response.get("external_reference").toString();
+    Long obligacionPagoId = null;
+    try {
+      obligacionPagoId = Long.valueOf(referenciaExterna);
+    } catch (NumberFormatException ignored) {
+      // Las referencias no numéricas pertenecen a flujos ajenos a las obligaciones regulares.
+    }
 
     BigDecimal monto = BigDecimal.ZERO;
     Object amountObj = response.get("transaction_amount");
@@ -163,7 +213,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     boolean aprobado = "approved".equalsIgnoreCase(status);
 
     return new VerificarPagoPort.PagoVerificado(
-        paymentId, obligacionPagoId, monto, currencyId, metodo, aprobado);
+        paymentId, obligacionPagoId, monto, currencyId, metodo, aprobado, referenciaExterna);
   }
 
   private void validarUrlSegura(String url) {
