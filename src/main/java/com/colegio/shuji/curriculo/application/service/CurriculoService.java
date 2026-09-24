@@ -23,6 +23,7 @@ import com.colegio.shuji.curriculo.application.port.out.BloqueHorarioRepositoryP
 import com.colegio.shuji.curriculo.application.port.out.CompetenciaRepositoryPort;
 import com.colegio.shuji.curriculo.application.port.out.CurriculoRepositoryPort;
 import com.colegio.shuji.curriculo.application.port.out.DocenteHabilitadoPort;
+import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,14 @@ public class CurriculoService implements GestionarCurriculoUseCase, AsignarCarga
   private final AnioLectivoRepositoryPort anios;
   private final NivelRepositoryPort niveles;
   private final DocenteHabilitadoPort docentes;
+  private final ActorActualPort actor;
+
+  @Transactional(readOnly = true)
+  public List<AsignacionDocenteResponseDto> listarAsignaciones() {
+    var lista = actor.tieneRol("DIRECCION") || actor.tieneRol("SECRETARIA")
+        ? asignaciones.listar() : asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId());
+    return lista.stream().map(mapper::toResponse).toList();
+  }
 
   public AreaCurricularResponseDto crearArea(CrearAreaRequestDto r) {
     requerido(niveles.buscarPorId(r.nivelId()));

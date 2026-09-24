@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -41,6 +42,12 @@ public class ComunicadoController {
   @Operation(summary = "publicacion.publicar")
   public ComunicadoResponseDto publicarComunicado(@Valid @RequestBody EmitirComunicadoRequestDto r) {
     return publicacion.publicar(r);
+  }
+
+  @GetMapping("")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  public List<ComunicadoResponseDto> listarPublicados() {
+    return publicacion.listarPublicados();
   }
 
   @GetMapping("/{id}/metricas")

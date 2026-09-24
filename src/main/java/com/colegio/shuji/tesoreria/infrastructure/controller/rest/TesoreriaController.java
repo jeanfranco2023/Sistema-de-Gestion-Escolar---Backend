@@ -5,6 +5,7 @@ import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnuales
 import com.colegio.shuji.tesoreria.application.dto.in.RegistrarPagoCajaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RevertirPagoRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.out.EstadoCuentaEstudianteResponseDto;
+import com.colegio.shuji.tesoreria.application.dto.out.ConceptoCobroResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.TransaccionResponseDto;
@@ -37,6 +38,12 @@ public class TesoreriaController {
   private final ProcesarPagoPasarelaUseCase pagos;
   private final RevertirPagoUseCase reversiones;
 
+  @GetMapping("/conceptos")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  public List<ConceptoCobroResponseDto> listarConceptos() {
+    return cronograma.listarConceptos();
+  }
+
   @PostMapping("/obligaciones")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   @Operation(summary = "cronograma.generarCronograma")
@@ -50,6 +57,12 @@ public class TesoreriaController {
   @Operation(summary = "cronograma.obligacionesMatricula")
   public List<ObligacionResponseDto> listarObligacionesMatricula(@RequestParam Long matriculaId) {
     return cronograma.obligacionesMatricula(matriculaId);
+  }
+
+  @GetMapping("/mis-obligaciones")
+  @PreAuthorize("hasRole('APODERADO')")
+  public List<ObligacionResponseDto> listarMisObligaciones() {
+    return cronograma.misObligaciones();
   }
 
   @GetMapping("/estudiantes/{id}/estado-cuenta")

@@ -66,7 +66,7 @@ public class AcademicoController {
   }
 
   @GetMapping("/anios")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "calendario.listarAnios")
   public List<AnioLectivoResponseDto> listarAnios() {
     return calendario.listarAnios();

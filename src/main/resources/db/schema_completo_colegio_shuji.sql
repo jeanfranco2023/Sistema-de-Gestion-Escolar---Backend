@@ -868,6 +868,19 @@ INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALU
     ('CONSTANCIA_ESTUDIOS', 'Emisión de Constancia de Estudios', 'CERTIFICADO', 25.00)
 ON CONFLICT (codigo) DO NOTHING;
 
+-- Contraseña sin hash para el usuario de práctica (cambiar antes de cualquier uso real): Admin2026!
+INSERT INTO usuarios (username, email, password_hash, activo)
+VALUES ('fq94289@gmail.com', 'fq94289@gmail.com', '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2', TRUE)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO usuario_roles (usuario_id, rol_id)
+SELECT u.id, r.id
+FROM usuarios u
+JOIN roles r ON r.codigo = 'DIRECCION'
+WHERE u.email = 'fq94289@gmail.com'
+ON CONFLICT (usuario_id, rol_id) DO NOTHING;
+
+
 -- <<< FIN V1__schema_colegio_shuji.sql
 
 -- >>> INICIO V2__series_indices_seguridad_y_rls.sql

@@ -53,6 +53,11 @@ public class ComunicadoService
   private final AnioLectivoRepositoryPort anios;
   private final ActorActualPort actor;
 
+  @Transactional(readOnly = true)
+  public List<ComunicadoResponseDto> listarPublicados() {
+    return comunicados.listar().stream().map(mapper::toResponse).toList();
+  }
+
   public ComunicadoResponseDto publicar(EmitirComunicadoRequestDto r) {
     requerido(anios.buscarPorId(r.anioLectivoId()));
     if (r.seccionId() != null) {

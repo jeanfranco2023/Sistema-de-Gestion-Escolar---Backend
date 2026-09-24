@@ -81,4 +81,10 @@ public class CurriculoController {
   public AsignacionDocenteResponseDto asignarDocente(@Valid @RequestBody AsignarDocenteRequestDto r) {
     return carga.asignarDocente(r);
   }
+
+  @GetMapping("/asignaciones")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  public List<AsignacionDocenteResponseDto> listarAsignaciones() {
+    return carga.listarAsignaciones();
+  }
 }

@@ -34,6 +34,12 @@ public class ConvivenciaController {
   private final RegistrarIncidenciaUseCase registro;
   private final GestionarIncidenciasUseCase gestion;
 
+  @GetMapping("/incidencias")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  public List<IncidenciaResponseDto> listarIncidencias() {
+    return gestion.listar();
+  }
+
   @PostMapping("/incidencias")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "registro.registrar")

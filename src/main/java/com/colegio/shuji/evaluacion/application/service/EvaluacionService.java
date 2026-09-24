@@ -10,6 +10,7 @@ import com.colegio.shuji.curriculo.application.port.out.CompetenciaRepositoryPor
 import com.colegio.shuji.evaluacion.application.dto.in.CalificacionItemRequestDto;
 import com.colegio.shuji.evaluacion.application.dto.in.RegistrarCalificacionesMasivasRequestDto;
 import com.colegio.shuji.evaluacion.application.dto.out.CalificacionResponseDto;
+import com.colegio.shuji.evaluacion.application.dto.out.FilaCalificacionResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.EstudiantesEnRiesgoResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.LibretaNotasResponseDto;
 import com.colegio.shuji.evaluacion.application.mapper.EvaluacionMapper;
@@ -45,6 +46,37 @@ public class EvaluacionService
   private final MatriculaRepositoryPort matriculas;
   private final CompetenciaRepositoryPort competencias;
   private final ActorActualPort actor;
+
+  @Transactional(readOnly = true)
+  public List<FilaCalificacionResponseDto> listarMatriz(Long asignacionDocenteId, Short periodoAcademicoId, Short competenciaId) {
+    var asignacion = requerido(asignaciones.buscarPorId(asignacionDocenteId));
+    actor.verificarDocente(asignacion.getDocenteUsuarioId());
+    var periodo = requerido(periodos.buscarPorId(periodoAcademicoId));
+    var competencia = requerido(competencias.buscarPorId(competenciaId));
+    exigir(asignacion.getAnioLectivoId().equals(periodo.getAnioLectivoId())
+        && asignacion.getAreaCurricularId().equals(competencia.getAreaId()), "Periodo o competencia incompatible");
+    var notas = calificaciones.buscarPorAsignacionYPeriodo(asignacionDocenteId, periodoAcademicoId).stream()
+        .filter(c -> c.getCompetenciaId().equals(competenciaId))
+        .collect(Collectors.toMap(CalificacionCneb::getMatriculaId, Function.identity(), (a, b) -> a));
+    return matriculas.buscarPorSeccionId(asignacion.getSeccionId()).stream()
+        .filter(m -> m.getEstadoMatricula() == EstadoMatricula.MATRICULADO
+            && m.getAnioLectivoId().equals(asignacion.getAnioLectivoId()))
+        .map(m -> {
+          var nota = notas.get(m.getId());
+          return new FilaCalificacionResponseDto(m.getId(), competenciaId,
+              nota == null ? null : nota.getCalificacionCualitativa(),
+              nota == null ? null : nota.getConclusionDescriptiva(),
+              nota == null ? false : nota.necesitaRefuerzo());
+        }).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<CalificacionResponseDto> listar(Long asignacionDocenteId, Short periodoAcademicoId) {
+    var asignacion = requerido(asignaciones.buscarPorId(asignacionDocenteId));
+    actor.verificarDocente(asignacion.getDocenteUsuarioId());
+    return calificaciones.buscarPorAsignacionYPeriodo(asignacionDocenteId, periodoAcademicoId)
+        .stream().map(mapper::toResponse).toList();
+  }
 
   public List<CalificacionResponseDto> registrar(RegistrarCalificacionesMasivasRequestDto r) {
     var snapshot = requerido(periodos.buscarPorId(r.periodoAcademicoId()));

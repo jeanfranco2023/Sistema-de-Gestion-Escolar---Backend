@@ -81,8 +81,9 @@ logging:
 
 integraciones:
   reniec:
-    url: ${RENIEC_PROXY_URL:}
-    token: ${RENIEC_PROXY_TOKEN:}
+    url: ${DNI_API_URL:${RENIEC_PROXY_URL:}}
+    api-key: ${DNI_API_KEY:}
+    token: ${DNI_API_TOKEN:${RENIEC_PROXY_TOKEN:}}
   pagos:
     verificador-url: ${PAGOS_VERIFICADOR_URL:}
     api-token: ${PAGOS_API_TOKEN:}

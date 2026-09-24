@@ -16,6 +16,8 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,15 +46,12 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
             .noneMatch(e -> e.getTipoDocumento() == r.tipoDocumento()),
         "Documento ya registrado");
     var e = mapper.toDomain(r);
+    e.actualizarCodigoSiagie(
+        r.codigoEstudianteSiagie() == null || r.codigoEstudianteSiagie().isBlank()
+            ? null
+            : r.codigoEstudianteSiagie().trim());
     e.iniciarRegistroManual();
     e.activar();
-    if (r.tipoDocumento() == TipoDocumento.DNI)
-      reniec
-          .consultar(r.numeroDocumento())
-          .ifPresent(
-              d ->
-                  e.verificarIdentidad(
-                      d.numeroDocumento(), d.nombres(), d.apellidoPaterno(), d.apellidoMaterno()));
     return mapper.toResponse(estudiantes.guardar(e));
   }
 
@@ -69,8 +68,8 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
           .consultar(r.numeroDocumento())
           .ifPresent(
               d ->
-                  a.verificarIdentidad(
-                      d.numeroDocumento(), d.nombres(), d.apellidoPaterno(), d.apellidoMaterno()));
+                  a.completarDesdeConsultaDni(
+                      d.nombres(), d.apellidoPaterno(), d.apellidoMaterno()));
     return mapper.toResponse(apoderados.guardar(a));
   }
 
@@ -95,7 +94,18 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
   }
 
   @Transactional(readOnly = true)
+  public List<EstudianteResponseDto> listarEstudiantes() {
+    return estudiantes.listar().stream().map(mapper::toResponse).toList();
+  }
+
+  @Transactional(readOnly = true)
   public ApoderadoResponseDto consultarApoderado(Long id) {
     return mapper.toResponse(requerido(apoderados.buscarPorId(id)));
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<ReniecServicePort.Identidad> consultarDni(String dni) {
+    validarDocumento(TipoDocumento.DNI, dni);
+    return reniec.consultar(dni);
   }
 }

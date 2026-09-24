@@ -68,7 +68,6 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     Map<String, Object> body = new HashMap<>();
     body.put("items", List.of(item));
     body.put("external_reference", obligacion.getId().toString());
-    body.put("auto_return", "approved");
 
     validarUrlSegura(backUrlSuccess);
     validarUrlSegura(backUrlFailure);
@@ -76,6 +75,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     Map<String, String> backUrls = new HashMap<>();
     if (backUrlSuccess != null && !backUrlSuccess.isBlank()) {
       backUrls.put("success", backUrlSuccess);
+      body.put("auto_return", "approved");
     }
     if (backUrlFailure != null && !backUrlFailure.isBlank()) {
       backUrls.put("failure", backUrlFailure);

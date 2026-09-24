@@ -30,6 +30,11 @@ public class ConvivenciaService implements RegistrarIncidenciaUseCase, Gestionar
   private final MatriculaRepositoryPort matriculas;
   private final ActorActualPort actor;
 
+  @Transactional(readOnly = true)
+  public List<IncidenciaResponseDto> listar() {
+    return incidencias.listar().stream().map(mapper::toResponse).toList();
+  }
+
   public IncidenciaResponseDto registrar(RegistrarIncidenciaRequestDto r) {
     var m = requerido(matriculas.buscarPorId(r.matriculaId()));
     exigir(m.getEstadoMatricula() == EstadoMatricula.MATRICULADO, "Matrícula no activa");

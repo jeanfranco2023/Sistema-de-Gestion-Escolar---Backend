@@ -17,6 +17,9 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import com.colegio.shuji.shared.domain.exception.BusinessException;
+import com.colegio.shuji.tesoreria.application.port.out.ObligacionRepositoryPort;
+import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   private final EstudianteRepositoryPort estudiantes;
   private final ApoderadoRepositoryPort apoderados;
   private final EstudianteApoderadoRepositoryPort vinculos;
+  private final ObligacionRepositoryPort obligaciones;
   private final SeccionRepositoryPort secciones;
   private final AnioLectivoRepositoryPort anios;
 
@@ -63,8 +67,34 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
         vinculos.buscarPorEstudianteId(m.getEstudianteId()).stream()
             .anyMatch(v -> Boolean.TRUE.equals(v.getEsResponsableEconomico())),
         "Se requiere responsable económico");
+    if (m.getEstadoMatricula() != EstadoMatricula.MATRICULADO) {
+      validarPagoMatricula(m.getId());
+    }
     m.confirmar(OffsetDateTime.now());
     return mapper.toResponse(matriculas.guardar(m));
+  }
+
+  private void validarPagoMatricula(Long matriculaId) {
+    var cuotasMatricula =
+        obligaciones.buscarPorMatriculaId(matriculaId).stream()
+            .filter(
+                o ->
+                    o.getTipoConcepto() == TipoConcepto.MATRICULA
+                        && o.getNumeroCuota() != null
+                        && o.getNumeroCuota() == 0)
+            .map(o -> requerido(obligaciones.bloquearPorId(o.getId())))
+            .toList();
+
+    exigir(
+        !cuotasMatricula.isEmpty(),
+        "Genere la obligación de matrícula en Tesorería antes de confirmarla.");
+    exigir(
+        cuotasMatricula.stream()
+            .allMatch(
+                o ->
+                    o.estaPagadoTotal()
+                        && o.saldo().compareTo(java.math.BigDecimal.ZERO) == 0),
+        "La cuota de matrícula debe estar pagada por completo antes de confirmar.");
   }
 
   public int liberarVencidas() {

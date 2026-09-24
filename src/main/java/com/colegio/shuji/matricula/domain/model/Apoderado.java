@@ -76,4 +76,10 @@ public class Apoderado {
     apellidoMaterno = materno;
     marcarValidadoReniec();
   }
+
+  public void completarDesdeConsultaDni(String nombres, String paterno, String materno) {
+    this.nombres = nombres;
+    this.apellidoPaterno = paterno;
+    this.apellidoMaterno = materno;
+  }
 }

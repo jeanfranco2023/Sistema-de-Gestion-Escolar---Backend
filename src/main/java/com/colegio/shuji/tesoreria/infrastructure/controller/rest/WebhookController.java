@@ -66,10 +66,11 @@ public class WebhookController {
       transaccionId = body.get("id").toString();
     }
 
-    if (firmaMercadoPago.estaConfigurado()) {
-      if (!firmaMercadoPago.validar(signature, requestId, transaccionId)) {
-        return ResponseEntity.status(401).build();
-      }
+    if (!firmaMercadoPago.estaConfigurado()) {
+      return ResponseEntity.status(503).build();
+    }
+    if (!firmaMercadoPago.validar(signature, requestId, transaccionId)) {
+      return ResponseEntity.status(401).build();
     }
 
     String eventType = type != null ? type : topic;

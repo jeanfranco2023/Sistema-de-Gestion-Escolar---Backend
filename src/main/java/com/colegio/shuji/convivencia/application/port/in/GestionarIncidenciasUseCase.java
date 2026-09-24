@@ -11,4 +11,5 @@ public interface GestionarIncidenciasUseCase {
   HistorialConductualEstudianteResponseDto historial(Long matriculaId);
 
   List<IncidenciaResponseDto> citaciones();
+  List<IncidenciaResponseDto> listar();
 }

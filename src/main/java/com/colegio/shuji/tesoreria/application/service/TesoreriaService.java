@@ -16,6 +16,7 @@ import com.colegio.shuji.tesoreria.application.dto.in.ProcesarPagoWebhookRequest
 import com.colegio.shuji.tesoreria.application.dto.in.RegistrarPagoCajaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RevertirPagoRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.out.EstadoCuentaEstudianteResponseDto;
+import com.colegio.shuji.tesoreria.application.dto.out.ConceptoCobroResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto;
 import com.colegio.shuji.tesoreria.application.dto.out.TransaccionResponseDto;
@@ -62,6 +63,11 @@ public class TesoreriaService
   private final ApoderadoRepositoryPort apoderados;
   private final EstudianteApoderadoRepositoryPort estudianteApoderados;
   private final PagoMatriculaPublicaService matriculasPublicas;
+
+  @Transactional(readOnly = true)
+  public List<ConceptoCobroResponseDto> listarConceptos() {
+    return conceptos.listar().stream().map(mapper::toResponse).toList();
+  }
 
   public List<ObligacionResponseDto> generarCronograma(GenerarObligacionesAnualesRequestDto r) {
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
@@ -110,6 +116,22 @@ public class TesoreriaService
   @Transactional(readOnly = true)
   public List<ObligacionResponseDto> obligacionesMatricula(Long id) {
     return obligaciones.buscarPorMatriculaId(id).stream().map(mapper::toResponse).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<ObligacionResponseDto> misObligaciones() {
+    var apoderado = apoderados.buscarPorUsuarioId(actor.usuarioId()).stream().findFirst();
+    if (apoderado.isEmpty()) return List.of();
+    var matriculaIds = estudianteApoderados.buscarPorApoderadoId(apoderado.get().getId()).stream()
+        .filter(v -> Boolean.TRUE.equals(v.getEsResponsableEconomico()))
+        .flatMap(v -> matriculas.buscarPorEstudianteId(v.getEstudianteId()).stream())
+        .map(m -> m.getId())
+        .distinct()
+        .toList();
+    if (matriculaIds.isEmpty()) return List.of();
+    return obligaciones.buscarPorMatriculaIds(matriculaIds).stream()
+        .map(mapper::toResponse)
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -180,7 +202,9 @@ public class TesoreriaService
       }
     }
     exigir(
-        o.getEstado() == EstadoObligacion.PENDIENTE || o.getEstado() == EstadoObligacion.VENCIDO,
+        o.getEstado() == EstadoObligacion.PENDIENTE
+            || o.getEstado() == EstadoObligacion.PAGADO_PARCIAL
+            || o.getEstado() == EstadoObligacion.VENCIDO,
         "La obligación no está pendiente de pago");
     exigir(o.saldo().compareTo(BigDecimal.ZERO) > 0, "No hay saldo pendiente");
     var concepto = requerido(conceptos.buscarPorId(o.getConceptoId()));

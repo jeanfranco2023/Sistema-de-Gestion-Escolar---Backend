@@ -2,6 +2,7 @@ package com.colegio.shuji.evaluacion.infrastructure.controller.rest;
 
 import com.colegio.shuji.evaluacion.application.dto.in.RegistrarCalificacionesMasivasRequestDto;
 import com.colegio.shuji.evaluacion.application.dto.out.CalificacionResponseDto;
+import com.colegio.shuji.evaluacion.application.dto.out.FilaCalificacionResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.EstudiantesEnRiesgoResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.LibretaNotasResponseDto;
 import com.colegio.shuji.evaluacion.application.port.in.ConsultarLibretaNotasUseCase;
@@ -37,6 +38,21 @@ public class EvaluacionController {
   public List<CalificacionResponseDto> registrarCalificacionesMasivas(
       @Valid @RequestBody RegistrarCalificacionesMasivasRequestDto r) {
     return registro.registrar(r);
+  }
+
+  @GetMapping("/cneb")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  public List<CalificacionResponseDto> listarCalificaciones(
+      @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId) {
+    return registro.listar(asignacionDocenteId, periodoAcademicoId);
+  }
+
+  @GetMapping("/cneb/matriz")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  public List<FilaCalificacionResponseDto> listarMatriz(
+      @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId,
+      @RequestParam Short competenciaId) {
+    return registro.listarMatriz(asignacionDocenteId, periodoAcademicoId, competenciaId);
   }
 
   @GetMapping("/libreta/{matriculaId}")

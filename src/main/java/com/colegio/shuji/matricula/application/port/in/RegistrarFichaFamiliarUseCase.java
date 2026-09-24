@@ -6,6 +6,9 @@ import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDt
 import com.colegio.shuji.matricula.application.dto.out.ApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
+import com.colegio.shuji.matricula.application.port.out.ReniecServicePort.Identidad;
+import java.util.List;
+import java.util.Optional;
 
 public interface RegistrarFichaFamiliarUseCase {
   EstudianteResponseDto registrarEstudiante(RegistrarEstudianteRequestDto r);
@@ -16,5 +19,9 @@ public interface RegistrarFichaFamiliarUseCase {
 
   EstudianteResponseDto consultarEstudiante(Long id);
 
+  List<EstudianteResponseDto> listarEstudiantes();
+
   ApoderadoResponseDto consultarApoderado(Long id);
+
+  Optional<Identidad> consultarDni(String dni);
 }
