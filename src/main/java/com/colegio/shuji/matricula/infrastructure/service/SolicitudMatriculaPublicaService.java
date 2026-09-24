@@ -36,6 +36,7 @@ import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.tesoreria.application.port.out.MercadoPagoPort;
 import com.colegio.shuji.tesoreria.application.port.out.VerificarPagoPort.PagoVerificado;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -58,7 +59,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class SolicitudMatriculaPublicaService {
   public static final String REFERENCIA_PAGO_PREFIX = "MATRICULA_PUBLICA:";
-  private static final BigDecimal MONTO_PRUEBA = new BigDecimal("1.00");
+
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final List<EstadoSolicitudMatriculaPublica> SOLICITUDES_ACTIVAS = List.of(
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES,
@@ -76,6 +77,9 @@ public class SolicitudMatriculaPublicaService {
   private final JpaMatriculaRepository matriculas;
   private final GeminiDocumentoMatriculaPort gemini;
   private final MercadoPagoPort mercadoPago;
+
+  @Value("${app.matricula-publica.monto-matricula:350.00}")
+  private BigDecimal montoMatriculaPublica = new BigDecimal("350.00");
 
   @Value("${app.matricula-publica.duracion-reserva-minutos:30}")
   private long duracionReservaMinutos;
@@ -150,7 +154,7 @@ public class SolicitudMatriculaPublicaService {
     s.setUbigeoApoderado(r.ubigeoApoderado().trim());
     s.setParentesco(r.parentesco());
     s.setConsentimientoGemini(r.consentimientoGemini());
-    s.setPagoMonto(MONTO_PRUEBA);
+    s.setPagoMonto(obtenerMontoMatriculaPublica());
     var guardado = solicitudes.saveAndFlush(s);
     return respuesta(guardado, token);
   }
@@ -287,13 +291,15 @@ public class SolicitudMatriculaPublicaService {
     }
     s.setVacanteReservada(true);
     s.setPagoExpiraAt(ahora.plusMinutes(Math.max(5, duracionReservaMinutos)));
-    s.setPagoMonto(MONTO_PRUEBA);
+    s.setPagoMonto(obtenerMontoMatriculaPublica());
     String referencia = REFERENCIA_PAGO_PREFIX + s.getId();
     var preferencia = mercadoPago.crearPreferenciaMatriculaPublica(
-        referencia, MONTO_PRUEBA, "Derecho de matrícula escolar (prueba) ");
+        referencia, obtenerMontoMatriculaPublica(), "Derecho de matrícula escolar");
     s.setPagoPreferenciaId(preferencia.preferenceId());
-    s.setPagoEnlace(preferencia.sandboxInitPoint() == null || preferencia.sandboxInitPoint().isBlank()
-        ? preferencia.initPoint() : preferencia.sandboxInitPoint());
+    if (preferencia.sandboxInitPoint() == null || preferencia.sandboxInitPoint().isBlank()) {
+      throw new BusinessException("Mercado Pago no devolvió el enlace de sandbox para la matrícula");
+    }
+    s.setPagoEnlace(preferencia.sandboxInitPoint());
     s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
     solicitudes.saveAndFlush(s);
     return pagoResponse(s);
@@ -315,9 +321,11 @@ public class SolicitudMatriculaPublicaService {
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud no está en etapa de pago");
     }
-    if (pago.monto() == null || pago.monto().compareTo(MONTO_PRUEBA) != 0
+    if (pago.monto() == null || pago.monto().compareTo(obtenerMontoMatriculaPublica()) != 0
         || !"PEN".equalsIgnoreCase(pago.moneda())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "El pago no coincide con S/ 1.00 PEN");
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "El pago debe coincidir con S/ " + obtenerMontoMatriculaPublica().toPlainString() + " PEN");
     }
     if (!s.isVacanteReservada()) {
       if (secciones.reservarVacante(s.getSeccionId()) != 1) {
@@ -630,5 +638,16 @@ public class SolicitudMatriculaPublicaService {
 
   private ResponseStatusException noEncontrada() {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud inexistente o token inválido");
+  }
+
+  private BigDecimal obtenerMontoMatriculaPublica() {
+    if (montoMatriculaPublica == null || montoMatriculaPublica.signum() <= 0) {
+      throw new IllegalStateException("El monto de matrícula debe ser mayor que cero");
+    }
+    try {
+      return montoMatriculaPublica.setScale(2, RoundingMode.UNNECESSARY);
+    } catch (ArithmeticException e) {
+      throw new IllegalStateException("El monto de matrícula debe tener como máximo dos decimales", e);
+    }
   }
 }

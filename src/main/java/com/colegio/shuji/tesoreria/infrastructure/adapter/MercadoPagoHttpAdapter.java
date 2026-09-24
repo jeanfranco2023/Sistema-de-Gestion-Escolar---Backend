@@ -157,9 +157,10 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     String initPoint = response.get("init_point") == null ? "" : response.get("init_point").toString();
     String sandboxInitPoint = response.get("sandbox_init_point") == null
         ? "" : response.get("sandbox_init_point").toString();
-    String checkout = !sandboxInitPoint.isBlank() ? sandboxInitPoint : initPoint;
-    if (checkout.isBlank()) throw new BusinessException("Mercado Pago no devolvió el enlace de pago");
-    return new PreferenciaMercadoPagoResponseDto(preferenceId, checkout, sandboxInitPoint, publicKey);
+    if (sandboxInitPoint.isBlank()) {
+      throw new BusinessException("Mercado Pago no devolvió un enlace de sandbox para la matrícula");
+    }
+    return new PreferenciaMercadoPagoResponseDto(preferenceId, initPoint, sandboxInitPoint, publicKey);
   }
 
   @Override

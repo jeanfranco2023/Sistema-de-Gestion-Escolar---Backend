@@ -57,7 +57,7 @@ app:
       url: ${RENIEC_API_URL:https://api.reniec.gob.pe/v1}
       token: ${RENIEC_API_TOKEN:}
   matricula-publica:
-    monto-prueba: ${MATRICULA_PAGO_PRUEBA_MONTO:1.00}
+    monto-matricula: ${MATRICULA_PAGO_MONTO:350.00}
     duracion-reserva-minutos: ${MATRICULA_RESERVA_MINUTOS:30}
     gemini:
       api-key: ${GEMINI_API_KEY:}

@@ -21,7 +21,7 @@ El consolidado contiene 37 tablas y 55 claves foráneas declaradas. Revisé tipo
 
 ### Prioridad alta
 
-1. **Pago público de matrícula fijado a S/ 1.00.** SolicitudMatriculaPublicaService declara MONTO_PRUEBA, rechaza cualquier otro importe y V8 mantiene CHECK (pago_monto = 1.00). El catálogo MATRÍCULA_ANUAL está sembrado en S/ 350.00. Antes de producción, el importe debe salir del concepto aprobado y no de un valor de prueba.
+1. **Pago de matrícula S/ 350 en sandbox — corregido localmente; V13 pendiente de aplicar.** El servicio usa el importe configurable, valida el pago confirmado contra ese valor y solo acepta credenciales TEST con enlace sandbox.
 2. **Credencial fija de administrador en V6/V7.** V6 crea una cuenta conocida y V7 incluye la contraseña de práctica en texto de comentario y fija su hash. Rotar/deshabilitar esa cuenta y evitar que nuevas instalaciones reciban una credencial compartida. No editar migraciones ya aplicadas: resolver con una migración posterior y procedimiento seguro. El script consolidado sí omite esa cuenta/contraseña.
 3. **TIMESTAMPTZ mapeado a LocalDateTime.** UsuarioEntity, SesionEntity y AuditoriaCambiosEntity usan LocalDateTime para columnas TIMESTAMPTZ y construyen valores con LocalDateTime.now(). Puede perderse la zona y puede fallar la validación de tipos de Hibernate; usar Instant/OffsetDateTime y verificar contra PostgreSQL real.
 4. **CHAR(1) de género no alineado en solicitud pública.** V8 define genero_estudiante CHAR(1); SolicitudMatriculaPublicaEntity lo mapea como enum STRING sin JdbcTypeCode(CHAR), mientras que el campo equivalente en EstudianteEntity sí declara CHAR explícitamente. Alinear el mapeo o el tipo DDL y probar ddl-auto=validate.
@@ -50,3 +50,13 @@ El consolidado contiene 37 tablas y 55 claves foráneas declaradas. Revisé tipo
 - Seguridad de acceso directo: razonable en las migraciones existentes, con una brecha de RLS fail-closed en solicitudes públicas y una credencial de práctica que debe retirarse.
 - Alineación DDL/JPA: requiere corregir/validar TIMESTAMPTZ y CHAR de género público.
 - Preparación productiva: observada hasta resolver prioridad alta y el importe de matrícula de prueba.
+
+
+## Seguimiento 2026-09-24 — simulación de matrícula por S/ 350
+
+- MATRICULA_PAGO_MONTO configura el importe en PEN y su valor predeterminado es 350.00.
+- La migración V13 elimina el límite fijo de S/ 1, deja el valor predeterminado en S/ 350 y conserva todos los pagos históricos; todavía no se ha aplicado en Supabase.
+- El backend rechaza access tokens que no empiecen con TEST- y exige/devoluciona sandbox_init_point; ya no recurre al enlace normal de checkout.
+- .env no fue leído ni modificado. .env.example documenta el nuevo parámetro. Para probar contra Mercado Pago, el entorno local debe tener las credenciales de prueba configuradas.
+- mvnw -Dtest=SolicitudMatriculaPublicaDocumentosTest test: BUILD SUCCESS, 5 pruebas en verde.
+- La ejecución completa previa a la segunda prueba nueva reportó 108 pruebas, 1 fallo en ArquitecturaTest.serviciosSinComodinesNiSettersDeNegocio (RefuerzoService) y 9 errores porque PostgreSQL de pruebas no estaba disponible en 127.0.0.1:55439. No valida una transacción real con Mercado Pago.

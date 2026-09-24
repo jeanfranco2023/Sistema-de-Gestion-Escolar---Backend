@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.colegio.shuji.academico.infrastructure.entity.AnioLectivoEntity;
@@ -23,6 +24,7 @@ import com.colegio.shuji.matricula.infrastructure.repository.JpaEstudianteReposi
 import com.colegio.shuji.matricula.infrastructure.repository.JpaMatriculaRepository;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaSolicitudMatriculaPublicaRepository;
 import com.colegio.shuji.tesoreria.application.port.out.MercadoPagoPort;
+import com.colegio.shuji.tesoreria.application.port.out.VerificarPagoPort.PagoVerificado;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -106,6 +108,52 @@ class SolicitudMatriculaPublicaDocumentosTest {
     assertEquals(409, error.getStatusCode().value());
   }
 
+
+  @Test
+  void creaPreferenciaDe350YDevuelveSoloElEnlaceSandbox() throws Exception {
+    var solicitud = new SolicitudMatriculaPublicaEntity();
+    solicitud.setId(SOLICITUD_ID);
+    solicitud.setTokenHash(hash(TOKEN));
+    solicitud.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
+    solicitud.setSeccionId(9);
+    when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(secciones.reservarVacante(9)).thenReturn(1);
+    when(mercadoPago.crearPreferenciaMatriculaPublica(
+        SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + SOLICITUD_ID,
+        new BigDecimal("350.00"),
+        "Derecho de matrícula escolar"))
+        .thenReturn(new com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto(
+            "pref-350", "https://checkout.example/normal", "https://checkout.example/sandbox", "TEST-key"));
+
+    var respuesta = service.crearPago(SOLICITUD_ID, TOKEN);
+
+    assertEquals(new BigDecimal("350.00"), respuesta.monto());
+    assertEquals("https://checkout.example/sandbox", respuesta.enlacePago());
+    verify(mercadoPago).crearPreferenciaMatriculaPublica(
+        SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + SOLICITUD_ID,
+        new BigDecimal("350.00"),
+        "Derecho de matrícula escolar");
+  }
+  @Test
+  void aceptaMontoDeMatriculaDe350YContinuaValidandoLaVacante() {
+    var solicitud = new SolicitudMatriculaPublicaEntity();
+    solicitud.setId(SOLICITUD_ID);
+    solicitud.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
+    solicitud.setSeccionId(9);
+    solicitud.setAnioLectivoId((short) 2026);
+    when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(secciones.reservarVacante(9)).thenReturn(0);
+    var pago = new PagoVerificado(
+        "pago-test-350", null, new BigDecimal("350.00"), "PEN", null, true,
+        SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + SOLICITUD_ID);
+
+    var error = assertThrows(
+        ResponseStatusException.class,
+        () -> service.finalizarPagoVerificado(SOLICITUD_ID, null, pago));
+
+    assertEquals(409, error.getStatusCode().value());
+    assertTrue(error.getReason().contains("Pago aprobado, pero la vacante"));
+  }
   private SolicitudMatriculaPublicaEntity solicitudConfirmada() throws Exception {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setTokenHash(hash(TOKEN));

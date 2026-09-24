@@ -1159,7 +1159,7 @@ CREATE TABLE IF NOT EXISTS solicitudes_matricula_publica (
     pago_preferencia_id VARCHAR(100),
     pago_enlace VARCHAR(1000),
     pago_id VARCHAR(100),
-    pago_monto NUMERIC(10,2) NOT NULL DEFAULT 1.00 CHECK (pago_monto = 1.00),
+    pago_monto NUMERIC(10,2) NOT NULL DEFAULT 350.00 CHECK (pago_monto > 0),
     pago_expira_at TIMESTAMPTZ,
     vacante_reservada BOOLEAN NOT NULL DEFAULT FALSE,
     estudiante_id BIGINT REFERENCES estudiantes(id) ON DELETE RESTRICT,
@@ -1429,3 +1429,17 @@ CREATE INDEX idx_sesiones_refuerzo_aula_asignada
     ON sesiones_refuerzo (aula_asignada);
 
 -- <<< FIN V12__limites_texto_periodos_activos_y_aula_refuerzo.sql
+
+-- >>> INICIO V13__monto_matricula_sandbox.sql
+-- El importe de matrícula es configurable en la aplicación (por defecto S/ 350.00).
+-- La base conserva importes históricos; solo valida que el importe sea positivo.
+ALTER TABLE solicitudes_matricula_publica
+    DROP CONSTRAINT IF EXISTS solicitudes_matricula_publica_pago_monto_check;
+
+ALTER TABLE solicitudes_matricula_publica
+    ALTER COLUMN pago_monto SET DEFAULT 350.00;
+
+ALTER TABLE solicitudes_matricula_publica
+    ADD CONSTRAINT chk_solicitudes_matricula_pago_monto_positivo
+    CHECK (pago_monto > 0);
+-- <<< FIN V13__monto_matricula_sandbox.sql
