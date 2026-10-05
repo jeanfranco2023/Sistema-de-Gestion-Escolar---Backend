@@ -20,7 +20,7 @@ public class LoteBiometrico {
   private Integer marcasValidas;
   private Integer marcasErroneas;
   private Long importadoPorUsuarioId;
-  private OffsetDateTime createdAt;
+  private OffsetDateTime fechaCreacion;
 
   public void registrarResultado(int validas, int erroneas) {
     if (validas < 0

@@ -24,6 +24,6 @@ public interface JpaSesionRepository extends JpaRepository<SesionEntity, Long> {
   void deleteByUsuarioId(@Param("usuarioId") Long usuarioId);
 
   @Modifying
-  @Query("DELETE FROM SesionEntity s WHERE s.expiraAt < :now")
+  @Query("DELETE FROM SesionEntity s WHERE s.fechaExpiracion < :now")
   void deleteExpiredSessions(@Param("now") LocalDateTime now);
 }

@@ -17,5 +17,4 @@ public class RolResponseDto {
   private Short id;
   private String codigo;
   private String nombre;
-  private String descripcion;
 }

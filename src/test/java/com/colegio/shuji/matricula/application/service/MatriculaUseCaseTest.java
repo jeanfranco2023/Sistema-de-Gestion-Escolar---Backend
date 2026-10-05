@@ -74,8 +74,8 @@ class MatriculaUseCaseTest {
     lenient().when(mapper.toResponse(any(Matricula.class))).thenAnswer(call -> {
       Matricula saved = call.getArgument(0);
       return new com.colegio.shuji.matricula.application.dto.out.MatriculaResponseDto(
-          saved.getId(), null, saved.getAnioLectivoId(), saved.getEstudianteId(), saved.getSeccionId(),
-          saved.getFechaMatricula(), saved.getEstadoMatricula(), saved.getReservaExpiraAt(), saved.getObservaciones());
+          saved.getId(), saved.getAnioLectivoId(), saved.getEstudianteId(), saved.getSeccionId(),
+          saved.getFechaMatricula(), saved.getEstadoMatricula(), saved.getFechaExpiracionReserva(), saved.getObservaciones());
     });
   }
 

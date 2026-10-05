@@ -16,10 +16,8 @@ public class Nivel {
   private Short id;
   private NivelCodigo codigo;
   private String nombre;
-  private String descripcion;
 
-  public void actualizar(String nuevoNombre, String nuevaDescripcion) {
+  public void actualizar(String nuevoNombre) {
     this.nombre = nuevoNombre;
-    this.descripcion = nuevaDescripcion;
   }
 }

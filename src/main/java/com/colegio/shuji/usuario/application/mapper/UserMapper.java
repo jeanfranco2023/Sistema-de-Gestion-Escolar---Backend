@@ -18,11 +18,10 @@ public interface UserMapper {
   List<UserResponseDto> toResponseDtoList(List<Usuario> domains);
 
   @Mapping(target = "id", ignore = true)
-  @Mapping(target = "uuid", ignore = true)
-  @Mapping(target = "passwordHash", ignore = true)
+  @Mapping(target = "usuarioPassword", ignore = true)
   @Mapping(target = "activo", constant = "true")
   @Mapping(target = "roles", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "fechaCreacion", ignore = true)
+  @Mapping(target = "fechaActualizacion", ignore = true)
   Usuario toDomain(RegisterUserRequestDto dto);
 }

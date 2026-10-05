@@ -28,6 +28,7 @@ import com.colegio.shuji.academico.application.port.out.NivelRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.PeriodoRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.SeccionRepositoryPort;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,12 +109,7 @@ public class AcademicoService
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
     var grado = requerido(grados.buscarPorId(r.gradoId()));
     exigir(grado.getNivelId().equals(r.nivelId()), "El grado no pertenece al nivel");
-    String codigoAula = r.aulaFisica().trim().toUpperCase();
-    if (secciones.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
-        .anyMatch(s -> codigoAula.equalsIgnoreCase(s.getAulaFisica()))) {
-      throw new com.colegio.shuji.academico.domain.exception.AulaOcupadaException(
-          "El aula ya está asignada");
-    }
+    String codigoAula = r.aulaFisica().trim().toUpperCase(Locale.ROOT);
     var aula =
         aulas
             .buscarPorCodigo(codigoAula)
@@ -130,8 +126,12 @@ public class AcademicoService
                 });
     exigir(Boolean.TRUE.equals(aula.getActiva()), "El aula no está activa");
     exigir(aula.getCapacidad() >= r.cupoMaximo(), "El cupo supera la capacidad del aula");
+    if (secciones.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
+        .anyMatch(s -> aula.getId().equals(s.getAulaId()))) {
+      throw new com.colegio.shuji.academico.domain.exception.AulaOcupadaException(
+          "El aula ya está asignada");
+    }
     var model = mapper.toDomain(r);
-    model.normalizarAula();
     model.asignarAula(aula);
     return mapper.toResponse(secciones.guardar(model));
   }

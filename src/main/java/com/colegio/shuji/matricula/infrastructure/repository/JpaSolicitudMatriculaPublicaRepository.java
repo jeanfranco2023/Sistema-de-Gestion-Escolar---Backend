@@ -21,11 +21,11 @@ public interface JpaSolicitudMatriculaPublicaRepository
   @Query("select s from SolicitudMatriculaPublicaEntity s where s.id = :id")
   Optional<SolicitudMatriculaPublicaEntity> bloquearPorId(@Param("id") UUID id);
 
-  List<SolicitudMatriculaPublicaEntity> findTop200ByOrderByCreatedAtDesc();
+  List<SolicitudMatriculaPublicaEntity> findTop200ByOrderByFechaCreacionDesc();
 
   boolean existsByNumeroDocumentoEstudianteAndEstadoIn(
       String numeroDocumentoEstudiante, List<EstadoSolicitudMatriculaPublica> estados);
 
-  @Query("select s from SolicitudMatriculaPublicaEntity s where s.vacanteReservada = true and s.pagoExpiraAt <= :ahora")
+  @Query("select s from SolicitudMatriculaPublicaEntity s where s.vacanteReservada = true and s.fechaExpiracionPago <= :ahora")
   List<SolicitudMatriculaPublicaEntity> buscarReservasExpiradas(@Param("ahora") OffsetDateTime ahora);
 }

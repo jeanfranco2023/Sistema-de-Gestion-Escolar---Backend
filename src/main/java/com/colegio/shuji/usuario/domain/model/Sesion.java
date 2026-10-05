@@ -24,14 +24,14 @@ public class Sesion {
   private String tokenHash;
   private String ipAddress;
   private String userAgent;
-  private LocalDateTime expiraAt;
-  private LocalDateTime createdAt;
+  private LocalDateTime fechaExpiracion;
+  private LocalDateTime fechaCreacion;
 
   public boolean estaExpirada(LocalDateTime ahora) {
-    if (expiraAt == null || ahora == null) {
+    if (fechaExpiracion == null || ahora == null) {
       return true;
     }
-    return !ahora.isBefore(expiraAt);
+    return !ahora.isBefore(fechaExpiracion);
   }
 
   public void renovar(
@@ -46,6 +46,6 @@ public class Sesion {
     tokenHash = hash;
     ipAddress = ip;
     userAgent = agente;
-    expiraAt = vencimiento;
+    fechaExpiracion = vencimiento;
   }
 }

@@ -6,7 +6,6 @@ import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.shared.domain.model.Reglas;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,7 +19,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Estudiante {
   private Long id;
-  private UUID uuid;
   private TipoDocumento tipoDocumento;
   private String numeroDocumento;
   private String nombres;
@@ -34,7 +32,7 @@ public class Estudiante {
   private String grupoSanguineo;
   private String alergiasCondiciones;
   private Boolean activo;
-  private OffsetDateTime createdAt;
+  private OffsetDateTime fechaCreacion;
 
   public String nombreCompleto() {
     return nombres + " " + apellidoPaterno + " " + (apellidoMaterno == null ? "" : apellidoMaterno);

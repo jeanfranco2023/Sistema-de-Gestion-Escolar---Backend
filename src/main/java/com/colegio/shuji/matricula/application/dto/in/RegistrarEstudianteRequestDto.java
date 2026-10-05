@@ -11,7 +11,7 @@ import java.time.LocalDate;
 public record RegistrarEstudianteRequestDto(
     @NotNull TipoDocumento tipoDocumento,
     @NotBlank @Size(max = 15) String numeroDocumento,
-    @NotBlank @Size(max = 100) String nombres,
+    @NotBlank @Size(max = 20) String nombres,
     @NotBlank @Size(max = 20) String apellidoPaterno,
     @NotBlank @Size(max = 20) String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,

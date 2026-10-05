@@ -36,7 +36,7 @@ class ReglasDominioTest {
     var m = new Matricula();
     m.setEstadoMatricula(EstadoMatricula.RESERVADA_TEMPORAL);
     var ahora = OffsetDateTime.now();
-    m.setReservaExpiraAt(ahora);
+    m.setFechaExpiracionReserva(ahora);
     assertThrows(ReservaExpiradaException.class, () -> m.confirmar(ahora));
     assertTrue(m.liberarSiVencida(ahora));
     assertFalse(m.liberarSiVencida(ahora));

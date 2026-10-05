@@ -50,9 +50,9 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
           "Ya existe matrícula para este año");
     var m = mapper.toDomain(r);
     m.iniciarSolicitud();
-    if (r.reservaExpiraAt() != null) {
+    if (r.fechaExpiracionReserva() != null) {
       s.verificarCupo();
-      m.reservar(r.reservaExpiraAt());
+      m.reservar(r.fechaExpiracionReserva());
     }
     return mapper.toResponse(matriculas.guardar(m));
   }
@@ -102,7 +102,7 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     var ahora = OffsetDateTime.now();
     var vencidas =
         matriculas.buscarPorEstadoMatricula(EstadoMatricula.RESERVADA_TEMPORAL).stream()
-            .filter(m -> !m.getReservaExpiraAt().isAfter(ahora))
+            .filter(m -> !m.getFechaExpiracionReserva().isAfter(ahora))
             .toList();
     secciones.bloquearPorIds(vencidas.stream().map(m -> m.getSeccionId()).distinct().toList());
     var bloqueadas =

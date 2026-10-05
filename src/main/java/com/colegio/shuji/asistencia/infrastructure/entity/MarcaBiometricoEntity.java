@@ -50,8 +50,8 @@ public class MarcaBiometricoEntity {
   @Column(name = "estado_procesamiento", nullable = false, length = 25)
   private EstadoMarca estadoProcesamiento;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
@@ -77,6 +77,6 @@ public class MarcaBiometricoEntity {
   void inicializar() {
     if (dispositivoCodigo == null) dispositivoCodigo = "PORTERIA_01";
     if (estadoProcesamiento == null) estadoProcesamiento = EstadoMarca.PENDIENTE;
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

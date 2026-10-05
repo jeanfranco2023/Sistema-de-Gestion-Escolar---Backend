@@ -170,11 +170,11 @@ public class SolicitudMatriculaPublicaController {
     var documento = solicitudes.documentoDescargaAdmin(id, tipo);
     return new DocumentoAdminDescarga(
         almacenDocumentos.urlFirmada(documento.bucket(), documento.objectKey()),
-        documento.mimeType(), documento.tamanoBytes(), documento.actualizadoAt());
+        documento.mimeType(), documento.tamanoBytes(), documento.fechaActualizacion());
   }
 
   public record DocumentoAdminDescarga(String url, String mimeType, long tamanoBytes,
-                                       java.time.OffsetDateTime actualizadoAt) {}
+                                       java.time.OffsetDateTime fechaActualizacion) {}
 
   private String detectarMime(byte[] bytes) {
     if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F' && bytes[4] == '-') {

@@ -15,14 +15,14 @@ import lombok.NoArgsConstructor;
 public class SerieComprobante {
   private String serie;
   private Integer ultimoCorrelativo;
-  private OffsetDateTime updatedAt;
+  private OffsetDateTime fechaActualizacion;
 
   public int siguienteCorrelativo() {
     if (ultimoCorrelativo == null || ultimoCorrelativo < 0) {
       throw new BusinessException("Contador de comprobante inválido");
     }
     ultimoCorrelativo++;
-    updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    fechaActualizacion = OffsetDateTime.now(ZoneOffset.UTC);
     return ultimoCorrelativo;
   }
 }

@@ -5,7 +5,6 @@ import com.colegio.shuji.convivencia.domain.enums.TipoFalta;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +18,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class IncidenciaConductual {
   private Long id;
-  private UUID uuid;
   private Long matriculaId;
   private LocalDate fechaIncidencia;
   private TipoFalta tipoFalta;
@@ -27,7 +25,7 @@ public class IncidenciaConductual {
   private Long reportadoPorUsuarioId;
   private Boolean requiereCitacion;
   private EstadoIncidencia estado;
-  private OffsetDateTime createdAt;
+  private OffsetDateTime fechaCreacion;
 
   public void cambiarEstado(EstadoIncidencia nuevoEstado) {
     if (estado == EstadoIncidencia.CERRADA) {

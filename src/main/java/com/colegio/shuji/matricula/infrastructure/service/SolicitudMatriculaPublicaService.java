@@ -193,7 +193,7 @@ public class SolicitudMatriculaPublicaService {
     archivo.setMimeType(mimeType);
     archivo.setTamanoBytes(tamanoBytes);
     archivo.setSha256(sha256);
-    archivo.setActualizadoAt(OffsetDateTime.now(ZoneOffset.UTC));
+    archivo.setFechaActualizacion(OffsetDateTime.now(ZoneOffset.UTC));
     documentos.save(archivo);
     s.actualizarDocumento(tipo,
         resultado.valido() ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
@@ -217,11 +217,11 @@ public class SolicitudMatriculaPublicaService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento no disponible"));
     return new DocumentoDescargaAdmin(
         archivo.getBucket(), archivo.getObjectKey(), archivo.getMimeType(), archivo.getTamanoBytes(),
-        archivo.getActualizadoAt());
+        archivo.getFechaActualizacion());
   }
 
   public record DocumentoDescargaAdmin(
-      String bucket, String objectKey, String mimeType, long tamanoBytes, OffsetDateTime actualizadoAt) {}
+      String bucket, String objectKey, String mimeType, long tamanoBytes, OffsetDateTime fechaActualizacion) {}
 
   @Transactional(readOnly = true)
   public String generarComprobanteHtml(UUID id, String token) {
@@ -233,7 +233,7 @@ public class SolicitudMatriculaPublicaService {
         + fila("Referencia de pago Mercado Pago", s.getPagoId())
         + fila("Importe pagado", "S/ " + s.getPagoMonto().toPlainString() + " PEN")
         + fila("Estado", "PAGO APROBADO Y VERIFICADO")
-        + fila("Emitido", fechaDocumento(s.getDocumentosEmitidosAt()));
+        + fila("Emitido", fechaDocumento(s.getFechaEmisionDocumentos()));
     String aviso = "Comprobante interno de pago. No es una boleta electrónica ni reemplaza un comprobante tributario emitido ante SUNAT.";
     return documentoHtml("Comprobante de pago de matrícula", s.getComprobantePagoCodigo(), filas, aviso);
   }
@@ -266,7 +266,7 @@ public class SolicitudMatriculaPublicaService {
         + fila("Correo", s.getEmailApoderado())
         + fila("Dirección", s.getDireccionApoderado())
         + fila("Estado", "MATRÍCULA CONFIRMADA")
-        + fila("Emitida", fechaDocumento(s.getDocumentosEmitidosAt()));
+        + fila("Emitida", fechaDocumento(s.getFechaEmisionDocumentos()));
     return documentoHtml("Ficha de matrícula", fichaCodigo, filas,
         "Documento informativo generado al confirmar el pago y registrar la matrícula.");
   }
@@ -282,7 +282,7 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Gemini debe validar los tres documentos antes del pago");
     }
     var ahora = OffsetDateTime.now(ZoneOffset.UTC);
-    if (s.isVacanteReservada() && s.getPagoExpiraAt() != null && s.getPagoExpiraAt().isAfter(ahora)
+    if (s.isVacanteReservada() && s.getFechaExpiracionPago() != null && s.getFechaExpiracionPago().isAfter(ahora)
         && s.getPagoEnlace() != null && !s.getPagoEnlace().isBlank()) {
       return pagoResponse(s);
     }
@@ -290,7 +290,7 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La vacante fue ocupada; selecciona otra sección");
     }
     s.setVacanteReservada(true);
-    s.setPagoExpiraAt(ahora.plusMinutes(Math.max(5, duracionReservaMinutos)));
+    s.setFechaExpiracionPago(ahora.plusMinutes(Math.max(5, duracionReservaMinutos)));
     s.setPagoMonto(obtenerMontoMatriculaPublica());
     String referencia = REFERENCIA_PAGO_PREFIX + s.getId();
     var preferencia = mercadoPago.crearPreferenciaMatriculaPublica(
@@ -405,19 +405,19 @@ public class SolicitudMatriculaPublicaService {
     s.setApoderadoId(apoderado.getId());
     s.setMatriculaId(matricula.getId());
     s.setComprobantePagoCodigo("REC-MAT-" + matricula.getId());
-    s.setDocumentosEmitidosAt(OffsetDateTime.now(ZoneOffset.UTC));
+    s.setFechaEmisionDocumentos(OffsetDateTime.now(ZoneOffset.UTC));
     s.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
-    s.setPagoExpiraAt(null);
+    s.setFechaExpiracionPago(null);
     return respuesta(solicitudes.saveAndFlush(s), null);
   }
 
   @Transactional(readOnly = true)
   public List<SolicitudMatriculaPublicaAdminResponseDto> listarAdmin() {
-    return solicitudes.findTop200ByOrderByCreatedAtDesc().stream().map(s ->
+    return solicitudes.findTop200ByOrderByFechaCreacionDesc().stream().map(s ->
         new SolicitudMatriculaPublicaAdminResponseDto(
             s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
             nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(),
-            s.getAnioLectivoId(), s.getSeccionId(), documentos(s), s.getCreatedAt(),
+            s.getAnioLectivoId(), s.getSeccionId(), documentos(s), s.getFechaCreacion(),
             s.getEstudianteId(), s.getMatriculaId())).toList();
   }
 
@@ -452,12 +452,12 @@ public class SolicitudMatriculaPublicaService {
     var ahora = OffsetDateTime.now(ZoneOffset.UTC);
     for (var snapshot : solicitudes.buscarReservasExpiradas(ahora)) {
       var actual = solicitudes.bloquearPorId(snapshot.getId()).orElse(null);
-      if (actual != null && actual.isVacanteReservada() && actual.getPagoExpiraAt() != null
-          && !actual.getPagoExpiraAt().isAfter(ahora)) {
+      if (actual != null && actual.isVacanteReservada() && actual.getFechaExpiracionPago() != null
+          && !actual.getFechaExpiracionPago().isAfter(ahora)) {
         liberarReserva(actual);
         actual.setPagoEnlace(null);
         actual.setPagoPreferenciaId(null);
-        actual.setPagoExpiraAt(null);
+        actual.setFechaExpiracionPago(null);
         if (actual.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
           actual.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
         }
@@ -549,7 +549,7 @@ public class SolicitudMatriculaPublicaService {
     return new SolicitudMatriculaPublicaAdminResponseDto(
         s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
         nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(), s.getAnioLectivoId(),
-        s.getSeccionId(), documentos(s), s.getCreatedAt(), s.getEstudianteId(), s.getMatriculaId());
+        s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId());
   }
 
   private String nombreEstudiante(SolicitudMatriculaPublicaEntity s) {
@@ -565,7 +565,7 @@ public class SolicitudMatriculaPublicaService {
         || solicitud.getMatriculaId() == null
         || solicitud.getPagoId() == null
         || solicitud.getComprobantePagoCodigo() == null
-        || solicitud.getDocumentosEmitidosAt() == null) {
+        || solicitud.getFechaEmisionDocumentos() == null) {
       throw new ResponseStatusException(HttpStatus.CONFLICT,
           "Los documentos estarán disponibles al confirmar el pago y la matrícula");
     }
@@ -632,7 +632,7 @@ public class SolicitudMatriculaPublicaService {
     if (s.isVacanteReservada()) {
       secciones.liberarVacante(s.getSeccionId());
       s.setVacanteReservada(false);
-      s.setPagoExpiraAt(null);
+      s.setFechaExpiracionPago(null);
     }
   }
 

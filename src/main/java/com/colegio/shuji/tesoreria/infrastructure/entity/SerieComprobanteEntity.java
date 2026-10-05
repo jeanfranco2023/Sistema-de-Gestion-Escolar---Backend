@@ -30,14 +30,14 @@ public class SerieComprobanteEntity {
   @Column(name = "ultimo_correlativo", nullable = false)
   private Integer ultimoCorrelativo;
 
-  @Column(name = "updated_at", nullable = false)
-  private OffsetDateTime updatedAt;
+  @Column(name = "fecha_actualizacion", nullable = false)
+  private OffsetDateTime fechaActualizacion;
 
   @PrePersist
   @PreUpdate
   void prePersist() {
-    if (updatedAt == null) {
-      updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaActualizacion == null) {
+      fechaActualizacion = OffsetDateTime.now(ZoneOffset.UTC);
     }
   }
 }

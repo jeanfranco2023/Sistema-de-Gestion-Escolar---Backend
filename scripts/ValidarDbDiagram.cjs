@@ -1,0 +1,14 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const root = path.resolve(__dirname, '..');
+const { Parser } = require(path.join(root, 'target/dbml-validacion/node_modules/@dbml/core'));
+const source = fs.readFileSync(path.join(root, 'src/main/resources/db/colegio_shuji_v18.dbml'), 'utf8');
+const model = new Parser().parse(source, 'dbmlv2');
+const tables = model.schemas.flatMap(schema => schema.tables);
+const refs = model.schemas.flatMap(schema => schema.refs);
+assert.equal(tables.length, 37);
+assert.equal(tables.reduce((total, table) => total + table.fields.length, 0), 307);
+assert.equal(refs.length, 56);
+assert.deepEqual(tables.find(table => table.name === 'roles').fields.map(field => field.name), ['id', 'codigo_rol', 'nombre_rol']);
+console.log('DBML_VALIDO_PARSER_OFICIAL: 37 tablas, 307 atributos, 56 relaciones; roles sin descripción.');

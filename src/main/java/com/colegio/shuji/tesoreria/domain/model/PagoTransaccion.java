@@ -7,7 +7,6 @@ import com.colegio.shuji.tesoreria.domain.enums.PasarelaProveedor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +20,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PagoTransaccion {
   private Long id;
-  private UUID uuid;
   private Long obligacionPagoId;
   private PasarelaProveedor pasarelaProveedor;
   private String pasarelaTransaccionId;

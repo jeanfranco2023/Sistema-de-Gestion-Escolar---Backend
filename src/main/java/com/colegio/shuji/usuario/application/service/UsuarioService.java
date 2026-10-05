@@ -127,7 +127,7 @@ public class UsuarioService implements GestionUsuarioUseCase {
             .orElseThrow(() -> new UserNotFoundException(usuarioId));
 
     if (!passwordEncoder.matches(
-        cambiarPasswordDto.getPasswordActual(), usuario.getPasswordHash())) {
+        cambiarPasswordDto.getPasswordActual(), usuario.getUsuarioPassword())) {
       log.warn("Fallo de coincidencia de contraseña actual para usuario ID: {}", usuarioId);
       throw new InvalidCredentialsException("La contraseña actual proporcionada es incorrecta.");
     }

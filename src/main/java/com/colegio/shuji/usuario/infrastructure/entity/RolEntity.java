@@ -28,12 +28,10 @@ public class RolEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Short id;
 
-  @Column(nullable = false, unique = true, length = 30)
+  @Column(name = "codigo_rol", nullable = false, unique = true, length = 20)
   private String codigo;
 
-  @Column(nullable = false, length = 30)
+  @Column(name = "nombre_rol", nullable = false, length = 30)
   private String nombre;
 
-  @Column(length = 255)
-  private String descripcion;
 }

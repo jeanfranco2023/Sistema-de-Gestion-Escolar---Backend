@@ -15,7 +15,6 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -31,8 +30,6 @@ public class EstudianteEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "uuid", nullable = false)
-  private UUID uuid;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "tipo_documento", nullable = false, length = 10)
@@ -41,13 +38,13 @@ public class EstudianteEntity {
   @Column(name = "numero_documento", nullable = false, length = 15)
   private String numeroDocumento;
 
-  @Column(name = "nombres", nullable = false, length = 100)
+  @Column(name = "nombres_estudiante", nullable = false, length = 20)
   private String nombres;
 
-  @Column(name = "apellido_paterno", nullable = false, length = 20)
+  @Column(name = "apellido_paterno_estudiante", nullable = false, length = 20)
   private String apellidoPaterno;
 
-  @Column(name = "apellido_materno", nullable = false, length = 20)
+  @Column(name = "apellido_materno_estudiante", nullable = false, length = 20)
   private String apellidoMaterno;
 
   @Column(name = "fecha_nacimiento", nullable = false)
@@ -77,16 +74,15 @@ public class EstudianteEntity {
   @Column(name = "activo", nullable = false)
   private Boolean activo;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
   @PrePersist
   void inicializar() {
-    if (uuid == null) uuid = UUID.randomUUID();
     if (tipoDocumento == null) tipoDocumento = TipoDocumento.DNI;
     if (validadoReniec == null) validadoReniec = false;
     if (origenRegistro == null) origenRegistro = OrigenRegistro.RENIEC_API;
     if (activo == null) activo = true;
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

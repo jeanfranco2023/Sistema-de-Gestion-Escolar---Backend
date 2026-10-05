@@ -18,6 +18,7 @@ import com.colegio.shuji.academico.domain.model.Nivel;
 import com.colegio.shuji.academico.domain.model.PeriodoAcademico;
 import com.colegio.shuji.academico.domain.model.Seccion;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
@@ -28,6 +29,7 @@ public interface AcademicoMapper {
 
   PeriodoAcademico toDomain(CrearPeriodoRequestDto request);
 
+  @Mapping(target = "codigoAula", source = "aulaFisica")
   Seccion toDomain(CrearSeccionRequestDto request);
 
   Grado toDomain(CrearGradoRequestDto request);
@@ -42,5 +44,6 @@ public interface AcademicoMapper {
 
   GradoResponseDto toResponse(Grado model);
 
+  @Mapping(target = "aulaFisica", source = "codigoAula")
   SeccionResponseDto toResponse(Seccion model);
 }

@@ -29,7 +29,7 @@ import lombok.Setter;
 public class SolicitudMatriculaPublicaEntity {
   @Id private UUID id;
 
-  @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+  @Column(name = "huella_token", nullable = false, unique = true, length = 64)
   private String tokenHash;
 
   @Enumerated(EnumType.STRING)
@@ -76,10 +76,10 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "celular_apoderado", nullable = false, length = 9)
   private String celularApoderado;
 
-  @Column(name = "email_apoderado", length = 254)
+  @Column(name = "correo_apoderado", length = 50)
   private String emailApoderado;
 
-  @Column(name = "direccion_apoderado", nullable = false, length = 200)
+  @Column(name = "direccion_apoderado", nullable = false, length = 150)
   private String direccionApoderado;
 
   @Column(name = "ubigeo_apoderado", nullable = false, length = 6)
@@ -125,14 +125,14 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "comprobante_pago_codigo", length = 40, unique = true)
   private String comprobantePagoCodigo;
 
-  @Column(name = "documentos_emitidos_at")
-  private OffsetDateTime documentosEmitidosAt;
+  @Column(name = "fecha_emision_documentos")
+  private OffsetDateTime fechaEmisionDocumentos;
 
   @Column(name = "pago_monto", precision = 10, scale = 2, nullable = false)
   private BigDecimal pagoMonto = new BigDecimal("1.00");
 
-  @Column(name = "pago_expira_at")
-  private OffsetDateTime pagoExpiraAt;
+  @Column(name = "fecha_expiracion_pago")
+  private OffsetDateTime fechaExpiracionPago;
 
   @Column(name = "vacante_reservada", nullable = false)
   private boolean vacanteReservada;
@@ -146,24 +146,24 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "matricula_id")
   private Long matriculaId;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
-  @Column(name = "updated_at", nullable = false)
-  private OffsetDateTime updatedAt;
+  @Column(name = "fecha_actualizacion", nullable = false)
+  private OffsetDateTime fechaActualizacion;
 
   @Version private long version;
 
   @PrePersist
   void crearFechas() {
     var now = OffsetDateTime.now(ZoneOffset.UTC);
-    if (createdAt == null) createdAt = now;
-    if (updatedAt == null) updatedAt = now;
+    if (fechaCreacion == null) fechaCreacion = now;
+    if (fechaActualizacion == null) fechaActualizacion = now;
   }
 
   @PreUpdate
   void actualizarFecha() {
-    updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    fechaActualizacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 
   public EstadoValidacionDocumento estadoDocumento(

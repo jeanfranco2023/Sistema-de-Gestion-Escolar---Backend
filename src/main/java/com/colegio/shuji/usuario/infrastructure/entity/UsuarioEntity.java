@@ -15,7 +15,6 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,24 +30,22 @@ import lombok.ToString;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"passwordHash", "roles"})
+@ToString(exclude = {"usuarioPassword", "roles"})
 public class UsuarioEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false, unique = true, updatable = false)
-  private UUID uuid;
 
-  @Column(nullable = false, unique = true, length = 50)
+  @Column(name = "nombre_usuario", nullable = false, unique = true, length = 30)
   private String username;
 
-  @Column(nullable = false, unique = true, length = 254)
+  @Column(name = "correo_electronico", nullable = false, unique = true, length = 50)
   private String email;
 
-  @Column(name = "password_hash", nullable = false, length = 60)
-  private String passwordHash;
+  @Column(name = "usuario_password", nullable = false, length = 60)
+  private String usuarioPassword;
 
   @Column(nullable = false)
   @Builder.Default
@@ -62,29 +59,26 @@ public class UsuarioEntity {
   @Builder.Default
   private Set<RolEntity> roles = new HashSet<>();
 
-  @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false, updatable = false)
+  private LocalDateTime fechaCreacion;
 
-  @Column(name = "updated_at", nullable = false)
-  private LocalDateTime updatedAt;
+  @Column(name = "fecha_actualizacion", nullable = false)
+  private LocalDateTime fechaActualizacion;
 
   @PrePersist
   public void prePersist() {
-    if (this.uuid == null) {
-      this.uuid = UUID.randomUUID();
-    }
     if (this.activo == null) {
       this.activo = true;
     }
     LocalDateTime now = LocalDateTime.now();
-    if (this.createdAt == null) {
-      this.createdAt = now;
+    if (this.fechaCreacion == null) {
+      this.fechaCreacion = now;
     }
-    this.updatedAt = now;
+    this.fechaActualizacion = now;
   }
 
   @PreUpdate
   public void preUpdate() {
-    this.updatedAt = LocalDateTime.now();
+    this.fechaActualizacion = LocalDateTime.now();
   }
 }

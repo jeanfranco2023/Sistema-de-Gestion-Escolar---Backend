@@ -25,6 +25,7 @@ import com.colegio.shuji.tesoreria.application.port.in.GenerarCronogramaPensione
 import com.colegio.shuji.tesoreria.application.port.in.ProcesarPagoPasarelaUseCase;
 import com.colegio.shuji.tesoreria.domain.enums.MetodoPago;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
+import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
 import com.colegio.shuji.usuario.infrastructure.entity.RolEntity;
 import com.colegio.shuji.usuario.infrastructure.entity.UsuarioEntity;
 import jakarta.persistence.EntityManager;
@@ -52,15 +53,20 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres",
-      "spring.datasource.username=postgres",
-      "spring.datasource.password=",
+      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres}",
+      "spring.datasource.username=${TEST_DB_USERNAME:postgres}",
+      "spring.datasource.password=${TEST_DB_PASSWORD:}",
+      "spring.flyway.schemas=${TEST_DB_SCHEMA:public}",
+      "spring.flyway.default-schema=${TEST_DB_SCHEMA:public}",
+      "spring.flyway.create-schemas=false",
+      "spring.flyway.locations=${TEST_DB_FLYWAY_LOCATIONS:classpath:db/migration}",
+      "spring.jpa.properties.hibernate.default_schema=${TEST_DB_SCHEMA:public}",
       "spring.jpa.hibernate.ddl-auto=validate",
       "integraciones.reniec.url=",
       "integraciones.pagos.verificador-url=",
       "logging.level.org.hibernate.SQL=WARN",
-      "spring.datasource.hikari.maximum-pool-size=20",
-      "spring.datasource.hikari.minimum-idle=5"
+      "spring.datasource.hikari.maximum-pool-size=10",
+      "spring.datasource.hikari.minimum-idle=0"
     })
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
@@ -87,7 +93,7 @@ class ConcurrenciaPostgresTest {
       var u = new UsuarioEntity();
       u.setUsername("admin_conc_" + UUID.randomUUID().toString().substring(0, 8));
       u.setEmail(u.getUsername() + "@colegio.pe");
-      u.setPasswordHash("hash123");
+      u.setUsuarioPassword("hash123");
       u.setRoles(new HashSet<>(rolesDocente));
       em.persist(u);
       em.flush();
@@ -146,11 +152,13 @@ class ConcurrenciaPostgresTest {
       familias.vincular(new VincularApoderadoRequestDto(est.id(), apod.id(), Parentesco.PADRE, true, true, true));
 
       var mat = matriculas.solicitar(new SolicitarMatriculaRequestDto(anioId, est.id(), seccion.id(), OffsetDateTime.now().plusDays(1), null));
-      matriculas.confirmar(new ConfirmarMatriculaRequestDto(mat.id()));
-
       var plan = cronograma.generarCronograma(new GenerarObligacionesAnualesRequestDto(mat.id(), (short) 1, (short) 2, LocalDate.of(2026, 3, 1)));
-      var obligacion = plan.getFirst();
-      var pago = pagos.registrarCaja(new RegistrarPagoCajaRequestDto(obligacion.id(), "caja-conc-" + UUID.randomUUID(), MetodoPago.EFECTIVO, new BigDecimal("100.00")));
+      var obligacion = plan.stream()
+          .filter(o -> o.tipoConcepto() == TipoConcepto.MATRICULA && Objects.equals(o.numeroCuota(), (short) 0))
+          .findFirst()
+          .orElseThrow();
+      var pago = pagos.registrarCaja(new RegistrarPagoCajaRequestDto(obligacion.id(), "caja-conc-" + UUID.randomUUID(), MetodoPago.EFECTIVO, obligacion.saldoPendiente()));
+      matriculas.confirmar(new ConfirmarMatriculaRequestDto(mat.id()));
       pagoIds.add(pago.id());
     }
 

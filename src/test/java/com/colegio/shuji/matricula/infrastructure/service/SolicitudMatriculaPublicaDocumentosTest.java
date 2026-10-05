@@ -161,7 +161,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setMatriculaId(42L);
     solicitud.setPagoId("987654321");
     solicitud.setComprobantePagoCodigo("REC-MAT-42");
-    solicitud.setDocumentosEmitidosAt(OffsetDateTime.parse("2026-09-23T18:30:00Z"));
+    solicitud.setFechaEmisionDocumentos(OffsetDateTime.parse("2026-09-23T18:30:00Z"));
     solicitud.setPagoMonto(new BigDecimal("1.00"));
     solicitud.setNombresEstudiante("Ana");
     solicitud.setApellidoPaternoEstudiante("Lopez");

@@ -21,7 +21,7 @@ public class MarcaPorteria {
   private String dispositivoCodigo;
   private Long estudianteId;
   private EstadoMarca estadoProcesamiento;
-  private OffsetDateTime createdAt;
+  private OffsetDateTime fechaCreacion;
 
   public void procesarValida(Long estudianteId) {
     this.estudianteId = estudianteId;

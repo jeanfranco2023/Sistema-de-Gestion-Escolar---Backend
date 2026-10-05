@@ -20,22 +20,22 @@ public class SolicitudMatriculaDocumentoEntity {
   @EmbeddedId
   private SolicitudMatriculaDocumentoId id;
 
-  @Column(nullable = false, length = 100)
+  @Column(name = "contenedor", nullable = false, length = 100)
   private String bucket;
 
-  @Column(name = "object_key", nullable = false, length = 500)
+  @Column(name = "ruta_objeto", nullable = false, length = 500)
   private String objectKey;
 
-  @Column(name = "mime_type", nullable = false, length = 100)
+  @Column(name = "tipo_contenido", nullable = false, length = 30)
   private String mimeType;
 
   @Column(name = "tamano_bytes", nullable = false)
   private long tamanoBytes;
 
   @JdbcTypeCode(SqlTypes.CHAR)
-  @Column(nullable = false, length = 64)
+  @Column(name = "huella_sha256", nullable = false, length = 64)
   private String sha256;
 
-  @Column(name = "actualizado_at", nullable = false)
-  private OffsetDateTime actualizadoAt;
+  @Column(name = "fecha_actualizacion", nullable = false)
+  private OffsetDateTime fechaActualizacion;
 }

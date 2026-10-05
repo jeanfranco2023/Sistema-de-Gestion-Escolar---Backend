@@ -6,11 +6,9 @@ import com.colegio.shuji.tesoreria.domain.enums.PasarelaProveedor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
-import java.util.UUID;
 
 public record TransaccionResponseDto(
     Long id,
-    UUID uuid,
     Long obligacionPagoId,
     PasarelaProveedor pasarelaProveedor,
     String pasarelaTransaccionId,

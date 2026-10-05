@@ -33,7 +33,7 @@ public class PeriodoAcademicoEntity {
   @Column(name = "numero_periodo", nullable = false)
   private Short numeroPeriodo;
 
-  @Column(name = "nombre", nullable = false, length = 30)
+  @Column(name = "nombre_periodo", nullable = false, length = 30)
   private String nombre;
 
   @Column(name = "fecha_inicio", nullable = false)

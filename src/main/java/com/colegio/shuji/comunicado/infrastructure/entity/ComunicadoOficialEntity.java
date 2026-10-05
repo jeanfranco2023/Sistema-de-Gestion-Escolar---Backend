@@ -28,7 +28,7 @@ public class ComunicadoOficialEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "titulo", nullable = false, length = 40)
+  @Column(name = "titulo_comunicado", nullable = false, length = 40)
   private String titulo;
 
   @Column(name = "contenido", nullable = false, columnDefinition = "text")

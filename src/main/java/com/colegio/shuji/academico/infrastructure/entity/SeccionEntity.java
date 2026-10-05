@@ -48,9 +48,6 @@ public class SeccionEntity {
   @Column(name = "aula_id", nullable = false)
   private Integer aulaId;
 
-  @Column(name = "aula_fisica", length = 30)
-  private String aulaFisica;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "aula_id", insertable = false, updatable = false)
   private AulaEntity aula;

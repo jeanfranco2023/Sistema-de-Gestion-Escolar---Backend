@@ -16,7 +16,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -32,8 +31,6 @@ public class MatriculaEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "uuid", nullable = false)
-  private UUID uuid;
 
   @Column(name = "anio_lectivo_id", nullable = false)
   private Short anioLectivoId;
@@ -51,8 +48,8 @@ public class MatriculaEntity {
   @Column(name = "estado_matricula", nullable = false, length = 25)
   private EstadoMatricula estadoMatricula;
 
-  @Column(name = "reserva_expira_at")
-  private OffsetDateTime reservaExpiraAt;
+  @Column(name = "fecha_expiracion_reserva")
+  private OffsetDateTime fechaExpiracionReserva;
 
   @Column(name = "observaciones", columnDefinition = "text")
   private String observaciones;
@@ -84,7 +81,6 @@ public class MatriculaEntity {
 
   @PrePersist
   void inicializar() {
-    if (uuid == null) uuid = UUID.randomUUID();
     if (fechaMatricula == null) fechaMatricula = OffsetDateTime.now(ZoneOffset.UTC);
     if (estadoMatricula == null) estadoMatricula = EstadoMatricula.SOLICITADA;
   }

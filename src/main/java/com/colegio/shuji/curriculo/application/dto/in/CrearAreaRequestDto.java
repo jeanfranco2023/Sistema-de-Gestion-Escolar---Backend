@@ -7,4 +7,4 @@ import jakarta.validation.constraints.Size;
 public record CrearAreaRequestDto(
     @NotNull Short nivelId,
     @NotBlank @Size(max = 20) String codigo,
-    @NotBlank @Size(max = 100) String nombre) {}
+    @NotBlank @Size(max = 60) String nombre) {}

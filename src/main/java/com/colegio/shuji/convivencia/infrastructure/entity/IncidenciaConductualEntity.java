@@ -56,8 +56,8 @@ public class IncidenciaConductualEntity {
   @Column(name = "estado", nullable = false, length = 20)
   private EstadoIncidencia estado;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
@@ -83,6 +83,6 @@ public class IncidenciaConductualEntity {
   void inicializar() {
     if (requiereCitacion == null) requiereCitacion = false;
     if (estado == null) estado = EstadoIncidencia.ABIERTA;
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

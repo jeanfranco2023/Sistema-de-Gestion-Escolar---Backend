@@ -31,7 +31,7 @@ public class LoteBiometricoEntity {
   @Column(name = "nombre_archivo", nullable = false, length = 150)
   private String nombreArchivo;
 
-  @Column(name = "hash_contenido", nullable = false, unique = true, length = 64)
+  @Column(name = "huella_contenido", nullable = false, unique = true, length = 64)
   private String hashContenido;
 
   @Column(name = "total_filas", nullable = false)
@@ -46,8 +46,8 @@ public class LoteBiometricoEntity {
   @Column(name = "importado_por_usuario_id")
   private Long importadoPorUsuarioId;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
@@ -61,6 +61,6 @@ public class LoteBiometricoEntity {
 
   @PrePersist
   void inicializar() {
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

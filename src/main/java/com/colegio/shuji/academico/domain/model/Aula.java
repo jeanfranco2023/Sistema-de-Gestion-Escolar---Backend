@@ -2,6 +2,7 @@ package com.colegio.shuji.academico.domain.model;
 
 import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 
+import java.util.Locale;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,7 +21,7 @@ public class Aula {
   private Boolean activa;
 
   public void prepararRegistro() {
-    codigo = codigo.trim().toUpperCase();
+    codigo = codigo.trim().toUpperCase(Locale.ROOT);
     nombre = nombre.trim();
     ubicacion = ubicacion == null || ubicacion.isBlank() ? null : ubicacion.trim();
     exigir(capacidad != null && capacidad > 0, "La capacidad del aula debe ser positiva");

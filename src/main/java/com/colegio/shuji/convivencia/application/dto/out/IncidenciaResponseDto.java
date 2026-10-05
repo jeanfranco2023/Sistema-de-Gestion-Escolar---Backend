@@ -1,5 +1,6 @@
 package com.colegio.shuji.convivencia.application.dto.out;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
 import com.colegio.shuji.convivencia.domain.enums.TipoFalta;
 import java.time.LocalDate;
@@ -14,4 +15,4 @@ public record IncidenciaResponseDto(
     Long reportadoPorUsuarioId,
     Boolean requiereCitacion,
     EstadoIncidencia estado,
-    OffsetDateTime createdAt) {}
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {}

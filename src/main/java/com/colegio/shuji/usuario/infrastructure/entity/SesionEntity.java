@@ -38,26 +38,26 @@ public class SesionEntity {
   @JoinColumn(name = "usuario_id", nullable = false)
   private UsuarioEntity usuario;
 
-  @Column(name = "token_hash", nullable = false, length = 64)
+  @Column(name = "huella_token", nullable = false, length = 64)
   private String tokenHash;
 
-  @Column(name = "ip_address", columnDefinition = "inet")
+  @Column(name = "direccion_ip", columnDefinition = "inet")
   @ColumnTransformer(write = "?::inet")
   private String ipAddress;
 
-  @Column(name = "user_agent", columnDefinition = "text")
+  @Column(name = "agente_usuario", columnDefinition = "text")
   private String userAgent;
 
-  @Column(name = "expira_at", nullable = false)
-  private LocalDateTime expiraAt;
+  @Column(name = "fecha_expiracion", nullable = false)
+  private LocalDateTime fechaExpiracion;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false, updatable = false)
+  private LocalDateTime fechaCreacion;
 
   @PrePersist
   public void prePersist() {
-    if (this.createdAt == null) {
-      this.createdAt = LocalDateTime.now();
+    if (this.fechaCreacion == null) {
+      this.fechaCreacion = LocalDateTime.now();
     }
   }
 }

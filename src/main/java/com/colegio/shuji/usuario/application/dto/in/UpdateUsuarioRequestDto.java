@@ -22,6 +22,6 @@ public class UpdateUsuarioRequestDto {
 
   @NotBlank(message = "El correo electrónico es obligatorio")
   @Email(message = "El formato del correo electrónico no es válido")
-  @Size(max = 254, message = "El correo electrónico no puede superar los 254 caracteres")
+  @Size(max = 50, message = "El correo electrónico no puede superar los 50 caracteres")
   private String email;
 }

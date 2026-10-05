@@ -17,7 +17,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -33,8 +32,6 @@ public class ApoderadoEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "uuid", nullable = false)
-  private UUID uuid;
 
   @Column(name = "usuario_id")
   private Long usuarioId;
@@ -46,22 +43,22 @@ public class ApoderadoEntity {
   @Column(name = "numero_documento", nullable = false, length = 15)
   private String numeroDocumento;
 
-  @Column(name = "nombres", nullable = false, length = 100)
+  @Column(name = "nombres_apoderado", nullable = false, length = 20)
   private String nombres;
 
-  @Column(name = "apellido_paterno", nullable = false, length = 20)
+  @Column(name = "apellido_paterno_apoderado", nullable = false, length = 20)
   private String apellidoPaterno;
 
-  @Column(name = "apellido_materno", nullable = false, length = 20)
+  @Column(name = "apellido_materno_apoderado", nullable = false, length = 20)
   private String apellidoMaterno;
 
   @Column(name = "celular", nullable = false, length = 9)
   private String celular;
 
-  @Column(name = "email", length = 254)
+  @Column(name = "correo_electronico", length = 50)
   private String email;
 
-  @Column(name = "direccion", nullable = false, length = 200)
+  @Column(name = "direccion", nullable = false, length = 150)
   private String direccion;
 
   @Column(name = "ubigeo_inei", nullable = false, length = 6)
@@ -74,8 +71,8 @@ public class ApoderadoEntity {
   @Column(name = "origen_registro", nullable = false, length = 20)
   private OrigenRegistro origenRegistro;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
@@ -89,10 +86,9 @@ public class ApoderadoEntity {
 
   @PrePersist
   void inicializar() {
-    if (uuid == null) uuid = UUID.randomUUID();
     if (tipoDocumento == null) tipoDocumento = TipoDocumento.DNI;
     if (validadoReniec == null) validadoReniec = false;
     if (origenRegistro == null) origenRegistro = OrigenRegistro.RENIEC_API;
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

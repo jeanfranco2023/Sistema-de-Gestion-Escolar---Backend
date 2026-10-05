@@ -3,7 +3,6 @@ package com.colegio.shuji.usuario.domain.model;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -21,21 +20,20 @@ import lombok.ToString;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = "passwordHash")
+@ToString(exclude = "usuarioPassword")
 @EqualsAndHashCode(of = "id")
 public class Usuario {
 
   private Long id;
-  private UUID uuid;
   private String username;
   private String email;
-  private String passwordHash;
+  private String usuarioPassword;
   private Boolean activo;
 
   @Builder.Default private Set<Rol> roles = new HashSet<>();
 
-  private LocalDateTime createdAt;
-  private LocalDateTime updatedAt;
+  private LocalDateTime fechaCreacion;
+  private LocalDateTime fechaActualizacion;
 
   public boolean tieneRol(String codigoRol) {
     if (roles == null || codigoRol == null) {
@@ -50,24 +48,24 @@ public class Usuario {
 
   public void activar() {
     this.activo = true;
-    this.updatedAt = LocalDateTime.now();
+    this.fechaActualizacion = LocalDateTime.now();
   }
 
   public void desactivar() {
     this.activo = false;
-    this.updatedAt = LocalDateTime.now();
+    this.fechaActualizacion = LocalDateTime.now();
   }
 
   public void cambiarPassword(String nuevoPasswordHash) {
-    this.passwordHash = nuevoPasswordHash;
-    this.updatedAt = LocalDateTime.now();
+    this.usuarioPassword = nuevoPasswordHash;
+    this.fechaActualizacion = LocalDateTime.now();
   }
 
   public void actualizarPerfil(String email) {
     if (email != null && !email.isBlank()) {
       this.email = email;
     }
-    this.updatedAt = LocalDateTime.now();
+    this.fechaActualizacion = LocalDateTime.now();
   }
 
   public void agregarRol(Rol rol) {
@@ -85,19 +83,18 @@ public class Usuario {
     }
   }
 
-  public void registrar(String passwordHash, Set<Rol> roles, LocalDateTime ahora) {
+  public void registrar(String usuarioPassword, Set<Rol> roles, LocalDateTime ahora) {
     if (id != null
-        || passwordHash == null
-        || passwordHash.isBlank()
+        || usuarioPassword == null
+        || usuarioPassword.isBlank()
         || roles == null
         || roles.isEmpty())
       throw new com.colegio.shuji.shared.domain.exception.BusinessException(
           "Registro de usuario inválido");
-    uuid = UUID.randomUUID();
-    this.passwordHash = passwordHash;
+    this.usuarioPassword = usuarioPassword;
     this.roles = new HashSet<>(roles);
     activo = true;
-    createdAt = ahora;
-    updatedAt = ahora;
+    fechaCreacion = ahora;
+    fechaActualizacion = ahora;
   }
 }

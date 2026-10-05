@@ -68,11 +68,11 @@ public class CalificacionCnebEntity {
   @Column(name = "requiere_refuerzo", insertable = false, updatable = false)
   private Boolean requiereRefuerzo;
 
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false)
+  private OffsetDateTime fechaCreacion;
 
-  @Column(name = "updated_at", nullable = false)
-  private OffsetDateTime updatedAt;
+  @Column(name = "fecha_actualizacion", nullable = false)
+  private OffsetDateTime fechaActualizacion;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
@@ -157,7 +157,7 @@ public class CalificacionCnebEntity {
   @PrePersist
   void inicializar() {
     if (sugerenciaIaUtilizada == null) sugerenciaIaUtilizada = false;
-    if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
-    if (updatedAt == null) updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
+    if (fechaActualizacion == null) fechaActualizacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

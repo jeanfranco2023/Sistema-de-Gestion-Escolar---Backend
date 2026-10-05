@@ -28,7 +28,7 @@ public class SerieComprobanteRepositoryAdapter implements SerieComprobanteReposi
                     new com.colegio.shuji.shared.domain.exception.BusinessException(
                         "Serie de comprobante no configurada: " + serie.getSerie()));
     entity.setUltimoCorrelativo(serie.getUltimoCorrelativo());
-    entity.setUpdatedAt(serie.getUpdatedAt());
+    entity.setFechaActualizacion(serie.getFechaActualizacion());
     return toDomain(repository.saveAndFlush(entity));
   }
 
@@ -36,7 +36,7 @@ public class SerieComprobanteRepositoryAdapter implements SerieComprobanteReposi
     return SerieComprobante.builder()
         .serie(entity.getSerie())
         .ultimoCorrelativo(entity.getUltimoCorrelativo())
-        .updatedAt(entity.getUpdatedAt())
+        .fechaActualizacion(entity.getFechaActualizacion())
         .build();
   }
 }

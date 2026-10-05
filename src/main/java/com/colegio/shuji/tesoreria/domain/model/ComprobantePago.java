@@ -5,7 +5,6 @@ import com.colegio.shuji.tesoreria.domain.enums.EstadoComprobante;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +18,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ComprobantePago {
   private Long id;
-  private UUID uuid;
   private Long pagoTransaccionId;
   private TipoComprobante tipoComprobante;
   private String serie;

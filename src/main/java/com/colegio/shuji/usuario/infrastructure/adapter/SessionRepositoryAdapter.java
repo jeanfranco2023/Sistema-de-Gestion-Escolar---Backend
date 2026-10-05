@@ -36,8 +36,8 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
             .tokenHash(sesion.getTokenHash())
             .ipAddress(sesion.getIpAddress())
             .userAgent(sesion.getUserAgent())
-            .expiraAt(sesion.getExpiraAt())
-            .createdAt(sesion.getCreatedAt())
+            .fechaExpiracion(sesion.getFechaExpiracion())
+            .fechaCreacion(sesion.getFechaCreacion())
             .build();
 
     SesionEntity saved = jpaSesionRepository.save(entity);
@@ -71,8 +71,8 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
         .tokenHash(entity.getTokenHash())
         .ipAddress(entity.getIpAddress())
         .userAgent(entity.getUserAgent())
-        .expiraAt(entity.getExpiraAt())
-        .createdAt(entity.getCreatedAt())
+        .fechaExpiracion(entity.getFechaExpiracion())
+        .fechaCreacion(entity.getFechaCreacion())
         .build();
   }
 }

@@ -27,8 +27,8 @@ public class CalificacionCneb {
   private String conclusionDescriptiva;
   private Boolean sugerenciaIaUtilizada;
   private Boolean requiereRefuerzo;
-  private OffsetDateTime createdAt;
-  private OffsetDateTime updatedAt;
+  private OffsetDateTime fechaCreacion;
+  private OffsetDateTime fechaActualizacion;
 
   public boolean necesitaRefuerzo() {
     return calificacionCualitativa == CalificacionCualitativa.C;

@@ -29,10 +29,10 @@ public class AreaCurricularEntity {
   @Column(name = "nivel_id", nullable = false)
   private Short nivelId;
 
-  @Column(name = "codigo", nullable = false, length = 20)
+  @Column(name = "codigo_area", nullable = false, length = 20)
   private String codigo;
 
-  @Column(name = "nombre", nullable = false, length = 100)
+  @Column(name = "nombre_area", nullable = false, length = 60)
   private String nombre;
 
   @ManyToOne(fetch = FetchType.LAZY)

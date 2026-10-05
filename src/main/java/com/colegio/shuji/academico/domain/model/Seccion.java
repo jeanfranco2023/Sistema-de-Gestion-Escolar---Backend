@@ -20,7 +20,7 @@ public class Seccion {
   private Short cupoMaximo;
   private Short vacantesOcupadas;
   private Integer aulaId;
-  private String aulaFisica;
+  private String codigoAula;
 
   public int vacantesDisponibles() {
     return Math.max(0, cupoMaximo - (vacantesOcupadas == null ? 0 : vacantesOcupadas));
@@ -49,14 +49,9 @@ public class Seccion {
     return vacantesDisponibles() > 0;
   }
 
-  public void actualizar(String nuevaLetra, Short nuevoCupo, String nuevaAula) {
+  public void actualizar(String nuevaLetra, Short nuevoCupo) {
     this.letra = nuevaLetra;
     this.cupoMaximo = nuevoCupo;
-    this.aulaFisica = nuevaAula;
-  }
-
-  public void normalizarAula() {
-    aulaFisica = aulaFisica == null || aulaFisica.isBlank() ? null : aulaFisica.trim();
   }
 
   public void asignarAula(Aula aula) {
@@ -69,6 +64,6 @@ public class Seccion {
           "El cupo supera la capacidad del aula");
     }
     aulaId = aula.getId();
-    aulaFisica = aula.getCodigo();
+    codigoAula = aula.getCodigo();
   }
 }

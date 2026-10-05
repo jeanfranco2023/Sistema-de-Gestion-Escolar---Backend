@@ -15,7 +15,6 @@ import lombok.Setter;
 public class InscripcionRefuerzo {
   private Long id;
   private Long sesionRefuerzoId;
-  private Long matriculaId;
   private Long estudianteId;
   private Long calificacionOrigenId;
   private EstadoAsistenciaRefuerzo estadoAsistencia;

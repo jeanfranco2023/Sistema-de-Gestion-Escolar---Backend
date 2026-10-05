@@ -38,16 +38,22 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Requiere DDL oficial en una base desechable local; nunca usa las credenciales de .env. */
+/** Requiere un esquema PostgreSQL desechable configurado mediante variables de entorno. */
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres",
-      "spring.datasource.username=postgres",
-      "spring.datasource.password=",
+      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres}",
+      "spring.datasource.username=${TEST_DB_USERNAME:postgres}",
+      "spring.datasource.password=${TEST_DB_PASSWORD:}",
+      "spring.flyway.schemas=${TEST_DB_SCHEMA:public}",
+      "spring.flyway.default-schema=${TEST_DB_SCHEMA:public}",
+      "spring.flyway.create-schemas=false",
+      "spring.flyway.locations=${TEST_DB_FLYWAY_LOCATIONS:classpath:db/migration}",
+      "spring.jpa.properties.hibernate.default_schema=${TEST_DB_SCHEMA:public}",
       "spring.jpa.hibernate.ddl-auto=validate",
       "integraciones.reniec.url=",
       "integraciones.pagos.verificador-url=",
       "logging.level.org.hibernate.SQL=WARN",
+      "spring.datasource.hikari.maximum-pool-size=10",
       "spring.datasource.hikari.minimum-idle=0"
     })
 @Transactional
@@ -86,7 +92,7 @@ class PersistenciaPostgresTest {
     var u = new UsuarioEntity();
     u.setUsername("prueba" + System.nanoTime());
     u.setEmail("prueba" + System.nanoTime() + "@example.test");
-    u.setPasswordHash("hash-de-prueba");
+    u.setUsuarioPassword("hash-de-prueba");
     u.setRoles(
         new HashSet<>(
             em.createQuery("select r from RolEntity r where r.codigo='DOCENTE'", RolEntity.class)
@@ -158,6 +164,21 @@ class PersistenciaPostgresTest {
             new SolicitarMatriculaRequestDto(
                 anioId, estudianteId, seccionId, OffsetDateTime.now().plusDays(1), null));
     matriculaId = matricula.id();
+    var plan =
+        cronograma.generarCronograma(
+            new GenerarObligacionesAnualesRequestDto(
+                matriculaId, (short) 1, (short) 2, LocalDate.of(2026, 3, 1)));
+    var obligacionMatricula =
+        plan.stream()
+            .filter(o -> o.tipoConcepto() == TipoConcepto.MATRICULA && o.numeroCuota() == 0)
+            .findFirst()
+            .orElseThrow();
+    pagos.registrarCaja(
+        new RegistrarPagoCajaRequestDto(
+            obligacionMatricula.id(),
+            "pago-matricula-test-" + UUID.randomUUID(),
+            MetodoPago.EFECTIVO,
+            obligacionMatricula.saldoPendiente()));
     matriculas.confirmar(new ConfirmarMatriculaRequestDto(matriculaId));
   }
 
@@ -230,41 +251,57 @@ class PersistenciaPostgresTest {
                 new GenerarObligacionesAnualesRequestDto(
                     matriculaId, (short) 1, (short) 2, LocalDate.of(2026, 3, 1)))
             .size());
+    var obligacionPension =
+        plan.stream()
+            .filter(o -> o.tipoConcepto() == TipoConcepto.PENSION)
+            .findFirst()
+            .orElseThrow();
+    var saldoInicial = obligacionPension.saldoPendiente();
     var r =
         new RegistrarPagoCajaRequestDto(
-            plan.getFirst().id(), "caja-001", MetodoPago.EFECTIVO, new BigDecimal("350.00"));
+            obligacionPension.id(), "caja-001", MetodoPago.EFECTIVO, saldoInicial);
     var pago = pagos.registrarCaja(r);
     assertEquals(pago.id(), pagos.registrarCaja(r).id());
     var comprobante =
         comprobantes.emitir(
             new EmitirComprobanteRequestDto(pago.id(), TipoComprobante.RECIBO_INTERNO, "E001"));
     em.clear();
-    assertEquals(
-        EstadoObligacion.PAGADO_TOTAL,
-        cronograma.obligacionesMatricula(matriculaId).getFirst().estado());
+    var pensionActual =
+        cronograma.obligacionesMatricula(matriculaId).stream()
+            .filter(o -> o.id().equals(obligacionPension.id()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(EstadoObligacion.PAGADO_TOTAL, pensionActual.estado());
     reversiones.revertir(new RevertirPagoRequestDto(pago.id(), "Error de caja"));
     em.clear();
     assertEquals(
         EstadoComprobante.ANULADO, comprobantes.consultar(comprobante.id()).estadoComprobante());
     assertEquals(
-        new BigDecimal("350.00"),
-        cronograma.obligacionesMatricula(matriculaId).getFirst().saldoPendiente());
+        saldoInicial,
+        cronograma.obligacionesMatricula(matriculaId).stream()
+            .filter(o -> o.id().equals(obligacionPension.id()))
+            .findFirst()
+            .orElseThrow()
+            .saldoPendiente());
   }
 
   @Test
   void clavesCompuestasNotasYRefuerzo() {
     var p =
-        calendario.crearPeriodo(
-            new CrearPeriodoRequestDto(
-                anioId,
-                (short) 1,
-                "Bimestre 1",
-                LocalDate.of(2026, 3, 1),
-                LocalDate.of(2026, 5, 1)));
+        calendario.listarPeriodos(anioId).stream()
+            .filter(periodo -> periodo.activo() && !periodo.cerrado())
+            .findFirst()
+            .orElseThrow();
     var area = curriculo.crearArea(new CrearAreaRequestDto(nivelId, "MAT", "Matemática"));
     var comp =
         curriculo.crearCompetencia(
             new CrearCompetenciaRequestDto(area.id(), (short) 1, "Resuelve problemas", null));
+    String aulaCodigo =
+        estructura.listarSecciones(anioId, nivelId).stream()
+            .filter(seccion -> seccion.id().equals(seccionId))
+            .map(com.colegio.shuji.academico.application.dto.out.SeccionResponseDto::aulaFisica)
+            .findFirst()
+            .orElseThrow();
     var asignacion =
         carga.asignarDocente(
             new AsignarDocenteRequestDto(usuarioId, seccionId, anioId, nivelId, area.id()));
@@ -297,7 +334,7 @@ class PersistenciaPostgresTest {
                 LocalDate.of(2026, 12, 1),
                 LocalTime.of(15, 0),
                 LocalTime.of(16, 0),
-                "R1"));
+                aulaCodigo));
     assertEquals(1, refuerzo.derivar(sesion.id()).size());
     assertEquals(0, refuerzo.derivar(sesion.id()).size());
     calendario.cerrarPeriodo(p.id());

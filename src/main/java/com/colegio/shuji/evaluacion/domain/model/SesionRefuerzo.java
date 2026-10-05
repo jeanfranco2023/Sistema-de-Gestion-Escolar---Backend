@@ -36,4 +36,8 @@ public class SesionRefuerzo {
   public void actualizarTema(String nuevoTema) {
     this.tema = nuevoTema;
   }
+
+  public void asignarAula(String codigoAula) {
+    this.aulaAsignada = codigoAula == null || codigoAula.isBlank() ? null : codigoAula.trim();
+  }
 }

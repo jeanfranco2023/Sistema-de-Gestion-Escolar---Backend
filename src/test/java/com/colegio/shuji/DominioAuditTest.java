@@ -89,13 +89,13 @@ class DominioAuditTest {
         com.colegio.shuji.tesoreria.domain.model.SerieComprobante.builder()
             .serie("B001")
             .ultimoCorrelativo(0)
-            .updatedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
+            .fechaActualizacion(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC))
             .build();
     assertEquals(1, serie.siguienteCorrelativo());
     assertEquals(2, serie.siguienteCorrelativo());
     assertEquals(3, serie.siguienteCorrelativo());
     assertEquals(3, serie.getUltimoCorrelativo());
-    assertNotNull(serie.getUpdatedAt());
+    assertNotNull(serie.getFechaActualizacion());
   }
 
   @Test
@@ -219,7 +219,7 @@ class DominioAuditTest {
   @Test
   void sesionExpiraExactamenteEnSuFechaLimite() {
     var limite = LocalDateTime.of(2026, 9, 18, 10, 0);
-    var sesion = Sesion.builder().expiraAt(limite).build();
+    var sesion = Sesion.builder().fechaExpiracion(limite).build();
     assertTrue(sesion.estaExpirada(limite));
     assertFalse(sesion.estaExpirada(limite.minusNanos(1)));
     assertThrows(

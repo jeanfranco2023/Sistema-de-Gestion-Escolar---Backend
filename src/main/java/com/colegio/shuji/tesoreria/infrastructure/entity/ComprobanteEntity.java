@@ -18,7 +18,6 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -34,8 +33,6 @@ public class ComprobanteEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "uuid", nullable = false)
-  private UUID uuid;
 
   @Column(name = "pago_transaccion_id", nullable = false)
   private Long pagoTransaccionId;
@@ -81,7 +78,6 @@ public class ComprobanteEntity {
 
   @PrePersist
   void inicializar() {
-    if (uuid == null) uuid = UUID.randomUUID();
     if (tipoComprobante == null) tipoComprobante = TipoComprobante.RECIBO_INTERNO;
     if (fechaEmision == null) fechaEmision = OffsetDateTime.now(ZoneOffset.UTC);
     if (estadoComprobante == null) estadoComprobante = EstadoComprobante.EMITIDO;

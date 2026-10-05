@@ -59,13 +59,13 @@ public class AuditoriaCambiosEntity {
   @JoinColumn(name = "usuario_id")
   private UsuarioEntity usuario;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
+  @Column(name = "fecha_creacion", nullable = false, updatable = false)
+  private LocalDateTime fechaCreacion;
 
   @PrePersist
   public void prePersist() {
-    if (this.createdAt == null) {
-      this.createdAt = LocalDateTime.now();
+    if (this.fechaCreacion == null) {
+      this.fechaCreacion = LocalDateTime.now();
     }
   }
 }

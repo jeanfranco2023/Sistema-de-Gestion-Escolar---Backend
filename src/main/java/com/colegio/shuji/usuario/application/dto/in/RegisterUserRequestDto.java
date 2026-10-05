@@ -20,12 +20,12 @@ import lombok.Setter;
 public class RegisterUserRequestDto {
 
   @NotBlank(message = "El nombre de usuario es obligatorio")
-  @Size(min = 3, max = 50, message = "El nombre de usuario debe tener entre 3 y 50 caracteres")
+  @Size(min = 3, max = 30, message = "El nombre de usuario debe tener entre 3 y 30 caracteres")
   private String username;
 
   @NotBlank(message = "El correo electrónico es obligatorio")
   @Email(message = "El formato del correo electrónico no es válido")
-  @Size(max = 254, message = "El correo electrónico no puede superar los 254 caracteres")
+  @Size(max = 50, message = "El correo electrónico no puede superar los 50 caracteres")
   private String email;
 
   @NotBlank(message = "La contraseña es obligatoria")

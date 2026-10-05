@@ -1,5 +1,6 @@
 package com.colegio.shuji.asistencia.application.dto.out;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.OffsetDateTime;
 
 public record LoteBiometricoResponseDto(
@@ -9,4 +10,4 @@ public record LoteBiometricoResponseDto(
     Integer marcasValidas,
     Integer marcasErroneas,
     Long importadoPorUsuarioId,
-    OffsetDateTime createdAt) {}
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {}

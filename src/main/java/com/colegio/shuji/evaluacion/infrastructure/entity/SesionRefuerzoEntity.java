@@ -41,7 +41,7 @@ public class SesionRefuerzoEntity {
   @Column(name = "docente_usuario_id", nullable = false)
   private Long docenteUsuarioId;
 
-  @Column(name = "tema", nullable = false, length = 40)
+  @Column(name = "tema_refuerzo", nullable = false, length = 40)
   private String tema;
 
   @Column(name = "fecha_programada", nullable = false)
@@ -53,13 +53,13 @@ public class SesionRefuerzoEntity {
   @Column(name = "hora_fin", nullable = false)
   private LocalTime horaFin;
 
-  @Column(name = "aula_asignada", length = 30)
+  @Column(name = "codigo_aula", length = 30)
   private String aulaAsignada;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(
-      name = "aula_asignada",
-      referencedColumnName = "codigo",
+      name = "codigo_aula",
+      referencedColumnName = "codigo_aula",
       insertable = false,
       updatable = false)
   private AulaEntity aula;

@@ -2,6 +2,7 @@ package com.colegio.shuji.academico.infrastructure.adapter;
 
 import com.colegio.shuji.academico.application.port.out.SeccionRepositoryPort;
 import com.colegio.shuji.academico.domain.model.Seccion;
+import com.colegio.shuji.academico.infrastructure.entity.SeccionEntity;
 import com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
@@ -34,11 +35,11 @@ public class SeccionRepositoryAdapter implements SeccionRepositoryPort {
     mapper.actualizar(valor, entity);
     repository.saveAndFlush(entity);
     entityManager.refresh(entity);
-    return mapper.toDomain(entity);
+    return toDomain(entity);
   }
 
   public Optional<Seccion> buscarPorId(Integer id) {
-    return repository.findById(id).map(mapper::toDomain);
+    return repository.findById(id).map(this::toDomain);
   }
 
   public Optional<Seccion> bloquearPorId(Integer id) {
@@ -47,30 +48,36 @@ public class SeccionRepositoryAdapter implements SeccionRepositoryPort {
         .map(
             e -> {
               entityManager.refresh(e);
-              return mapper.toDomain(e);
+              return toDomain(e);
             });
   }
 
   public List<Seccion> bloquearPorIds(Collection<Integer> ids) {
     if (ids == null || ids.isEmpty()) return List.of();
-    return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
+    return repository.bloquearPorIds(ids).stream().map(this::toDomain).toList();
   }
 
   public List<Seccion> listar() {
-    return repository.findAll(org.springframework.data.domain.Sort.by("id")).stream()
-        .map(mapper::toDomain)
+    return repository.listarConAula().stream()
+        .map(this::toDomain)
         .toList();
   }
 
   public List<Seccion> buscarPorAnioLectivoId(Short valor) {
-    return repository.buscarPorAnioLectivoId(valor).stream().map(mapper::toDomain).toList();
+    return repository.buscarPorAnioLectivoId(valor).stream().map(this::toDomain).toList();
   }
 
   public List<Seccion> buscarPorGradoId(Short valor) {
-    return repository.buscarPorGradoId(valor).stream().map(mapper::toDomain).toList();
+    return repository.buscarPorGradoId(valor).stream().map(this::toDomain).toList();
   }
 
   public List<Seccion> buscarPorNivelId(Short valor) {
-    return repository.buscarPorNivelId(valor).stream().map(mapper::toDomain).toList();
+    return repository.buscarPorNivelId(valor).stream().map(this::toDomain).toList();
+  }
+
+  private Seccion toDomain(SeccionEntity entity) {
+    var model = mapper.toDomain(entity);
+    model.setCodigoAula(entity.getAula().getCodigo());
+    return model;
   }
 }

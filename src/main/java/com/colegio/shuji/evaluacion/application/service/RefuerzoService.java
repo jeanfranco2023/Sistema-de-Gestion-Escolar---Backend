@@ -83,7 +83,7 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
                                 && aulaValidada.equals(s.getAulaAsignada())))),
         "Horario de refuerzo ocupado");
     var sesion = mapper.toDomain(r);
-    sesion.setAulaAsignada(codigoAula);
+    sesion.asignarAula(codigoAula);
     return mapper.toResponse(refuerzos.guardar(sesion));
   }
 

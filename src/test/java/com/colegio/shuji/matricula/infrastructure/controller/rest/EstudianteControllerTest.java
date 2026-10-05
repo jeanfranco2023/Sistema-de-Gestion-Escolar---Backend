@@ -21,7 +21,6 @@ import com.colegio.shuji.shared.infrastructure.controller.exception.GlobalExcept
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -49,7 +48,7 @@ class EstudianteControllerTest {
     var request = solicitud("12345678", "María");
     when(familias.registrarEstudiante(any(RegistrarEstudianteRequestDto.class)))
         .thenReturn(new EstudianteResponseDto(
-            7L, UUID.randomUUID(), TipoDocumento.DNI, "12345678", "María", "Pérez", "López",
+            7L, TipoDocumento.DNI, "12345678", "María", "Pérez", "López",
             LocalDate.of(2015, 5, 12), Genero.F, null, false, OrigenRegistro.MANUAL_CONTINGENCIA,
             null, null, true, OffsetDateTime.now()));
 

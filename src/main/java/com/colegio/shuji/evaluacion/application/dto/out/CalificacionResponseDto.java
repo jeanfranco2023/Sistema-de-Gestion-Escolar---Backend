@@ -1,5 +1,6 @@
 package com.colegio.shuji.evaluacion.application.dto.out;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa;
 import java.time.OffsetDateTime;
 
@@ -17,5 +18,5 @@ public record CalificacionResponseDto(
     String conclusionDescriptiva,
     Boolean sugerenciaIaUtilizada,
     Boolean requiereRefuerzo,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt) {}
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion,
+    @JsonProperty("updatedAt") OffsetDateTime fechaActualizacion) {}

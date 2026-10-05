@@ -178,12 +178,10 @@ class DominioCoberturaTest {
               .id((short) 2)
               .codigo(NivelCodigo.SECUNDARIA)
               .nombre("Secundaria")
-              .descripcion("Educación Secundaria")
               .build();
       assertEquals(NivelCodigo.SECUNDARIA, nivel.getCodigo());
-      nivel.actualizar("Secundaria Regular", "Nueva descripcion");
+      nivel.actualizar("Secundaria Regular");
       assertEquals("Secundaria Regular", nivel.getNombre());
-      assertEquals("Nueva descripcion", nivel.getDescripcion());
     }
 
     @Test
@@ -228,14 +226,13 @@ class DominioCoberturaTest {
               .letra("A")
               .cupoMaximo((short) 2)
               .vacantesOcupadas((short) 0)
-              .aulaFisica("  A-101  ")
+              .codigoAula("A-101")
               .build();
 
       assertEquals(2, seccion.vacantesDisponibles());
       assertTrue(seccion.tieneDisponibilidad());
 
-      seccion.normalizarAula();
-      assertEquals("A-101", seccion.getAulaFisica());
+      assertEquals("A-101", seccion.getCodigoAula());
 
       seccion.ocuparVacante();
       assertEquals(1, seccion.vacantesDisponibles());
@@ -252,7 +249,7 @@ class DominioCoberturaTest {
       seccion.liberarVacante(); // no baja de 0
       assertEquals(2, seccion.vacantesDisponibles());
 
-      seccion.actualizar("B", (short) 30, "A-102");
+      seccion.actualizar("B", (short) 30);
       assertEquals("B", seccion.getLetra());
       assertEquals((short) 30, seccion.getCupoMaximo());
 
@@ -260,7 +257,7 @@ class DominioCoberturaTest {
       var aulaValida = Aula.builder().id(5).codigo("A-102").capacidad((short) 35).activa(true).build();
       seccion.asignarAula(aulaValida);
       assertEquals(5, seccion.getAulaId());
-      assertEquals("A-102", seccion.getAulaFisica());
+      assertEquals("A-102", seccion.getCodigoAula());
 
       var aulaChica = Aula.builder().id(6).codigo("A-CHICA").capacidad((short) 25).activa(true).build();
       assertThrows(BusinessException.class, () -> seccion.asignarAula(aulaChica));
@@ -659,7 +656,6 @@ class DominioCoberturaTest {
           InscripcionRefuerzo.builder()
               .id(1L)
               .sesionRefuerzoId(2L)
-              .matriculaId(10L)
               .estudianteId(15L)
               .calificacionOrigenId(1L)
               .estadoAsistencia(EstadoAsistenciaRefuerzo.PENDIENTE)
@@ -822,7 +818,7 @@ class DominioCoberturaTest {
 
       mat.confirmar(ahora);
       assertTrue(mat.estaMatriculado());
-      assertNull(mat.getReservaExpiraAt());
+      assertNull(mat.getFechaExpiracionReserva());
 
       // Confirmar de nuevo es idempotente
       mat.confirmar(ahora);
@@ -1033,7 +1029,7 @@ class DominioCoberturaTest {
       var serie = SerieComprobante.builder().serie("B001").ultimoCorrelativo(10).build();
       assertEquals(11, serie.siguienteCorrelativo());
       assertEquals(12, serie.siguienteCorrelativo());
-      assertNotNull(serie.getUpdatedAt());
+      assertNotNull(serie.getFechaActualizacion());
 
       var serieCorrupta = SerieComprobante.builder().serie("B001").ultimoCorrelativo(-1).build();
       assertThrows(BusinessException.class, serieCorrupta::siguienteCorrelativo);
@@ -1046,9 +1042,9 @@ class DominioCoberturaTest {
 
     @Test
     void testRolYSesion() {
-      var rol1 = Rol.builder().id((short) 1).codigo("ADMIN").nombre("Administrador").descripcion("Admin").build();
-      var rol2 = Rol.builder().id((short) 1).codigo("ADMIN").nombre("Administrador").descripcion("Admin").build();
-      var rol3 = Rol.builder().id((short) 2).codigo("DOCENTE").nombre("Docente").descripcion("Doc").build();
+      var rol1 = Rol.builder().id((short) 1).codigo("ADMIN").nombre("Administrador").build();
+      var rol2 = Rol.builder().id((short) 1).codigo("ADMIN").nombre("Administrador").build();
+      var rol3 = Rol.builder().id((short) 2).codigo("DOCENTE").nombre("Docente").build();
 
       assertEquals(rol1, rol2);
       assertNotEquals(rol1, rol3);
@@ -1062,8 +1058,8 @@ class DominioCoberturaTest {
               .tokenHash("hash123")
               .ipAddress("127.0.0.1")
               .userAgent("Mozilla/5.0")
-              .expiraAt(LocalDateTime.of(2026, 6, 1, 12, 0))
-              .createdAt(LocalDateTime.of(2026, 6, 1, 10, 0))
+              .fechaExpiracion(LocalDateTime.of(2026, 6, 1, 12, 0))
+              .fechaCreacion(LocalDateTime.of(2026, 6, 1, 10, 0))
               .build();
 
       assertFalse(sesion.estaExpirada(LocalDateTime.of(2026, 6, 1, 11, 0)));
@@ -1080,7 +1076,7 @@ class DominioCoberturaTest {
       assertEquals("hashNuevo", sesion.getTokenHash());
       assertEquals("192.168.1.1", sesion.getIpAddress());
       assertEquals("PostmanRuntime", sesion.getUserAgent());
-      assertEquals(LocalDateTime.of(2026, 6, 1, 14, 0), sesion.getExpiraAt());
+      assertEquals(LocalDateTime.of(2026, 6, 1, 14, 0), sesion.getFechaExpiracion());
 
       assertThrows(
           BusinessException.class,
@@ -1114,7 +1110,6 @@ class DominioCoberturaTest {
       assertTrue(usuario.estaActivo());
       assertTrue(usuario.tieneRol("ADMIN"));
       assertFalse(usuario.tieneRol("DOCENTE"));
-      assertNotNull(usuario.getUuid());
 
       usuario.agregarRol(rolDocente);
       assertTrue(usuario.tieneRol("DOCENTE"));
@@ -1129,7 +1124,7 @@ class DominioCoberturaTest {
       assertTrue(usuario.estaActivo());
 
       usuario.cambiarPassword("nuevoHash$456");
-      assertEquals("nuevoHash$456", usuario.getPasswordHash());
+      assertEquals("nuevoHash$456", usuario.getUsuarioPassword());
 
       usuario.actualizarPerfil("juan.nuevo@colegio.edu.pe");
       assertEquals("juan.nuevo@colegio.edu.pe", usuario.getEmail());

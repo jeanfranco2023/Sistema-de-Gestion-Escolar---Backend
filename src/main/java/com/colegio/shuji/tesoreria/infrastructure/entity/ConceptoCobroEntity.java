@@ -26,10 +26,10 @@ public class ConceptoCobroEntity {
   @Column(name = "id", nullable = false)
   private Short id;
 
-  @Column(name = "codigo", nullable = false, length = 30)
+  @Column(name = "codigo_concepto", nullable = false, length = 30)
   private String codigo;
 
-  @Column(name = "nombre", nullable = false, length = 100)
+  @Column(name = "nombre_concepto", nullable = false, length = 50)
   private String nombre;
 
   @Enumerated(EnumType.STRING)

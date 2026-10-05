@@ -1,5 +1,6 @@
 package com.colegio.shuji.matricula.application.dto.in;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -9,5 +10,5 @@ public record SolicitarMatriculaRequestDto(
     @NotNull Short anioLectivoId,
     @NotNull Long estudianteId,
     @NotNull Integer seccionId,
-    @Future OffsetDateTime reservaExpiraAt,
-    @Size(max = 4000) String observaciones) {}
+    @Future @JsonProperty("reservaExpiraAt") OffsetDateTime fechaExpiracionReserva,
+    @Size(max = 500) String observaciones) {}

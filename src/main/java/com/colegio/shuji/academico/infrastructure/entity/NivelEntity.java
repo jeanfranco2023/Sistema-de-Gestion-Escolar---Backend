@@ -26,10 +26,10 @@ public class NivelEntity {
   private Short id;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "codigo", nullable = false, length = 20)
+  @Column(name = "codigo_nivel", nullable = false, length = 20)
   private NivelCodigo codigo;
 
-  @Column(name = "nombre", nullable = false, length = 30)
+  @Column(name = "nombre_nivel", nullable = false, length = 30)
   private String nombre;
 
   @PrePersist

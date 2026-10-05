@@ -20,7 +20,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -36,8 +35,6 @@ public class PagoTransaccionEntity {
   @Column(name = "id", nullable = false)
   private Long id;
 
-  @Column(name = "uuid", nullable = false)
-  private UUID uuid;
 
   @Column(name = "obligacion_pago_id", nullable = false)
   private Long obligacionPagoId;
@@ -79,7 +76,6 @@ public class PagoTransaccionEntity {
 
   @PrePersist
   void inicializar() {
-    if (uuid == null) uuid = UUID.randomUUID();
     if (fechaPago == null) fechaPago = OffsetDateTime.now(ZoneOffset.UTC);
     if (estadoPago == null) estadoPago = EstadoPago.APROBADO;
   }

@@ -4,7 +4,6 @@ import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.shared.domain.model.Reglas;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,7 +17,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Apoderado {
   private Long id;
-  private UUID uuid;
   private Long usuarioId;
   private TipoDocumento tipoDocumento;
   private String numeroDocumento;
@@ -31,7 +29,7 @@ public class Apoderado {
   private String ubigeoInei;
   private Boolean validadoReniec;
   private OrigenRegistro origenRegistro;
-  private OffsetDateTime createdAt;
+  private OffsetDateTime fechaCreacion;
 
   public String nombreCompleto() {
     return nombres + " " + apellidoPaterno + " " + (apellidoMaterno == null ? "" : apellidoMaterno);

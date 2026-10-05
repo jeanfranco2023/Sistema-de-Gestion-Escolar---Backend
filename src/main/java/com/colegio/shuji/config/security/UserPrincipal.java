@@ -4,7 +4,6 @@ import com.colegio.shuji.config.persistence.SupabaseAuditInterceptor;
 import com.colegio.shuji.usuario.domain.model.Usuario;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +18,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class UserPrincipal implements UserDetails, SupabaseAuditInterceptor.UserPrincipalHolder {
 
   private final Long id;
-  private final UUID uuid;
   private final String username;
   private final String email;
   private final String password;
@@ -39,10 +37,9 @@ public class UserPrincipal implements UserDetails, SupabaseAuditInterceptor.User
 
     return UserPrincipal.builder()
         .id(usuario.getId())
-        .uuid(usuario.getUuid())
         .username(usuario.getUsername())
         .email(usuario.getEmail())
-        .password(usuario.getPasswordHash())
+        .password(usuario.getUsuarioPassword())
         .active(usuario.estaActivo())
         .authorities(authorities)
         .build();

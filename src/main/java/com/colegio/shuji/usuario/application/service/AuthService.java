@@ -61,7 +61,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
             .findByUsernameOrEmail(loginRequest.getUsername())
             .orElseThrow(InvalidCredentialsException::new);
 
-    if (!passwordEncoder.matches(loginRequest.getPassword(), usuario.getPasswordHash())) {
+    if (!passwordEncoder.matches(loginRequest.getPassword(), usuario.getUsuarioPassword())) {
       log.warn("Contraseña incorrecta para el usuario: {}", loginRequest.getUsername());
       throw new InvalidCredentialsException();
     }
@@ -92,8 +92,8 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
             .tokenHash(tokenHash)
             .ipAddress(ipAddress)
             .userAgent(userAgent)
-            .expiraAt(expiresAt)
-            .createdAt(LocalDateTime.now())
+            .fechaExpiracion(expiresAt)
+            .fechaCreacion(LocalDateTime.now())
             .build();
 
     sessionRepositoryPort.save(sesion);

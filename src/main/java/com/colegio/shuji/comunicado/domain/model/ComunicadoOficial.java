@@ -1,7 +1,6 @@
 package com.colegio.shuji.comunicado.domain.model;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +14,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ComunicadoOficial {
   private Long id;
-  private UUID uuid;
   private Long remitenteUsuarioId;
   private String titulo;
   private String contenido;

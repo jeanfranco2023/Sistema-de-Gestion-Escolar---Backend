@@ -60,3 +60,25 @@ El consolidado contiene 37 tablas y 55 claves foráneas declaradas. Revisé tipo
 - .env no fue leído ni modificado. .env.example documenta el nuevo parámetro. Para probar contra Mercado Pago, el entorno local debe tener las credenciales de prueba configuradas.
 - mvnw -Dtest=SolicitudMatriculaPublicaDocumentosTest test: BUILD SUCCESS, 5 pruebas en verde.
 - La ejecución completa previa a la segunda prueba nueva reportó 108 pruebas, 1 fallo en ArquitecturaTest.serviciosSinComodinesNiSettersDeNegocio (RefuerzoService) y 9 errores porque PostgreSQL de pruebas no estaba disponible en 127.0.0.1:55439. No valida una transacción real con Mercado Pago.
+
+## Seguimiento local 2026-09-24 — limpieza arquitectónica V14
+
+Se preparó la migración `V14__normalizar_aulas_integridad_y_indices.sql` y se incorporó al final de ambos scripts consolidados. No se ejecutó sobre PostgreSQL ni se corrieron pruebas.
+
+- **Aulas:** `secciones.aula_id` es la única relación persistida; se elimina el duplicado `aula_fisica`. El contrato JSON conserva `aulaFisica` con el código para compatibilidad, derivado de `aulas.codigo`. Las respuestas cargan el aula relacionada en lote. V14 aborta ante códigos duplicados por mayúsculas, espacios externos o discrepancias entre la columna antigua y el aula FK.
+- **Tesorería:** se añadió FK entre comprobantes y series, respetando `B001` y `E001`; V14 valida orfandad antes de aplicarla.
+- **Retención:** competencias y documentos de solicitudes ya no se eliminan en cascada con su padre; sus FKs usan `RESTRICT`.
+- **Índices:** se quitan cinco duplicados exactos o cubiertos por una clave única; se añaden índices para las cinco FKs de solicitudes públicas, usando índices parciales para columnas opcionales.
+- **Acceso:** se habilita RLS y se revoca acceso directo a `anon` y `authenticated` en solicitudes públicas con PII.
+- **Scripts:** `schema_completo_colegio_shuji.sql` y `schema_completo_importador_postgresql.sql` siguen idénticos y ahora consolidan V1–V14.
+- `mvnw -DskipTests -Dmaven.compiler.fork=true compile`: BUILD SUCCESS, sin errores de fuentes; no se ejecutaron pruebas. El JDK imprimió un `AccessDeniedException` al cerrar un JAR cacheado, aunque Maven devolvió código 0.
+- `.env` no se leyó ni modificó. El cambio previo en `CorsConfig.java` permanece fuera del alcance.
+
+## Resultados de pruebas locales — 2026-09-24
+
+- La primera suite completa contó **109 tests, 1 fallo y 9 errores**. El fallo de arquitectura por setter directo en `RefuerzoService` se corrigió mediante `SesionRefuerzo.asignarAula(...)`.
+- Repetición dirigida: **30/30** para `ArquitecturaTest`, `SeguridadAvanzadaTest`, `MercadoPagoWebhookControllerTest` y `TesoreriaMercadoPagoFlowTest`.
+- Suite restante excluyendo las tres clases que requieren PostgreSQL: **100/100 BUILD SUCCESS**.
+- Las pruebas de integración/concurrencia no arrancaron porque no hay PostgreSQL en `127.0.0.1:55439`; el motor Docker local tampoco estaba iniciado. No se consultó la base remota.
+- OWASP Dependency-Check 9.0.9 no llegó a analizar dependencias: NVD respondió HTTP 403/404 y no existía base CVE local. El resultado queda **pendiente**, no equivale a cero vulnerabilidades.
+- `.env` no se leyó ni modificó. `CorsConfig.java` conserva su cambio local previo.

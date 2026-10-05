@@ -4,11 +4,9 @@ import com.colegio.shuji.tesoreria.domain.enums.EstadoComprobante;
 import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 public record ComprobanteResponseDto(
     Long id,
-    UUID uuid,
     Long pagoTransaccionId,
     TipoComprobante tipoComprobante,
     String serie,

@@ -7,4 +7,4 @@ import jakarta.validation.constraints.Size;
 public record RegistrarAsistenciaRefuerzoRequestDto(
     @NotNull Long inscripcionId,
     @NotNull EstadoAsistenciaRefuerzo estadoAsistencia,
-    @Size(max = 4000) String observaciones) {}
+    @Size(max = 500) String observaciones) {}

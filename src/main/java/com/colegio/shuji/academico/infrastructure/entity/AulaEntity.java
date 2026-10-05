@@ -20,13 +20,13 @@ public class AulaEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Integer id;
 
-  @Column(nullable = false, unique = true, length = 30)
+  @Column(name = "codigo_aula", nullable = false, unique = true, length = 30)
   private String codigo;
 
-  @Column(nullable = false, length = 40)
+  @Column(name = "nombre_aula", nullable = false, length = 40)
   private String nombre;
 
-  @Column(length = 150)
+  @Column(length = 60)
   private String ubicacion;
 
   @Column(nullable = false)
