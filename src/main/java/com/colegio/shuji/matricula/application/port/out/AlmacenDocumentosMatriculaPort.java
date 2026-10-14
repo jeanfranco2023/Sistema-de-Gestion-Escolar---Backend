@@ -11,4 +11,6 @@ public interface AlmacenDocumentosMatriculaPort {
   ArchivoGuardado guardar(UUID solicitudId, TipoDocumentoSolicitud tipo, byte[] contenido, String mimeType);
 
   String urlFirmada(String bucket, String objectKey);
+
+  void eliminar(ArchivoGuardado archivo);
 }

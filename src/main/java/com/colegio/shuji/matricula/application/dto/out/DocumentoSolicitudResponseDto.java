@@ -6,4 +6,9 @@ import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
 public record DocumentoSolicitudResponseDto(
     TipoDocumentoSolicitud tipo,
     EstadoValidacionDocumento estado,
-    String observacion) {}
+    String observacion,
+    java.util.UUID versionId,
+    Boolean iaValida,
+    Boolean dniApiCoincide,
+    com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital estadoFirma,
+    String detalleFirma) {}

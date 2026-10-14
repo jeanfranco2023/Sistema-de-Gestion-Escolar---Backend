@@ -70,7 +70,7 @@ class EstudianteServiceTest {
         mock(EstudianteApoderadoRepositoryPort.class),
         mock(ReniecServicePort.class));
     var request = new RegistrarEstudianteRequestDto(
-        TipoDocumento.CE, "12345678", "Prueba", "Local", "Integracion",
+        TipoDocumento.DNI, "12345678", "Prueba", "Local", "Integracion",
         LocalDate.of(2015, 5, 12), Genero.F, recibido, null, null);
     when(estudiantes.buscarPorNumeroDocumento("12345678")).thenReturn(List.of());
     when(mapper.toDomain(request)).thenReturn(Estudiante.builder().codigoEstudianteSiagie(recibido).build());

@@ -34,7 +34,7 @@ public class MarcaBiometricoEntity {
   @Column(name = "lote_id")
   private Long loteId;
 
-  @Column(name = "dni_leido", nullable = false, length = 15)
+  @Column(name = "dni_leido", nullable = false, length = 8)
   private String dniLeido;
 
   @Column(name = "fecha_hora", nullable = false)

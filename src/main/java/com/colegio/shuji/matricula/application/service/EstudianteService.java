@@ -33,10 +33,9 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
   private final ReniecServicePort reniec;
 
   private void validarDocumento(TipoDocumento tipo, String numero) {
-    if (tipo == TipoDocumento.DNI && (numero == null || !numero.matches("[0-9]{8}")))
+    if (tipo != TipoDocumento.DNI || numero == null || !numero.matches("[0-9]{8}"))
       throw new com.colegio.shuji.matricula.domain.exception.DniInvalidoException(
-          "El DNI debe tener ocho dígitos");
-    exigir(numero != null && !numero.isBlank() && numero.length() <= 15, "Documento inválido");
+          "Solo se admite DNI peruano de ocho dígitos");
   }
 
   public EstudianteResponseDto registrarEstudiante(RegistrarEstudianteRequestDto r) {

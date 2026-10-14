@@ -41,7 +41,7 @@ class SupabaseStorageMatriculaAdapterTest {
       var bytes = new byte[] {1, 2, 3, 4};
       var result = adapter.guardar(id, TipoDocumentoSolicitud.DNI_C4, bytes, "image/png");
       assertEquals("matricula-documentos", result.bucket());
-      assertEquals("/storage/v1/object/matricula-documentos/" + id + "/dni_c4.png", path.get());
+      org.junit.jupiter.api.Assertions.assertTrue(path.get().matches("/storage/v1/object/matricula-documentos/" + id + "/dni_c4/[0-9a-f-]{36}\\.png"));
       assertEquals("Bearer server-only-test-key", authorization.get());
       assertArrayEquals(bytes, content.get());
     } finally {

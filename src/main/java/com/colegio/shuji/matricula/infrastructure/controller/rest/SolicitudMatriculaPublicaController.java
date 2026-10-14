@@ -8,6 +8,8 @@ import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublica
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
+import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
+import com.colegio.shuji.matricula.application.dto.out.VersionDocumentoMatriculaResponseDto;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.application.port.out.AlmacenDocumentosMatriculaPort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
@@ -52,6 +54,8 @@ public class SolicitudMatriculaPublicaController {
   private final SolicitudMatriculaPublicaService solicitudes;
   private final GestionarPagoMatriculaPublicaUseCase pagos;
   private final GeminiDocumentoMatriculaPort gemini;
+  private final FirmaDigitalDocumentoPort firmas;
+  private final com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService identidades;
   private final ReniecServicePort consultaDni;
   private final AlmacenDocumentosMatriculaPort almacenDocumentos;
 
@@ -90,25 +94,62 @@ public class SolicitudMatriculaPublicaController {
     if (archivo == null || archivo.isEmpty() || archivo.getSize() > MAX_FILE_BYTES) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El documento debe pesar hasta 5 MB");
     }
+    var declarados = solicitudes.prepararValidacion(id, token, tipo);
     final byte[] bytes;
     try {
       bytes = archivo.getBytes();
     } catch (IOException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo leer el documento");
     }
+    AlmacenDocumentosMatriculaPort.ArchivoGuardado referenciaArchivo = null;
     try {
       almacenDocumentos.validarConfiguracion();
       String mimeType = detectarMime(bytes);
-      String declarados = solicitudes.prepararValidacion(id, token, tipo);
-      int separador = declarados.lastIndexOf('|');
-      var resultado = gemini.validar(
-          tipo, bytes, mimeType, declarados.substring(0, separador), declarados.substring(separador + 1));
-      var referenciaArchivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
+      var firma = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
+          ? new FirmaDigitalDocumentoPort.Resultado(com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.NO_APLICA,
+              "La comprobación de firma RENIEC no aplica al recibo de servicio.", null)
+          : firmas.verificar(bytes, mimeType, tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO);
+      GeminiDocumentoMatriculaPort.Resultado resultado;
+      Boolean dniApiCoincide = null;
+      try {
+        var identidad = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
+            ? com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE
+            : identidades.verificar(declarados.nombres(), declarados.dni());
+        if (tipo != TipoDocumentoSolicitud.RECIBO_SERVICIO) {
+          dniApiCoincide = identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE
+              ? null : identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE;
+        }
+        if (firma.estado() == com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.INVALIDA) {
+          resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false, "Archivo o firma inválida.", false);
+        } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE) {
+          resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
+              "La API de DNI no confirmó la identidad; reintenta cuando el proveedor esté disponible.", false);
+        } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE) {
+          resultado = new GeminiDocumentoMatriculaPort.Resultado(true, true, false,
+              "El DNI y los nombres declarados no coinciden con la API de identidad.", false);
+        } else {
+          resultado = gemini.validar(tipo, bytes, mimeType, declarados.nombres(), declarados.dni());
+        }
+      } catch (ResponseStatusException ex) {
+        if (!ex.getStatusCode().is5xxServerError()) throw ex;
+        resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
+            "Análisis automático no disponible; vuelve a intentar la verificación.", false);
+      } catch (com.colegio.shuji.shared.domain.exception.BusinessException ex) {
+        resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
+            "La respuesta automática no pudo interpretarse; vuelve a intentar la verificación.", false);
+      }
+      referenciaArchivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
       String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
       return solicitudes.guardarResultadoDocumento(
-          id, token, tipo, resultado, referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
+          id, token, tipo, resultado, firma, dniApiCoincide, declarados.versionActual(), referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
     } catch (NoSuchAlgorithmException ex) {
       throw new IllegalStateException("SHA-256 no está disponible", ex);
+    } catch (RuntimeException ex) {
+      if (referenciaArchivo != null) {
+        try { almacenDocumentos.eliminar(referenciaArchivo); }
+        catch (RuntimeException limpieza) { ex.addSuppressed(limpieza); }
+      }
+      throw ex;
     } finally {
       java.util.Arrays.fill(bytes, (byte) 0);
     }
@@ -157,6 +198,13 @@ public class SolicitudMatriculaPublicaController {
     return solicitudes.observarAdmin(id, request);
   }
 
+  @GetMapping("/admin/{id}/documentos/{tipo}/historial")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  public List<VersionDocumentoMatriculaResponseDto> historialDocumento(@PathVariable UUID id,
+      @PathVariable TipoDocumentoSolicitud tipo) {
+    return solicitudes.historialDocumento(id, tipo);
+  }
+
   @PostMapping("/admin/{id}/rechazar")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public void rechazarAdmin(@PathVariable UUID id) {
@@ -170,11 +218,11 @@ public class SolicitudMatriculaPublicaController {
     var documento = solicitudes.documentoDescargaAdmin(id, tipo);
     return new DocumentoAdminDescarga(
         almacenDocumentos.urlFirmada(documento.bucket(), documento.objectKey()),
-        documento.mimeType(), documento.tamanoBytes(), documento.fechaActualizacion());
+        documento.mimeType(), documento.tamanoBytes(), documento.fechaActualizacion(), documento.versionId());
   }
 
   public record DocumentoAdminDescarga(String url, String mimeType, long tamanoBytes,
-                                       java.time.OffsetDateTime fechaActualizacion) {}
+                                       java.time.OffsetDateTime fechaActualizacion, UUID versionId) {}
 
   private String detectarMime(byte[] bytes) {
     if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F' && bytes[4] == '-') {
@@ -183,7 +231,8 @@ public class SolicitudMatriculaPublicaController {
     if (bytes.length >= 3 && (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff) {
       return MediaType.IMAGE_JPEG_VALUE;
     }
-    if (bytes.length >= 8 && (bytes[0] & 0xff) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
+    if (bytes.length >= 8 && (bytes[0] & 0xff) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G'
+        && bytes[4] == 13 && bytes[5] == 10 && bytes[6] == 26 && bytes[7] == 10) {
       return MediaType.IMAGE_PNG_VALUE;
     }
     if (bytes.length >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'

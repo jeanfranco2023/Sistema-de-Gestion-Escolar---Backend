@@ -54,13 +54,13 @@ public class SupabaseStorageMatriculaAdapter implements AlmacenDocumentosMatricu
       case "image/webp" -> "webp";
       default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de documento no permitido");
     };
-    String objectKey = solicitudId + "/" + tipo.name().toLowerCase() + "." + extension;
+    String objectKey = solicitudId + "/" + tipo.name().toLowerCase(java.util.Locale.ROOT) + "/" + UUID.randomUUID() + "." + extension;
     try {
-      client.put()
+      client.post()
           .uri(url + "/storage/v1/object/" + bucket + "/" + objectKey)
           .header("apikey", serviceRoleKey)
           .header("Authorization", "Bearer " + serviceRoleKey)
-          .header("x-upsert", "true")
+          .header("x-upsert", "false")
           .contentType(MediaType.parseMediaType(mimeType))
           .body(contenido)
           .retrieve()
@@ -95,6 +95,16 @@ public class SupabaseStorageMatriculaAdapter implements AlmacenDocumentosMatricu
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Supabase no devolvió una URL temporal válida");
     }
     return url + "/storage/v1" + signedPath;
+  }
+
+  @Override
+  public void eliminar(ArchivoGuardado archivo) {
+    validarConfiguracion();
+    client.method(org.springframework.http.HttpMethod.DELETE)
+        .uri(url + "/storage/v1/object/" + archivo.bucket())
+        .header("apikey", serviceRoleKey).header("Authorization", "Bearer " + serviceRoleKey)
+        .contentType(MediaType.APPLICATION_JSON).body(Map.of("prefixes", List.of(archivo.objectKey())))
+        .retrieve().toBodilessEntity();
   }
 
   private void asegurarBucketPrivado() {

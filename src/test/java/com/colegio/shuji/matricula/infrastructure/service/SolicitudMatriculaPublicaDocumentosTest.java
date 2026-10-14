@@ -45,6 +45,8 @@ class SolicitudMatriculaPublicaDocumentosTest {
   private static final String TOKEN = "token-privado-de-prueba";
 
   @Mock private JpaSolicitudMatriculaPublicaRepository solicitudes;
+  @Mock private com.colegio.shuji.matricula.infrastructure.repository.JpaSolicitudMatriculaDocumentoRepository documentos;
+  @Mock private com.colegio.shuji.matricula.infrastructure.repository.JpaDocumentoMatriculaVersionRepository versiones;
   @Mock private JpaAnioLectivoRepository anios;
   @Mock private JpaSeccionRepository secciones;
   @Mock private JpaEstudianteRepository estudiantes;
@@ -115,6 +117,9 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setId(SOLICITUD_ID);
     solicitud.setTokenHash(hash(TOKEN));
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
+    solicitud.setEstadoPartida(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEstadoDniC4(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEstadoRecibo(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
     solicitud.setSeccionId(9);
     when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
     when(secciones.reservarVacante(9)).thenReturn(1);
@@ -139,6 +144,9 @@ class SolicitudMatriculaPublicaDocumentosTest {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setId(SOLICITUD_ID);
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
+    solicitud.setEstadoPartida(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEstadoDniC4(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEstadoRecibo(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
     solicitud.setSeccionId(9);
     solicitud.setAnioLectivoId((short) 2026);
     when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));

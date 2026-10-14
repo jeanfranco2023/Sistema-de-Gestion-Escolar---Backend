@@ -32,10 +32,10 @@ public class EstudianteEntity {
 
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "tipo_documento", nullable = false, length = 10)
+  @Column(name = "tipo_documento", nullable = false, length = 3)
   private TipoDocumento tipoDocumento;
 
-  @Column(name = "numero_documento", nullable = false, length = 15)
+  @Column(name = "numero_documento", nullable = false, length = 8)
   private String numeroDocumento;
 
   @Column(name = "nombres_estudiante", nullable = false, length = 20)

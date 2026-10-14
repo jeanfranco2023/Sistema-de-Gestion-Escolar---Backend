@@ -103,7 +103,7 @@ El backend contiene **420 clases Java** organizadas de forma modular en:
 El esquema de base de datos (`src/main/resources/db/migration/V1__schema_colegio_shuji.sql`) implementa:
 * **33 tablas relacionales** en 3ra Forma Normal (3NF/BCNF).
 * **Identificadores Públicos UUIDv4:** Cada tabla cuenta con identificadores `UUID` inmutables expuestos en la API pública para prevenir ataques de enumeración y scraping.
-* **Tipos de Datos Especializados:** `CHAR(8)` para DNI peruano, `CHAR(9)` para teléfonos móviles peruanos, `NUMERIC(10,2)` para transacciones financieras en Soles (`PEN`), `JSONB` para auditoría y payloads externos.
+* **Tipos de Datos Especializados:** `VARCHAR(8)` con validación exacta de ocho dígitos para DNI peruano, `CHAR(9)` para teléfonos móviles peruanos, `NUMERIC(10,2)` para transacciones financieras en Soles (`PEN`), `JSONB` para auditoría y payloads externos.
 * **11 Funciones PL/pgSQL y 15 Triggers:** Para actualización automática de timestamps, auditoría de cambios y sincronización del usuario autenticado vía `SupabaseAuditInterceptor`.
 * **28 Índices B-Tree Estratégicos:** Sobre claves naturales, foráneas y campos de consulta masiva.
 
@@ -217,3 +217,19 @@ Una vez iniciado el backend, accede a la documentación interactiva y explorador
 * **Institución:** I.E.P. Shuji Kitamura
 * **Curso:** Curso Integrador II: Sistemas (Universidad Tecnológica del Perú - UTP)
 * **Desarrollo y Arquitectura:** Jean Franco & Antigravity (Google DeepMind)
+
+## Validación automática de documentos (V20)
+
+- Partida de nacimiento: se exige el PDF original con firma CMS/PDF verificable, certificado institucional de RENIEC, cadena admitida, vigencia actual y CRL completa y vigente. Una imagen o un PDF sin firma queda observado.
+- DNI/C4: se contrasta el DNI de ocho dígitos y el nombre completo declarado contra el proveedor `integraciones.reniec` ya configurado. Gemini evalúa tipo, legibilidad y coincidencia visible. Esta consulta no acredita por sí sola posesión del DNI.
+- Recibo: se revisan tipo y legibilidad; no se exige firma de RENIEC ni coincidencia del titular con el estudiante.
+- La IA no puede aprobar una partida con firma inválida o sin evidencia de confianza/revocación. Servicios no disponibles quedan en `EN_VALIDACION`; no hay aprobación humana obligatoria ni endpoint de aprobación manual añadido.
+- Cada carga conserva ruta privada única, huella SHA-256 y resultados separados de IA, DNI y firma. V20 añade `versiones_documentos_matricula` y conserva evidencia inmutable; una respuesta tardía no sustituye una versión más reciente.
+
+Las autoridades públicas ROOT 3 y ROOT 5 se incluyen en `src/main/resources/security/reniec/autoridades.pem`. Se descargaron de los enlaces publicados en el [repositorio RENIEC](https://pki.reniec.gob.pe/repositorio/) y se contrastaron con las huellas de ese repositorio. La consulta de certificados intermedios y CRL utiliza solo hosts oficiales permitidos, sin enviar PDFs a esos repositorios. No se utiliza el servicio de demostración DSS de terceros.
+
+Configuración opcional mediante propiedades de Spring (sin necesidad de cambiar `.env`): `app.matricula-publica.firmas.certificados-confiables` admite un recurso `file:` o `classpath:`; por defecto usa las autoridades incluidas. `app.matricula-publica.firmas.crls` permite un archivo local para pruebas aisladas. `app.matricula-publica.firmas.consulta-publica-habilitada=false` desactiva las consultas públicas; sin CRL local vigente el resultado no se presenta como válido.
+
+La política valida la firma y el certificado a la fecha actual. No implementa validación histórica PAdES-LTV, XAdES, CAdES separado, sellos de tiempo como sustituto de firma institucional ni determina parentesco/autorización del apoderado. Los formatos no admitidos y revisiones posteriores a la última firma quedan sin confirmar.
+
+Para una instalación existente se aplican las migraciones pendientes V19/V20 con Flyway. El SQL consolidado y `colegio_shuji_v20.dbml` describen el esquema local V20; el consolidado es exclusivamente para una base vacía.

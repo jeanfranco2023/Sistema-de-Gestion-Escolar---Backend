@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 
 public record RegistrarApoderadoRequestDto(
     @NotNull TipoDocumento tipoDocumento,
-    @NotBlank @Size(max = 15) String numeroDocumento,
+    @NotBlank @Size(min = 8, max = 8) @Pattern(regexp = "[0-9]{8}") String numeroDocumento,
     @NotBlank @Size(max = 20) String nombres,
     @NotBlank @Size(max = 20) String apellidoPaterno,
     @NotBlank @Size(max = 20) String apellidoMaterno,

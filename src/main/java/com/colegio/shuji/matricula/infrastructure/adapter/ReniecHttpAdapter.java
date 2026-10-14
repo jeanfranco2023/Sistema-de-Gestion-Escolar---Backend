@@ -49,7 +49,7 @@ public class ReniecHttpAdapter implements ReniecServicePort {
       if (body == null) return Optional.empty();
       JsonNode data = body.has("data") && body.get("data").isObject() ? body.get("data") : body;
       String documento = campo(data, "numeroDocumento", "document_number", "numero", "dni");
-      if (documento != null && !dni.equals(documento)) return Optional.empty();
+      if (documento == null || !dni.equals(documento)) return Optional.empty();
       String nombres = campo(data, "nombres", "first_name", "nombre");
       String paterno = campo(data, "apellidoPaterno", "apellido_paterno", "first_last_name");
       String materno = campo(data, "apellidoMaterno", "apellido_materno", "second_last_name");

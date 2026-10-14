@@ -20,6 +20,9 @@ public class SolicitudMatriculaDocumentoEntity {
   @EmbeddedId
   private SolicitudMatriculaDocumentoId id;
 
+  @Column(name = "version_id", nullable = false)
+  private java.util.UUID versionId;
+
   @Column(name = "contenedor", nullable = false, length = 100)
   private String bucket;
 

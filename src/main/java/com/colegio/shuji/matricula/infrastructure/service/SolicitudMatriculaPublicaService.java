@@ -12,6 +12,11 @@ import com.colegio.shuji.matricula.application.dto.out.SeccionMatriculaPublicaOp
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaAdminResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
+import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
+import com.colegio.shuji.matricula.application.dto.out.VersionDocumentoMatriculaResponseDto;
+import com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital;
+import com.colegio.shuji.matricula.infrastructure.entity.DocumentoMatriculaVersionEntity;
+import com.colegio.shuji.matricula.infrastructure.repository.JpaDocumentoMatriculaVersionRepository;
 import com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica;
 import com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento;
 import com.colegio.shuji.matricula.domain.enums.Genero;
@@ -63,12 +68,14 @@ public class SolicitudMatriculaPublicaService {
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final List<EstadoSolicitudMatriculaPublica> SOLICITUDES_ACTIVAS = List.of(
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES,
+      EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION,
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS,
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS,
       EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
 
   private final JpaSolicitudMatriculaPublicaRepository solicitudes;
   private final JpaSolicitudMatriculaDocumentoRepository documentos;
+  private final JpaDocumentoMatriculaVersionRepository versiones;
   private final JpaAnioLectivoRepository anios;
   private final JpaSeccionRepository secciones;
   private final JpaEstudianteRepository estudiantes;
@@ -160,12 +167,14 @@ public class SolicitudMatriculaPublicaService {
   }
 
   @Transactional(readOnly = true)
-  public String prepararValidacion(UUID id, String token, TipoDocumentoSolicitud tipo) {
+  public PreparacionDocumento prepararValidacion(UUID id, String token, TipoDocumentoSolicitud tipo) {
     var s = solicitudConToken(id, token);
     if (!s.isConsentimientoGemini()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No se autorizó enviar los documentos a Gemini");
     }
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La etapa documental ya está cerrada");
     }
@@ -173,21 +182,50 @@ public class SolicitudMatriculaPublicaService {
     if (estado == EstadoValidacionDocumento.VALIDADO) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Este documento ya fue validado");
     }
-    return s.getNombresEstudiante() + " " + s.getApellidoPaternoEstudiante() + " "
-        + s.getApellidoMaternoEstudiante() + "|" + s.getNumeroDocumentoEstudiante();
+    var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
+    return new PreparacionDocumento(nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
+        actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null));
   }
+
+  public record PreparacionDocumento(String nombres, String dni, UUID versionActual) {}
 
   @Transactional
   public SolicitudMatriculaPublicaResponseDto guardarResultadoDocumento(
       UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
+      FirmaDigitalDocumentoPort.Resultado firma, Boolean dniApiCoincide, UUID versionEsperada,
       String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
     var s = solicitudConTokenBloqueada(id, token);
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud cambió mientras se validaba el archivo");
     }
+    var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
+    if (s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO
+        || !java.util.Objects.equals(versionEsperada, actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null))) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "El documento fue actualizado o revisado; consulta el trámite nuevamente");
+    }
+    var version = new DocumentoMatriculaVersionEntity();
+    version.setId(UUID.randomUUID());
+    version.setSolicitudId(id);
+    version.setTipo(tipo);
+    version.setBucket(bucket);
+    version.setObjectKey(objectKey);
+    version.setMimeType(mimeType);
+    version.setTamanoBytes(tamanoBytes);
+    version.setSha256(sha256);
+    version.setIaValida(resultado.disponible() ? resultado.valido() : null);
+    version.setDniApiCoincide(dniApiCoincide);
+    version.setObservacionIa(resultado.observacion());
+    version.setEstadoFirma(firma.estado());
+    version.setDetalleFirma(firma.detalle());
+    version.setCertificadoSha256(firma.certificadoSha256());
+    version.setFechaCarga(OffsetDateTime.now(ZoneOffset.UTC));
+    versiones.saveAndFlush(version);
     var archivo = new SolicitudMatriculaDocumentoEntity();
     archivo.setId(new SolicitudMatriculaDocumentoId(id, tipo));
+    archivo.setVersionId(version.getId());
     archivo.setBucket(bucket);
     archivo.setObjectKey(objectKey);
     archivo.setMimeType(mimeType);
@@ -195,14 +233,21 @@ public class SolicitudMatriculaPublicaService {
     archivo.setSha256(sha256);
     archivo.setFechaActualizacion(OffsetDateTime.now(ZoneOffset.UTC));
     documentos.save(archivo);
-    s.actualizarDocumento(tipo,
-        resultado.valido() ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
-        resultado.observacion());
-    s.setEstado(todosDocumentosValidados(s)
-        ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
-        : hayDocumentoObservado(s)
-            ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS
-            : EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
+    boolean firmaAceptada = firma.estado() == EstadoFirmaDigital.VALIDA
+        || (tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA);
+    boolean dniAceptado = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || Boolean.TRUE.equals(dniApiCoincide);
+    boolean rechazo = Boolean.FALSE.equals(dniApiCoincide) || firma.estado() == EstadoFirmaDigital.INVALIDA
+        || (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA)
+        || (resultado.disponible() && !resultado.valido());
+    boolean pendiente = !rechazo && (!dniAceptado || !resultado.disponible() || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
+        || firma.estado() == EstadoFirmaDigital.ERROR_SERVICIO);
+    s.actualizarDocumento(tipo, pendiente ? EstadoValidacionDocumento.EN_VALIDACION
+        : resultado.valido() && firmaAceptada && dniAceptado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
+        Boolean.FALSE.equals(dniApiCoincide) ? "El DNI y los nombres declarados no coinciden con la API de identidad."
+        : !firmaAceptada ? tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA
+            ? "Adjunta la partida original en PDF con firma digital de RENIEC; una fotografía no contiene la firma verificable."
+            : firma.detalle() : resultado.observacion());
+    actualizarEtapaDocumental(s);
     return respuesta(solicitudes.saveAndFlush(s), null);
   }
 
@@ -217,11 +262,11 @@ public class SolicitudMatriculaPublicaService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento no disponible"));
     return new DocumentoDescargaAdmin(
         archivo.getBucket(), archivo.getObjectKey(), archivo.getMimeType(), archivo.getTamanoBytes(),
-        archivo.getFechaActualizacion());
+        archivo.getFechaActualizacion(), archivo.getVersionId());
   }
 
   public record DocumentoDescargaAdmin(
-      String bucket, String objectKey, String mimeType, long tamanoBytes, OffsetDateTime fechaActualizacion) {}
+      String bucket, String objectKey, String mimeType, long tamanoBytes, OffsetDateTime fechaActualizacion, UUID versionId) {}
 
   @Transactional(readOnly = true)
   public String generarComprobanteHtml(UUID id, String token) {
@@ -279,8 +324,10 @@ public class SolicitudMatriculaPublicaService {
     }
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Gemini debe validar los tres documentos antes del pago");
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Completa la verificación automática de los documentos antes del pago");
     }
+    if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
+        "Los documentos todavía no completaron la verificación automática");
     var ahora = OffsetDateTime.now(ZoneOffset.UTC);
     if (s.isVacanteReservada() && s.getFechaExpiracionPago() != null && s.getFechaExpiracionPago().isAfter(ahora)
         && s.getPagoEnlace() != null && !s.getPagoEnlace().isBlank()) {
@@ -321,6 +368,8 @@ public class SolicitudMatriculaPublicaService {
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud no está en etapa de pago");
     }
+    if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
+        "Pago recibido; la documentación requiere conciliación administrativa");
     if (pago.monto() == null || pago.monto().compareTo(obtenerMontoMatriculaPublica()) != 0
         || !"PEN".equalsIgnoreCase(pago.moneda())) {
       throw new ResponseStatusException(
@@ -413,11 +462,13 @@ public class SolicitudMatriculaPublicaService {
 
   @Transactional(readOnly = true)
   public List<SolicitudMatriculaPublicaAdminResponseDto> listarAdmin() {
-    return solicitudes.findTop200ByOrderByFechaCreacionDesc().stream().map(s ->
+    var lista = solicitudes.findTop200ByOrderByFechaCreacionDesc();
+    var archivos = cargarVersiones(lista.stream().map(SolicitudMatriculaPublicaEntity::getId).toList());
+    return lista.stream().map(s ->
         new SolicitudMatriculaPublicaAdminResponseDto(
             s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
             nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(),
-            s.getAnioLectivoId(), s.getSeccionId(), documentos(s), s.getFechaCreacion(),
+            s.getAnioLectivoId(), s.getSeccionId(), documentos(s, archivos), s.getFechaCreacion(),
             s.getEstudianteId(), s.getMatriculaId())).toList();
   }
 
@@ -530,11 +581,50 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private List<DocumentoSolicitudResponseDto> documentos(SolicitudMatriculaPublicaEntity s) {
-    return java.util.Arrays.stream(TipoDocumentoSolicitud.values())
-        .map(tipo -> new DocumentoSolicitudResponseDto(tipo, s.estadoDocumento(tipo), s.observacionDocumento(tipo)))
-        .toList();
+    return documentos(s, cargarVersiones(List.of(s.getId())));
   }
 
+  private java.util.Map<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity> cargarVersiones(List<UUID> ids) {
+    if (ids.isEmpty()) return java.util.Map.of();
+    var actuales = documentos.findByIdSolicitudIdIn(ids);
+    var versionesIds = actuales.stream().map(SolicitudMatriculaDocumentoEntity::getVersionId).toList();
+    if (versionesIds.isEmpty()) return java.util.Map.of();
+    var porId = new java.util.HashMap<UUID, DocumentoMatriculaVersionEntity>();
+    versiones.findAllById(versionesIds).forEach(v -> porId.put(v.getId(), v));
+    var mapa = new java.util.HashMap<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity>();
+    actuales.forEach(a -> { var v = porId.get(a.getVersionId()); if (v != null) mapa.put(a.getId(), v); });
+    return mapa;
+  }
+
+  private List<DocumentoSolicitudResponseDto> documentos(SolicitudMatriculaPublicaEntity s,
+      java.util.Map<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity> archivos) {
+    return java.util.Arrays.stream(TipoDocumentoSolicitud.values()).map(tipo -> {
+      var v = archivos.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
+      return new DocumentoSolicitudResponseDto(tipo, s.estadoDocumento(tipo), s.observacionDocumento(tipo),
+          v == null ? null : v.getId(), v == null ? null : v.getIaValida(),
+          v == null ? null : v.getDniApiCoincide(),
+          v == null ? null : v.getEstadoFirma(), v == null ? null : v.getDetalleFirma());
+    }).toList();
+  }
+
+  private void actualizarEtapaDocumental(SolicitudMatriculaPublicaEntity s) {
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) return;
+    boolean cargados = java.util.Arrays.stream(TipoDocumentoSolicitud.values())
+        .allMatch(tipo -> s.estadoDocumento(tipo) != EstadoValidacionDocumento.PENDIENTE);
+    s.setEstado(todosDocumentosValidados(s) ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
+        : hayDocumentoObservado(s) ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS
+        : cargados ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        : EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
+  }
+
+  @Transactional(readOnly = true)
+  public List<VersionDocumentoMatriculaResponseDto> historialDocumento(UUID id, TipoDocumentoSolicitud tipo) {
+    if (!solicitudes.existsById(id)) throw noEncontrada();
+    var lista = versiones.findBySolicitudIdAndTipoOrderByFechaCargaDesc(id, tipo);
+    return lista.stream().map(v -> new VersionDocumentoMatriculaResponseDto(v.getId(), v.getSha256(), v.getMimeType(),
+        v.getTamanoBytes(), v.getFechaCarga(), v.getIaValida(), v.getDniApiCoincide(), v.getObservacionIa(), v.getEstadoFirma(), v.getDetalleFirma(),
+        v.getCertificadoSha256())).toList();
+  }
   private SolicitudMatriculaPublicaResponseDto respuesta(SolicitudMatriculaPublicaEntity s, String token) {
     return new SolicitudMatriculaPublicaResponseDto(
         s.getId(), token, s.getEstado(), nombreEstudiante(s), documentos(s), s.getPagoEnlace(),

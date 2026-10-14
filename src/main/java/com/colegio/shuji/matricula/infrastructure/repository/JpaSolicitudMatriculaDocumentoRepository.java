@@ -5,4 +5,6 @@ import com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocum
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaSolicitudMatriculaDocumentoRepository
-    extends JpaRepository<SolicitudMatriculaDocumentoEntity, SolicitudMatriculaDocumentoId> {}
+    extends JpaRepository<SolicitudMatriculaDocumentoEntity, SolicitudMatriculaDocumentoId> {
+  java.util.List<SolicitudMatriculaDocumentoEntity> findByIdSolicitudIdIn(java.util.List<java.util.UUID> ids);
+}

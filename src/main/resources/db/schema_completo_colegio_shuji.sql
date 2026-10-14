@@ -1,11 +1,11 @@
--- COLEGIO SHUJI KITAMURA — ESTRUCTURA DEFINITIVA V18 (2026-10-04)
--- PostgreSQL 17 / Supabase. Define directamente el estado final de las 37 tablas.
+-- COLEGIO SHUJI KITAMURA — ESTRUCTURA V20 (2026-10-13)
+-- PostgreSQL 17 / Supabase. Define directamente el estado final de las 38 tablas.
 -- No concatena versiones históricas ni incluye atributos eliminados.
 -- roles: id, codigo_rol VARCHAR(20), nombre_rol VARCHAR(30).
 -- Solo para crear una base VACÍA o consultar/importar su modelo.
--- No ejecutar sobre la base existente, que ya se encuentra en V18.
+-- No ejecutar sobre la base existente, que puede tener migraciones pendientes.
 -- Sin usuarios de práctica, credenciales, datos personales ni historial Flyway.
--- Si se inicializa una base con este archivo, registrar el baseline V18 en Flyway
+-- Si se inicializa una base con este archivo, registrar el baseline V20 en Flyway
 -- antes de iniciar el backend; para bases existentes usar las migraciones pendientes.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
@@ -327,8 +327,8 @@ ALTER SEQUENCE public.anios_lectivos_id_seq OWNED BY public.anios_lectivos.id;
 CREATE TABLE public.apoderados (
     id bigint NOT NULL,
     usuario_id bigint,
-    tipo_documento character varying(10) DEFAULT 'DNI'::character varying NOT NULL,
-    numero_documento character varying(15) NOT NULL,
+    tipo_documento character varying(3) DEFAULT 'DNI'::character varying NOT NULL,
+    numero_documento character varying(8) NOT NULL,
     nombres_apoderado character varying(20) NOT NULL,
     apellido_paterno_apoderado character varying(20) NOT NULL,
     apellido_materno_apoderado character varying(20) NOT NULL,
@@ -341,9 +341,9 @@ CREATE TABLE public.apoderados (
     fecha_creacion timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT apoderados_celular_check CHECK (((celular)::text ~ '^9[0-9]{8}$'::text)),
     CONSTRAINT apoderados_origen_registro_check CHECK ((origen_registro IN ('RENIEC_API', 'MANUAL_CONTINGENCIA'))),
-    CONSTRAINT apoderados_tipo_documento_check CHECK ((tipo_documento IN ('DNI', 'CE', 'PASAPORTE'))),
+    CONSTRAINT apoderados_tipo_documento_check CHECK ((tipo_documento = 'DNI')),
     CONSTRAINT apoderados_ubigeo_inei_check CHECK (((ubigeo_inei)::text ~ '^[0-9]{6}$'::text)),
-    CONSTRAINT chk_apoderados_dni_8_digitos CHECK ((((tipo_documento)::text <> 'DNI'::text) OR ((numero_documento)::text ~ '^[0-9]{8}$'::text)))
+    CONSTRAINT chk_apoderados_dni_8_digitos CHECK (((numero_documento)::text ~ '^[0-9]{8}$'::text))
 );
 
 CREATE SEQUENCE public.apoderados_id_seq
@@ -652,8 +652,8 @@ ALTER SEQUENCE public.estudiante_apoderados_id_seq OWNED BY public.estudiante_ap
 
 CREATE TABLE public.estudiantes (
     id bigint NOT NULL,
-    tipo_documento character varying(10) DEFAULT 'DNI'::character varying NOT NULL,
-    numero_documento character varying(15) NOT NULL,
+    tipo_documento character varying(3) DEFAULT 'DNI'::character varying NOT NULL,
+    numero_documento character varying(8) NOT NULL,
     nombres_estudiante character varying(20) NOT NULL,
     apellido_paterno_estudiante character varying(20) NOT NULL,
     apellido_materno_estudiante character varying(20) NOT NULL,
@@ -666,11 +666,11 @@ CREATE TABLE public.estudiantes (
     alergias_condiciones text,
     activo boolean DEFAULT true NOT NULL,
     fecha_creacion timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT chk_estudiantes_dni_8_digitos CHECK ((((tipo_documento)::text <> 'DNI'::text) OR ((numero_documento)::text ~ '^[0-9]{8}$'::text))),
+    CONSTRAINT chk_estudiantes_dni_8_digitos CHECK (((numero_documento)::text ~ '^[0-9]{8}$'::text)),
     CONSTRAINT chk_estudiantes_salud_longitud CHECK ((char_length(alergias_condiciones) <= 4000)),
     CONSTRAINT estudiantes_genero_check CHECK ((genero = ANY (ARRAY['M'::bpchar, 'F'::bpchar]))),
     CONSTRAINT estudiantes_origen_registro_check CHECK ((origen_registro IN ('RENIEC_API', 'MANUAL_CONTINGENCIA'))),
-    CONSTRAINT estudiantes_tipo_documento_check CHECK ((tipo_documento IN ('DNI', 'CE', 'PASAPORTE')))
+    CONSTRAINT estudiantes_tipo_documento_check CHECK ((tipo_documento = 'DNI'))
 );
 
 CREATE SEQUENCE public.estudiantes_id_seq
@@ -790,12 +790,13 @@ ALTER SEQUENCE public.lotes_biometrico_id_seq OWNED BY public.lotes_biometrico.i
 CREATE TABLE public.marcas_biometrico_porteria (
     id bigint NOT NULL,
     lote_id bigint,
-    dni_leido character varying(15) NOT NULL,
+    dni_leido character varying(8) NOT NULL,
     fecha_hora timestamp with time zone NOT NULL,
     dispositivo_codigo character varying(30) DEFAULT 'PORTERIA_01'::character varying NOT NULL,
     estudiante_id bigint,
     estado_procesamiento character varying(25) DEFAULT 'PENDIENTE'::character varying NOT NULL,
     fecha_creacion timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_marcas_porteria_dni_8_digitos CHECK (((dni_leido)::text ~ '^[0-9]{8}$'::text)),
     CONSTRAINT marcas_biometrico_porteria_estado_procesamiento_check CHECK ((estado_procesamiento IN ('PENDIENTE', 'CONCILIADO', 'DNI_NO_IDENTIFICADO', 'DUPLICADO')))
 );
 
@@ -1028,6 +1029,7 @@ CREATE TABLE public.solicitudes_matricula_documentos (
     tamano_bytes bigint NOT NULL,
     huella_sha256 character(64) NOT NULL,
     fecha_actualizacion timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    version_id uuid NOT NULL,
     CONSTRAINT solicitudes_matricula_documentos_mime_type_check CHECK (((tipo_contenido)::text = ANY (ARRAY[('application/pdf'::character varying)::text, ('image/jpeg'::character varying)::text, ('image/png'::character varying)::text, ('image/webp'::character varying)::text]))),
     CONSTRAINT solicitudes_matricula_documentos_tamano_bytes_check CHECK (((tamano_bytes >= 1) AND (tamano_bytes <= 5242880))),
     CONSTRAINT solicitudes_matricula_documentos_tipo_check CHECK ((tipo IN ('PARTIDA_NACIMIENTO', 'DNI_C4', 'RECIBO_SERVICIO')))
@@ -1082,10 +1084,10 @@ CREATE TABLE public.solicitudes_matricula_publica (
     CONSTRAINT solicitudes_matricula_publica_check CHECK (((NOT vacante_reservada) OR (fecha_expiracion_pago IS NOT NULL))),
     CONSTRAINT solicitudes_matricula_publica_check1 CHECK ((((estado)::text <> 'MATRICULADA'::text) OR ((estudiante_id IS NOT NULL) AND (apoderado_id IS NOT NULL) AND (matricula_id IS NOT NULL) AND (pago_id IS NOT NULL)))),
     CONSTRAINT solicitudes_matricula_publica_consentimiento_gemini_check CHECK ((consentimiento_gemini IS TRUE)),
-    CONSTRAINT solicitudes_matricula_publica_estado_check CHECK ((estado IN ('DOCUMENTOS_PENDIENTES', 'DOCUMENTOS_OBSERVADOS', 'DOCUMENTOS_VALIDADOS', 'PAGO_PENDIENTE', 'MATRICULADA', 'RECHAZADA'))),
-    CONSTRAINT solicitudes_matricula_publica_estado_dni_c4_check CHECK ((estado_dni_c4 IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO'))),
-    CONSTRAINT solicitudes_matricula_publica_estado_partida_check CHECK ((estado_partida IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO'))),
-    CONSTRAINT solicitudes_matricula_publica_estado_recibo_check CHECK ((estado_recibo IN ('PENDIENTE', 'VALIDADO', 'OBSERVADO'))),
+    CONSTRAINT solicitudes_matricula_publica_estado_check CHECK ((estado IN ('DOCUMENTOS_PENDIENTES', 'DOCUMENTOS_EN_VALIDACION', 'DOCUMENTOS_OBSERVADOS', 'DOCUMENTOS_VALIDADOS', 'PAGO_PENDIENTE', 'MATRICULADA', 'RECHAZADA'))),
+    CONSTRAINT solicitudes_matricula_publica_estado_dni_c4_check CHECK ((estado_dni_c4 IN ('PENDIENTE', 'EN_VALIDACION', 'VALIDADO', 'OBSERVADO'))),
+    CONSTRAINT solicitudes_matricula_publica_estado_partida_check CHECK ((estado_partida IN ('PENDIENTE', 'EN_VALIDACION', 'VALIDADO', 'OBSERVADO'))),
+    CONSTRAINT solicitudes_matricula_publica_estado_recibo_check CHECK ((estado_recibo IN ('PENDIENTE', 'EN_VALIDACION', 'VALIDADO', 'OBSERVADO'))),
     CONSTRAINT solicitudes_matricula_publica_genero_estudiante_check CHECK ((genero_estudiante = ANY (ARRAY['M'::bpchar, 'F'::bpchar]))),
     CONSTRAINT solicitudes_matricula_publica_numero_documento_apoderado_check CHECK (((numero_documento_apoderado)::text ~ '^[0-9]{8}$'::text)),
     CONSTRAINT solicitudes_matricula_publica_numero_documento_estudiante_check CHECK (((numero_documento_estudiante)::text ~ '^[0-9]{8}$'::text)),
@@ -1962,4 +1964,48 @@ BEGIN
         ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM authenticated;
     END IF;
 END
+$$;
+
+-- Evidencia y comprobaciones automáticas de documentos V20
+CREATE TABLE versiones_documentos_matricula (
+  id UUID PRIMARY KEY,
+  solicitud_id UUID NOT NULL REFERENCES solicitudes_matricula_publica(id) ON DELETE RESTRICT,
+  tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('PARTIDA_NACIMIENTO','DNI_C4','RECIBO_SERVICIO')),
+  contenedor VARCHAR(100) NOT NULL,
+  ruta_objeto VARCHAR(500) NOT NULL,
+  tipo_contenido VARCHAR(30) NOT NULL CHECK (tipo_contenido IN ('application/pdf','image/jpeg','image/png','image/webp')),
+  tamano_bytes BIGINT NOT NULL CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880),
+  huella_sha256 CHAR(64) NOT NULL CHECK (huella_sha256 ~ '^[0-9a-f]{64}$'),
+  ia_valida BOOLEAN,
+  dni_api_coincide BOOLEAN,
+  observacion_ia VARCHAR(500),
+  estado_firma VARCHAR(20) NOT NULL CHECK (estado_firma IN ('VALIDA','INVALIDA','NO_APLICA','NO_VERIFICABLE','ERROR_SERVICIO')),
+  detalle_firma VARCHAR(500) NOT NULL,
+  certificado_sha256 CHAR(64) CHECK (certificado_sha256 IS NULL OR certificado_sha256 ~ '^[0-9a-f]{64}$'),
+  fecha_carga TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (id, solicitud_id, tipo)
+);
+CREATE INDEX idx_versiones_documentos_solicitud_tipo ON versiones_documentos_matricula (solicitud_id, tipo, fecha_carga DESC);
+
+ALTER TABLE solicitudes_matricula_documentos ADD CONSTRAINT fk_documento_version_actual
+  FOREIGN KEY (version_id, solicitud_id, tipo) REFERENCES versiones_documentos_matricula (id, solicitud_id, tipo) ON DELETE RESTRICT;
+
+CREATE FUNCTION fn_proteger_version_documental() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'La evidencia documental es inmutable; registre un nuevo intento de verificación.';
+END;
+$$;
+CREATE TRIGGER trg_version_documental_inmutable BEFORE UPDATE OR DELETE ON versiones_documentos_matricula
+FOR EACH ROW EXECUTE FUNCTION fn_proteger_version_documental();
+ALTER TABLE versiones_documentos_matricula ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE rol TEXT;
+BEGIN
+  FOREACH rol IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = rol) THEN
+      EXECUTE format('REVOKE ALL ON versiones_documentos_matricula FROM %I', rol);
+    END IF;
+  END LOOP;
+END;
 $$;

@@ -24,9 +24,28 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>2.5.0</springdoc.version>
         <dotenv.version>4.0.0</dotenv.version>
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <bouncycastle.version>1.86</bouncycastle.version>
     </properties>
 
     <dependencies>
+        <!-- Verificación de PDFs firmados, independiente de IA. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
         <!-- 1. Web & REST API -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
