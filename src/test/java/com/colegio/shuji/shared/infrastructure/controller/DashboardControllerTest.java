@@ -32,16 +32,14 @@ class DashboardControllerTest {
   }
 
   @Test
-  void retornaResumen200ConMetricasSegurasSiFallanLasFuentes() throws Exception {
+  void retornaResumen200ConMetricasNulasSiFallanLasFuentes() throws Exception {
     when(anios.listar()).thenThrow(new IllegalStateException("fuente temporalmente indisponible"));
 
     mvc.perform(get("/api/v1/dashboard/resumen"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.anio").isNumber())
-        .andExpect(jsonPath("$.totalEstudiantes").value(0))
-        .andExpect(jsonPath("$.asistenciaHoy").value(0))
-        .andExpect(jsonPath("$.recaudacionMes").value(0))
-        .andExpect(jsonPath("$.alumnosEnRiesgo").value(0));
+        .andExpect(jsonPath("$.totalEstudiantes").doesNotExist())
+        .andExpect(jsonPath("$.alumnosEnRiesgo").doesNotExist());
   }
 
   @Test

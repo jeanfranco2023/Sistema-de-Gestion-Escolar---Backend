@@ -28,18 +28,19 @@ public class DashboardController {
   private final CalificacionRepositoryPort calificaciones;
   private final PagoRepositoryPort pagos;
 
-  public record Resumen(int anio, long totalEstudiantes, Integer asistenciaHoy,
-                        BigDecimal recaudacionMes, long alumnosEnRiesgo) {}
+  /** Cada metrica es null cuando no pudo calcularse; el cliente debe mostrarla como "sin dato". */
+  public record Resumen(int anio, Long totalEstudiantes, Integer asistenciaHoy,
+                        BigDecimal recaudacionMes, Long alumnosEnRiesgo) {}
 
   @GetMapping("/resumen")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public Resumen resumen() {
     var hoy = LocalDate.now(ZoneId.of("America/Lima"));
     int anioActual = hoy.getYear();
-    long totalEstudiantes = 0L;
-    Integer porcentajeAsistencia = 0;
-    BigDecimal recaudacion = BigDecimal.ZERO;
-    long alumnosRiesgo = 0L;
+    Long totalEstudiantes = null;
+    Integer porcentajeAsistencia = null;
+    BigDecimal recaudacion = null;
+    Long alumnosRiesgo = null;
 
     try {
       var anioOpt = anios.listar().stream().filter(a -> a.getAnio() == hoy.getYear()).findFirst();
@@ -66,9 +67,10 @@ public class DashboardController {
 
     try {
       var asistencia = asistencias.buscarPorFechaSesion(hoy);
-      if (asistencia != null && !asistencia.isEmpty()) {
-        porcentajeAsistencia = (int) Math.round(100.0 * asistencia.stream()
-            .filter(a -> a.esPresente()).count() / asistencia.size());
+      if (asistencia != null) {
+        porcentajeAsistencia = asistencia.isEmpty() ? 0
+            : (int) Math.round(100.0 * asistencia.stream()
+                .filter(a -> a.esPresente()).count() / asistencia.size());
       }
     } catch (Exception e) {
       log.warn("Error calculando asistencia: {}", e.getMessage());
