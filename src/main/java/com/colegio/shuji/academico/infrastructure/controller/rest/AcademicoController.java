@@ -88,7 +88,7 @@ public class AcademicoController {
   }
 
   @GetMapping("/periodos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
   @Operation(summary = "calendario.listarPeriodos")
   public List<PeriodoResponseDto> listarPeriodos(@RequestParam Short anioId) {
     return calendario.listarPeriodos(anioId);
