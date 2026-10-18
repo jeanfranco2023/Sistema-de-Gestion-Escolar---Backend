@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+target
+*.log
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+Thumbs.db
+.DS_Store

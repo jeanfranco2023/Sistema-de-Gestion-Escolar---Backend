@@ -1,0 +1,19 @@
+server:
+  forward-headers-strategy: framework
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  security:
+    behind-trusted-proxy: true
+
+logging:
+  level:
+    root: INFO
+    "[com.colegio.shuji]": INFO
+    "[org.hibernate.SQL]": WARN
+    "[org.hibernate.orm.jdbc.bind]": WARN
