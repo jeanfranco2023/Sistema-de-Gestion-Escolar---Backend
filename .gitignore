@@ -39,3 +39,13 @@ scratch/
 
 # Frontend is maintained in the sibling ../frontend project.
 /frontend/
+
+# Informes de auditoria y reportes temporales
+*Auditoria*
+*auditoria*
+AUDITORIA_*
+ACTUALIZACION_*
+CONSOLIDADO_*
+DBDIAGRAM_*
+JUSTIFICACION_*
+
