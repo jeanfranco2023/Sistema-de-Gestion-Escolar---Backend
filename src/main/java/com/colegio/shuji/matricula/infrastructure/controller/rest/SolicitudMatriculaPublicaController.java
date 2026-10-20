@@ -170,14 +170,14 @@ public class SolicitudMatriculaPublicaController {
     return pagos.confirmarRetorno(id, token, request.paymentId());
   }
 
-  @GetMapping(value = "/public/{id}/comprobante", produces = MediaType.TEXT_HTML_VALUE)
+  @GetMapping("/public/{id}/comprobante")
   public ResponseEntity<byte[]> descargarComprobante(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
     return documentoHtml("comprobante-matricula-" + id + ".html", solicitudes.generarComprobanteHtml(id, token));
   }
 
-  @GetMapping(value = "/public/{id}/ficha", produces = MediaType.TEXT_HTML_VALUE)
+  @GetMapping("/public/{id}/ficha")
   public ResponseEntity<byte[]> descargarFicha(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
