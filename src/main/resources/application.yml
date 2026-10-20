@@ -91,6 +91,8 @@ integraciones:
     api-token: ${PAGOS_API_TOKEN:}
     webhook-secret: ${PAGOS_WEBHOOK_SECRET:}
     mercadopago:
+      sandbox: ${MERCADOPAGO_SANDBOX:true}
+      notification-url: ${MERCADOPAGO_NOTIFICATION_URL:}
       public-key: ${MERCADOPAGO_PUBLIC_KEY:}
       access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
       webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}

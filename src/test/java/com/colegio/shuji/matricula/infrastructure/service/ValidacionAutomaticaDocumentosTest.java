@@ -30,7 +30,8 @@ class ValidacionAutomaticaDocumentosTest {
   final SolicitudMatriculaPublicaService service = new SolicitudMatriculaPublicaService(solicitudes, documentos, versiones,
       mock(JpaAnioLectivoRepository.class), mock(JpaSeccionRepository.class), mock(JpaEstudianteRepository.class),
       mock(JpaApoderadoRepository.class), mock(JpaEstudianteApoderadoRepository.class), mock(JpaMatriculaRepository.class),
-      mock(GeminiDocumentoMatriculaPort.class), mercado);
+      mock(GeminiDocumentoMatriculaPort.class), mercado,
+      mock(com.colegio.shuji.tesoreria.application.port.in.RegistrarCobroMatriculaUseCase.class));
   SolicitudMatriculaPublicaEntity solicitud;
   final GeminiDocumentoMatriculaPort.Resultado iaCorrecta = new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"Compatible.");
   final GeminiDocumentoMatriculaPort.Resultado iaNoDisponible = new GeminiDocumentoMatriculaPort.Resultado(false,false,false,"Proveedor no disponible.",false);

@@ -81,12 +81,18 @@ public class ObligacionPago {
 
   public static ObligacionPago programar(
       Long matriculaId, ConceptoCobro concepto, short cuota, java.time.LocalDate vencimiento) {
+    return programar(matriculaId, concepto, cuota, vencimiento,
+        concepto == null ? null : concepto.getMontoSugerido());
+  }
+
+  public static ObligacionPago programar(
+      Long matriculaId, ConceptoCobro concepto, short cuota, java.time.LocalDate vencimiento, BigDecimal importe) {
     if (matriculaId == null || concepto == null || vencimiento == null || cuota < 0 || cuota > 10)
       throw new BusinessException("Datos de obligación inválidos");
     if ((concepto.getTipoConcepto() == TipoConcepto.MATRICULA && cuota != 0)
         || (concepto.getTipoConcepto() == TipoConcepto.PENSION && cuota == 0))
       throw new BusinessException("Cuota incompatible con el concepto");
-    if (concepto.getMontoSugerido() == null || concepto.getMontoSugerido().signum() < 0)
+    if (importe == null || importe.signum() < 0)
       throw new BusinessException("Importe inválido");
     return builder()
         .matriculaId(matriculaId)
@@ -95,7 +101,7 @@ public class ObligacionPago {
         .numeroCuota(cuota)
         .descripcion(concepto.getNombre() + " - " + cuota)
         .fechaVencimiento(vencimiento)
-        .montoBase(concepto.getMontoSugerido())
+        .montoBase(importe)
         .montoMora(BigDecimal.ZERO)
         .montoDescuento(BigDecimal.ZERO)
         .totalPagado(BigDecimal.ZERO)

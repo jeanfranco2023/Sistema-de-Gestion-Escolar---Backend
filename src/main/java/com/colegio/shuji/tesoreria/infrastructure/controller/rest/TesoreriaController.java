@@ -93,4 +93,12 @@ public class TesoreriaController {
       @Valid @RequestBody CrearPreferenciaMercadoPagoDto r) {
     return pagos.crearPreferenciaMercadoPago(r);
   }
+
+  @PostMapping("/obligaciones/{id}/confirmar-pago")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  public org.springframework.http.ResponseEntity<TransaccionResponseDto> confirmarPago(@PathVariable @Positive Long id) {
+    var pago = pagos.confirmarPagoMercadoPago(id);
+    return pago == null ? org.springframework.http.ResponseEntity.noContent().build()
+        : org.springframework.http.ResponseEntity.ok(pago);
+  }
 }

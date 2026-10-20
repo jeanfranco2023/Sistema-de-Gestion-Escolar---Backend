@@ -232,4 +232,26 @@ Configuración opcional mediante propiedades de Spring (sin necesidad de cambiar
 
 La política valida la firma y el certificado a la fecha actual. No implementa validación histórica PAdES-LTV, XAdES, CAdES separado, sellos de tiempo como sustituto de firma institucional ni determina parentesco/autorización del apoderado. Los formatos no admitidos y revisiones posteriores a la última firma quedan sin confirmar.
 
-Para una instalación existente se aplican las migraciones pendientes V19/V20 con Flyway. El SQL consolidado y `colegio_shuji_v20.dbml` describen el esquema local V20; el consolidado es exclusivamente para una base vacía.
+Para una instalación existente se aplican las migraciones pendientes V19–V22 con Flyway. El SQL consolidado y `colegio_shuji_v22.dbml` describen el esquema local V22; el consolidado es exclusivamente para una base vacía.
+
+### Pagos en Perú (2026-10-20)
+
+La matrícula pública cobra S/ 350 (importe configurado en el servidor). Checkout Pro conserva todos los medios que Mercado Pago habilite para la cuenta de Perú: Yape, tarjetas y PagoEfectivo/CIP. El comprador selecciona el medio en el checkout; el sistema no captura números de tarjeta ni claves bancarias. Plin no se anuncia como disponible sin habilitación del proveedor.
+
+El ambiente de prueba se determina con `MERCADOPAGO_SANDBOX=true` y el tipo real de cuenta obtenido de `/users/me`, no por el prefijo del token: las cuentas de prueba de Checkout Pro también usan `APP_USR-`. El backend rechaza pagos cuyo `live_mode` no corresponde al ambiente. El frontend usa el enlace `initPoint` ya seleccionado y validado por el backend.
+
+Configuración por variables de proceso o entorno de despliegue (sin necesidad de editar `.env`):
+
+- `MERCADOPAGO_NOTIFICATION_URL`: URL HTTPS pública terminada en `/api/v1/pagos/webhook/mercadopago`.
+- `MERCADOPAGO_WEBHOOK_SECRET`: secreto de firma de la aplicación en Mercado Pago.
+- `MERCADOPAGO_RETURN_URL_HOSTS`: dominios autorizados para el retorno.
+- `MERCADOPAGO_MATRICULA_RETURN_URL`: página HTTPS pública de matrícula; no usar localhost.
+- Producción: credenciales de cuenta real, `MERCADOPAGO_SANDBOX=false` y perfil `prod`. No mezclar compradores/cuentas de prueba con cuentas reales.
+
+La firma HMAC del webhook acepta timestamps en segundos o milisegundos y conserva la ventana de frescura de cinco minutos. Solo se registra el estado aprobado consultado directamente a la pasarela. Pagos pendientes/rechazados no abonan la obligación. Como respaldo, la pantalla consulta la pasarela por referencia mediante POST `/api/v1/solicitudes-matricula/public/{id}/consultar-pago` y POST `/tesoreria/obligaciones/{id}/confirmar-pago`. El primer endpoint requiere token de solicitud; el segundo exige rol y responsabilidad económica.
+
+La confirmación de matrícula registra obligación, transacción y boleta B001 en una sola transacción PostgreSQL; el bloqueo de solicitud y la idempotencia impiden emitirlos dos veces. El importe aprobado se compara con el reservado en la solicitud. Una confirmación diferida de PagoEfectivo puede recuperar la vacante liberada; si ya no existe cupo o el año cerró, requiere conciliación administrativa. El documento emitido por el sistema no equivale a integración de facturación electrónica SUNAT.
+
+PagoEfectivo usa el método explícito `PAGO_EFECTIVO`, distinto de caja y transferencias directas: aplicar Flyway V22; consolidados y `colegio_shuji_v22.dbml` actualizados. No ejecutar un consolidado sobre una base con datos.
+
+Las transferencias directas sin API bancaria se registran solo por Dirección/Secretaría tras verificar el abono en el banco, consignando banco y operación; una captura no se aprueba automáticamente. Conectar una API bancaria directa requiere contrato, especificación y credenciales institucionales del banco. La cobertura de banca móvil/agentes disponible se obtiene mediante PagoEfectivo/CIP en la pasarela existente.

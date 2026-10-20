@@ -84,6 +84,7 @@ public class SolicitudMatriculaPublicaService {
   private final JpaMatriculaRepository matriculas;
   private final GeminiDocumentoMatriculaPort gemini;
   private final MercadoPagoPort mercadoPago;
+  private final com.colegio.shuji.tesoreria.application.port.in.RegistrarCobroMatriculaUseCase cobrosMatricula;
 
   @Value("${app.matricula-publica.monto-matricula:350.00}")
   private BigDecimal montoMatriculaPublica = new BigDecimal("350.00");
@@ -343,10 +344,10 @@ public class SolicitudMatriculaPublicaService {
     var preferencia = mercadoPago.crearPreferenciaMatriculaPublica(
         referencia, obtenerMontoMatriculaPublica(), "Derecho de matrícula escolar");
     s.setPagoPreferenciaId(preferencia.preferenceId());
-    if (preferencia.sandboxInitPoint() == null || preferencia.sandboxInitPoint().isBlank()) {
-      throw new BusinessException("Mercado Pago no devolvió el enlace de sandbox para la matrícula");
+    if (preferencia.initPoint() == null || preferencia.initPoint().isBlank()) {
+      throw new BusinessException("Mercado Pago no devolvió el enlace de pago para la matrícula");
     }
-    s.setPagoEnlace(preferencia.sandboxInitPoint());
+    s.setPagoEnlace(preferencia.initPoint());
     s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
     solicitudes.saveAndFlush(s);
     return pagoResponse(s);
@@ -365,12 +366,13 @@ public class SolicitudMatriculaPublicaService {
       }
       return respuesta(s, null);
     }
-    if (s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
+    if (s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud no está en etapa de pago");
     }
     if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
         "Pago recibido; la documentación requiere conciliación administrativa");
-    if (pago.monto() == null || pago.monto().compareTo(obtenerMontoMatriculaPublica()) != 0
+    if (pago.monto() == null || s.getPagoMonto() == null || pago.monto().compareTo(s.getPagoMonto()) != 0
         || !"PEN".equalsIgnoreCase(pago.moneda())) {
       throw new ResponseStatusException(
           HttpStatus.CONFLICT,
@@ -380,6 +382,7 @@ public class SolicitudMatriculaPublicaService {
       if (secciones.reservarVacante(s.getSeccionId()) != 1) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Pago aprobado, pero la vacante requiere revisión administrativa");
       }
+      s.setFechaExpiracionPago(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5));
       s.setVacanteReservada(true);
     }
 
@@ -453,7 +456,7 @@ public class SolicitudMatriculaPublicaService {
     s.setEstudianteId(estudiante.getId());
     s.setApoderadoId(apoderado.getId());
     s.setMatriculaId(matricula.getId());
-    s.setComprobantePagoCodigo("REC-MAT-" + matricula.getId());
+    s.setComprobantePagoCodigo(cobrosMatricula.registrar(matricula.getId(), s.getPagoMonto(), pago));
     s.setFechaEmisionDocumentos(OffsetDateTime.now(ZoneOffset.UTC));
     s.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
     s.setFechaExpiracionPago(null);

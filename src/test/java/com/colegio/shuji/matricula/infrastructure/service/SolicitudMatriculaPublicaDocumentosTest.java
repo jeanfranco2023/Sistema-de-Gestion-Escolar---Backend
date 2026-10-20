@@ -55,6 +55,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
   @Mock private JpaMatriculaRepository matriculas;
   @Mock private GeminiDocumentoMatriculaPort gemini;
   @Mock private MercadoPagoPort mercadoPago;
+  @Mock private com.colegio.shuji.tesoreria.application.port.in.RegistrarCobroMatriculaUseCase cobrosMatricula;
 
   @InjectMocks private SolicitudMatriculaPublicaService service;
 
@@ -112,7 +113,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
 
 
   @Test
-  void creaPreferenciaDe350YDevuelveSoloElEnlaceSandbox() throws Exception {
+  void creaPreferenciaDe350YDevuelveElEnlaceValidadoPorElAdaptador() throws Exception {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setId(SOLICITUD_ID);
     solicitud.setTokenHash(hash(TOKEN));
@@ -133,7 +134,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     var respuesta = service.crearPago(SOLICITUD_ID, TOKEN);
 
     assertEquals(new BigDecimal("350.00"), respuesta.monto());
-    assertEquals("https://checkout.example/sandbox", respuesta.enlacePago());
+    assertEquals("https://checkout.example/normal", respuesta.enlacePago());
     verify(mercadoPago).crearPreferenciaMatriculaPublica(
         SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + SOLICITUD_ID,
         new BigDecimal("350.00"),
@@ -142,6 +143,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
   @Test
   void aceptaMontoDeMatriculaDe350YContinuaValidandoLaVacante() {
     var solicitud = new SolicitudMatriculaPublicaEntity();
+    solicitud.setPagoMonto(new BigDecimal("350.00"));
     solicitud.setId(SOLICITUD_ID);
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
     solicitud.setEstadoPartida(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);

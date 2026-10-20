@@ -8,6 +8,8 @@ public interface GestionarPagoMatriculaPublicaUseCase {
   SolicitudMatriculaPublicaResponseDto confirmarRetorno(
       UUID solicitudId, String token, String paymentId);
 
+  SolicitudMatriculaPublicaResponseDto consultarPago(UUID solicitudId, String token);
+
   boolean esPagoDeSolicitud(PagoVerificado pago);
 
   void procesarWebhook(PagoVerificado pago);

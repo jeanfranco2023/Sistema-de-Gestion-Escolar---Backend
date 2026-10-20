@@ -81,6 +81,8 @@ class PersistenciaPostgresTest {
   private final PublicarComunicadoUseCase publicacion;
   private final ConfirmarLecturaUseCase lectura;
   private final ConsultarBandejaUseCase bandeja;
+  private final com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService solicitudesPublicas;
+  private final com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepository seccionesJpa;
 
   Long usuarioId, estudianteId, matriculaId;
   Short anioId, nivelId;
@@ -283,6 +285,44 @@ class PersistenciaPostgresTest {
             .findFirst()
             .orElseThrow()
             .saldoPendiente());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(value = MetodoPago.class, names = {"YAPE", "PAGO_EFECTIVO"})
+  void pagoPublicoDe350RegistraObligacionTransaccionYBoletaUnaSolaVez(MetodoPago metodo) {
+    String dniNuevo = "5" + String.format("%07d", new Random().nextInt(9999999));
+    String dniTutor = "6" + String.format("%07d", new Random().nextInt(9999999));
+    var nueva = solicitudesPublicas.crear(new CrearSolicitudMatriculaPublicaRequestDto(
+        anioId, seccionId, dniNuevo, "Maria", "Perez", "Ruiz", LocalDate.of(2018, 2, 1), Genero.F,
+        dniTutor, "Luis", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.PADRE, true));
+    var s = em.find(com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity.class, nueva.id());
+    s.setEstado(metodo == MetodoPago.PAGO_EFECTIVO ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
+        : EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
+    s.setEstadoPartida(EstadoValidacionDocumento.VALIDADO);
+    s.setEstadoDniC4(EstadoValidacionDocumento.VALIDADO);
+    s.setEstadoRecibo(EstadoValidacionDocumento.VALIDADO);
+    if (metodo == MetodoPago.YAPE) {
+      assertEquals(1, seccionesJpa.reservarVacante(seccionId));
+      s.setVacanteReservada(true);
+      s.setFechaExpiracionPago(OffsetDateTime.now().plusMinutes(30));
+    }
+    em.flush();
+    String transaccionId = "it-publico-" + UUID.randomUUID();
+    var pago = new com.colegio.shuji.tesoreria.application.port.out.VerificarPagoPort.PagoVerificado(
+        transaccionId, null, new BigDecimal("350.00"), "PEN", metodo, true,
+        com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + nueva.id());
+    var confirmada = solicitudesPublicas.finalizarPagoVerificado(nueva.id(), nueva.token(), pago);
+    em.flush();
+    em.clear();
+    assertEquals(EstadoSolicitudMatriculaPublica.MATRICULADA, confirmada.estado());
+    var deuda = cronograma.obligacionesMatricula(confirmada.matriculaId()).getFirst();
+    assertEquals(new BigDecimal("350.00"), deuda.totalPagado());
+    assertEquals(EstadoObligacion.PAGADO_TOTAL, deuda.estado());
+    var codigo = em.find(com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity.class, nueva.id()).getComprobantePagoCodigo();
+    assertTrue(codigo.matches("B001-[0-9]{8}"));
+    assertEquals(confirmada.matriculaId(), solicitudesPublicas.finalizarPagoVerificado(nueva.id(), nueva.token(), pago).matriculaId());
+    assertEquals(1L, em.createQuery("select count(p) from PagoTransaccionEntity p where p.pasarelaTransaccionId=:id", Long.class)
+        .setParameter("id", transaccionId).getSingleResult());
   }
 
   @Test

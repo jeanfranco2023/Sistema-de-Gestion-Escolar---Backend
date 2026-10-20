@@ -132,6 +132,16 @@ class SeguridadAvanzadaTest {
       assertFalse(validator.validar("", "req", "123"));
       assertFalse(validator.validar(null, "req", "123"));
     }
+
+    @Test
+    void aceptaTimestampEnMilisegundosSinDebilitarAntiReplay() throws Exception {
+      String ts = String.valueOf((AHORA - 30) * 1000);
+      String firma = calcularHmac(SECRET, "id:123;request-id:req;ts:" + ts + ";");
+      assertTrue(validator.validar("ts=" + ts + ",v1=" + firma, "req", "123"));
+      String vencido = String.valueOf((AHORA - 301) * 1000);
+      String firmaVencida = calcularHmac(SECRET, "id:123;request-id:req;ts:" + vencido + ";");
+      assertFalse(validator.validar("ts=" + vencido + ",v1=" + firmaVencida, "req", "123"));
+    }
   }
 
   @Nested

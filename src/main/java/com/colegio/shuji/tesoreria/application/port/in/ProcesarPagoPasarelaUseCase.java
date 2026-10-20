@@ -14,4 +14,6 @@ public interface ProcesarPagoPasarelaUseCase {
       PasarelaProveedor proveedor, ProcesarPagoWebhookRequestDto r, String credencial);
 
   PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(CrearPreferenciaMercadoPagoDto r);
+
+  TransaccionResponseDto confirmarPagoMercadoPago(Long obligacionId);
 }

@@ -50,7 +50,8 @@ public class MercadoPagoWebhookSignatureValidator {
 
     final long timestamp;
     try {
-      timestamp = Long.parseLong(ts);
+      long valor = Long.parseLong(ts);
+      timestamp = valor > 1_000_000_000_000L ? valor / 1000 : valor;
     } catch (NumberFormatException ex) {
       return false;
     }
@@ -60,7 +61,7 @@ public class MercadoPagoWebhookSignatureValidator {
     }
 
     try {
-      StringBuilder manifest = new StringBuilder("id:").append(dataId).append(';');
+      StringBuilder manifest = new StringBuilder("id:").append(dataId.toLowerCase(java.util.Locale.ROOT)).append(';');
       if (requestId != null && !requestId.isBlank()) {
         manifest.append("request-id:").append(requestId).append(';');
       }

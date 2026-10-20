@@ -23,6 +23,16 @@ public class PagoMatriculaPublicaService implements GestionarPagoMatriculaPublic
   }
 
   @Override
+  public SolicitudMatriculaPublicaResponseDto consultarPago(UUID solicitudId, String token) {
+    var actual = solicitudes.consultar(solicitudId, token);
+    if (actual.estado() != com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
+        && actual.estado() != com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS)
+      return actual;
+    var pago = mercadoPago.buscarPagoAprobado(SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX + solicitudId);
+    return pago.map(p -> solicitudes.finalizarPagoVerificado(solicitudId, token, p)).orElse(actual);
+  }
+
+  @Override
   public boolean esPagoDeSolicitud(PagoVerificado pago) {
     return pago.referenciaExterna() != null
         && pago.referenciaExterna().startsWith(SolicitudMatriculaPublicaService.REFERENCIA_PAGO_PREFIX);

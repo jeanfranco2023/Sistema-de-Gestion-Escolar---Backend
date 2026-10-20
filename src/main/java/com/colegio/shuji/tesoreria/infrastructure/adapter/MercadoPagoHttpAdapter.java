@@ -31,6 +31,11 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   private final Set<String> returnUrlHosts;
   private final String matriculaReturnUrl;
   private final RestClient client;
+  @Value("${integraciones.pagos.mercadopago.sandbox:true}")
+  private boolean sandbox = true;
+  @Value("${integraciones.pagos.mercadopago.notification-url:}")
+  private String notificationUrl = "";
+  private volatile Boolean cuentaDePrueba;
 
   public MercadoPagoHttpAdapter(
       @Value("${integraciones.pagos.mercadopago.api-url:https://api.mercadopago.com}") String apiUrl,
@@ -58,6 +63,8 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   @Override
   public PreferenciaMercadoPagoResponseDto crearPreferencia(
       ObligacionPago obligacion, String descripcion, String backUrlSuccess, String backUrlFailure) {
+    if (backUrlSuccess == null || backUrlSuccess.isBlank()) backUrlSuccess = matriculaReturnUrl;
+    if (backUrlFailure == null || backUrlFailure.isBlank()) backUrlFailure = matriculaReturnUrl;
     if (accessToken == null || accessToken.isBlank()) {
       throw new BusinessException("Mercado Pago no configurado (access token ausente)");
     }
@@ -71,9 +78,11 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     Map<String, Object> body = new HashMap<>();
     body.put("items", List.of(item));
     body.put("external_reference", obligacion.getId().toString());
+    agregarNotificacion(body);
 
     validarUrlSegura(backUrlSuccess);
     validarUrlSegura(backUrlFailure);
+    validarAmbiente();
 
     Map<String, String> backUrls = new HashMap<>();
     if (backUrlSuccess != null && !backUrlSuccess.isBlank()) {
@@ -107,16 +116,13 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     String sandboxInitPoint =
         response.get("sandbox_init_point") != null ? response.get("sandbox_init_point").toString() : "";
 
-    return new PreferenciaMercadoPagoResponseDto(preferenceId, initPoint, sandboxInitPoint, publicKey);
+    return new PreferenciaMercadoPagoResponseDto(preferenceId, enlaceCheckout(initPoint, sandboxInitPoint), sandboxInitPoint, publicKey);
   }
 
   @Override
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMatriculaPublica(
       String referencia, BigDecimal monto, String descripcion) {
-    if (accessToken == null || !accessToken.startsWith("TEST-")) {
-      throw new BusinessException(
-          "La matrícula pública está habilitada solo con credenciales de prueba de Mercado Pago");
-    }
+    validarAmbiente();
     Map<String, Object> item = new HashMap<>();
     item.put("title", descripcion);
     item.put("quantity", 1);
@@ -126,6 +132,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     Map<String, Object> body = new HashMap<>();
     body.put("items", List.of(item));
     body.put("external_reference", referencia);
+    agregarNotificacion(body);
     body.put("statement_descriptor", "SHUJI MATRICULA");
     body.put("expires", true);
     body.put("expiration_date_from", java.time.OffsetDateTime.now().toString());
@@ -157,14 +164,13 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     String initPoint = response.get("init_point") == null ? "" : response.get("init_point").toString();
     String sandboxInitPoint = response.get("sandbox_init_point") == null
         ? "" : response.get("sandbox_init_point").toString();
-    if (sandboxInitPoint.isBlank()) {
-      throw new BusinessException("Mercado Pago no devolvió un enlace de sandbox para la matrícula");
-    }
-    return new PreferenciaMercadoPagoResponseDto(preferenceId, initPoint, sandboxInitPoint, publicKey);
+    return new PreferenciaMercadoPagoResponseDto(preferenceId, enlaceCheckout(initPoint, sandboxInitPoint), sandboxInitPoint, publicKey);
   }
 
   @Override
   public VerificarPagoPort.PagoVerificado consultarPago(String paymentId) {
+    if (paymentId == null || !paymentId.matches("[0-9]{1,32}"))
+      throw new BusinessException("Identificador de pago inválido");
     if (accessToken == null || accessToken.isBlank()) {
       throw new BusinessException("Mercado Pago no configurado (access token ausente)");
     }
@@ -177,7 +183,9 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
             .retrieve()
             .body(new ParameterizedTypeReference<Map<String, Object>>() {});
 
-    if (response == null || response.get("external_reference") == null) {
+    if (response == null || response.get("external_reference") == null
+        || !paymentId.equals(String.valueOf(response.get("id")))
+        || !(response.get("live_mode") instanceof Boolean live) || live == sandbox) {
       throw new BusinessException("Respuesta incompleta de Mercado Pago para el pago: " + paymentId);
     }
 
@@ -189,43 +197,93 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
       // Las referencias no numéricas pertenecen a flujos ajenos a las obligaciones regulares.
     }
 
-    BigDecimal monto = BigDecimal.ZERO;
-    Object amountObj = response.get("transaction_amount");
-    if (amountObj instanceof Number num) {
-      monto = BigDecimal.valueOf(num.doubleValue()).setScale(2, RoundingMode.HALF_UP);
-    } else if (amountObj instanceof String str) {
-      monto = new BigDecimal(str).setScale(2, RoundingMode.HALF_UP);
+    BigDecimal monto;
+    try {
+      monto = new BigDecimal(String.valueOf(response.get("transaction_amount")))
+          .setScale(2, RoundingMode.UNNECESSARY);
+      if (monto.signum() <= 0) throw new NumberFormatException();
+    } catch (ArithmeticException | NumberFormatException ex) {
+      throw new BusinessException("Importe de pago inválido");
     }
 
     String currencyId =
-        response.get("currency_id") != null ? response.get("currency_id").toString() : "PEN";
+        response.get("currency_id") != null ? response.get("currency_id").toString() : "";
 
     String paymentMethodId =
         response.get("payment_method_id") != null ? response.get("payment_method_id").toString() : "";
 
-    MetodoPago metodo = MetodoPago.TARJETA_CREDITO;
-    if (!paymentMethodId.isBlank()) {
-      String pm = paymentMethodId.toLowerCase();
-      if (pm.contains("yape")) {
-        metodo = MetodoPago.YAPE;
-      } else if (pm.contains("plin")) {
-        metodo = MetodoPago.PLIN;
-      } else if (pm.contains("deb") || pm.contains("debit")) {
-        metodo = MetodoPago.TARJETA_DEBITO;
-      } else if (pm.contains("transf") || pm.contains("bank")) {
-        metodo = MetodoPago.TRANSFERENCIA;
-      } else if (pm.contains("cash") || pm.contains("efectivo")) {
-        metodo = MetodoPago.EFECTIVO;
-      } else {
-        metodo = MetodoPago.TARJETA_CREDITO;
-      }
-    }
+    MetodoPago metodo = switch (paymentMethodId.toLowerCase(java.util.Locale.ROOT)) {
+      case "yape" -> MetodoPago.YAPE;
+      case "plin" -> MetodoPago.PLIN;
+      case "pagoefectivo_atm" -> MetodoPago.PAGO_EFECTIVO;
+      default -> switch (String.valueOf(response.get("payment_type_id"))) {
+        case "credit_card" -> MetodoPago.TARJETA_CREDITO;
+        case "debit_card", "prepaid_card" -> MetodoPago.TARJETA_DEBITO;
+        case "bank_transfer", "account_money" -> MetodoPago.TRANSFERENCIA;
+        case "ticket", "atm" -> MetodoPago.EFECTIVO;
+        default -> throw new BusinessException("Medio de pago no reconocido por la pasarela");
+      };
+    };
 
     String status = response.get("status") != null ? response.get("status").toString() : "";
     boolean aprobado = "approved".equalsIgnoreCase(status);
 
     return new VerificarPagoPort.PagoVerificado(
         paymentId, obligacionPagoId, monto, currencyId, metodo, aprobado, referenciaExterna);
+  }
+
+  @Override
+  public java.util.Optional<VerificarPagoPort.PagoVerificado> buscarPagoAprobado(String referencia) {
+    var response = client.get().uri(apiUrl + "/v1/payments/search?external_reference={ref}&status=approved&sort=date_created&criteria=desc&limit=10", referencia)
+        .header("Authorization", "Bearer " + accessToken).retrieve()
+        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+    if (response == null || !(response.get("results") instanceof List<?> resultados))
+      throw new BusinessException("No se pudo consultar el estado del pago");
+    for (var resultado : resultados) {
+      if (resultado instanceof Map<?, ?> pago && referencia.equals(pago.get("external_reference"))
+          && pago.get("id") != null) {
+        var verificado = consultarPago(pago.get("id").toString());
+        if (verificado.aprobado() && referencia.equals(verificado.referenciaExterna()))
+          return java.util.Optional.of(verificado);
+      }
+    }
+    return java.util.Optional.empty();
+  }
+
+  private synchronized void validarAmbiente() {
+    if (accessToken == null || accessToken.isBlank())
+      throw new BusinessException("Mercado Pago no configurado (access token ausente)");
+    if (cuentaDePrueba == null) {
+      var cuenta = client.get().uri(apiUrl + "/users/me")
+          .header("Authorization", "Bearer " + accessToken).retrieve()
+          .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+      if (cuenta == null || !"PE".equals(cuenta.get("country_id")))
+        throw new BusinessException("Se requiere una cuenta de Mercado Pago de Perú");
+      cuentaDePrueba = cuenta.get("tags") instanceof List<?> tags && tags.contains("test_user");
+    }
+    if (sandbox != cuentaDePrueba)
+      throw new BusinessException("La cuenta de Mercado Pago no corresponde al ambiente configurado");
+  }
+
+  private String enlaceCheckout(String initPoint, String sandboxInitPoint) {
+    String enlace = accessToken.startsWith("TEST-") ? sandboxInitPoint : initPoint;
+    if (enlace == null || enlace.isBlank()) throw new BusinessException("Mercado Pago no devolvió el enlace de pago");
+    var uri = java.net.URI.create(enlace);
+    String host = uri.getHost();
+    if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null || host == null
+        || !(host.equals("mercadopago.com.pe") || host.endsWith(".mercadopago.com.pe")
+        || host.equals("mercadopago.com") || host.endsWith(".mercadopago.com")))
+      throw new BusinessException("Enlace de Mercado Pago inválido");
+    return enlace;
+  }
+
+  private void agregarNotificacion(Map<String, Object> body) {
+    if (notificationUrl != null && !notificationUrl.isBlank()) {
+      var uri = java.net.URI.create(notificationUrl);
+      if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null)
+        throw new BusinessException("El webhook debe ser una URL HTTPS pública");
+      body.put("notification_url", notificationUrl);
+    }
   }
 
   private void validarUrlSegura(String url) {

@@ -1,11 +1,11 @@
--- COLEGIO SHUJI KITAMURA — ESTRUCTURA V20 (2026-10-13)
+-- COLEGIO SHUJI KITAMURA — ESTRUCTURA V22 (2026-10-20)
 -- PostgreSQL 17 / Supabase. Define directamente el estado final de las 38 tablas.
 -- No concatena versiones históricas ni incluye atributos eliminados.
 -- roles: id, codigo_rol VARCHAR(20), nombre_rol VARCHAR(30).
 -- Solo para crear una base VACÍA o consultar/importar su modelo.
 -- No ejecutar sobre la base existente, que puede tener migraciones pendientes.
 -- Sin usuarios de práctica, credenciales, datos personales ni historial Flyway.
--- Si se inicializa una base con este archivo, registrar el baseline V20 en Flyway
+-- Si se inicializa una base con este archivo, registrar el baseline V22 en Flyway
 -- antes de iniciar el backend; para bases existentes usar las migraciones pendientes.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
@@ -893,7 +893,7 @@ CREATE TABLE public.pagos_transacciones (
     estado_pago character varying(20) DEFAULT 'APROBADO'::character varying NOT NULL,
     payload_webhook jsonb,
     CONSTRAINT pagos_transacciones_estado_pago_check CHECK ((estado_pago IN ('APROBADO', 'RECHAZADO', 'REVERTIDO'))),
-    CONSTRAINT pagos_transacciones_metodo_pago_check CHECK ((metodo_pago IN ('TARJETA_CREDITO', 'TARJETA_DEBITO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO'))),
+    CONSTRAINT pagos_transacciones_metodo_pago_check CHECK ((metodo_pago IN ('TARJETA_CREDITO', 'TARJETA_DEBITO', 'YAPE', 'PLIN', 'TRANSFERENCIA', 'EFECTIVO', 'PAGO_EFECTIVO'))),
     CONSTRAINT pagos_transacciones_monto_pagado_check CHECK ((monto_pagado > 0.00)),
     CONSTRAINT pagos_transacciones_pasarela_proveedor_check CHECK ((pasarela_proveedor IN ('CULQI', 'NIUBIZ', 'MERCADO_PAGO', 'CAJA_EFECTIVO', 'TRANSFERENCIA')))
 );
@@ -2009,3 +2009,6 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- V21: series base; conserva correlativos existentes.
+INSERT INTO series_comprobante (serie, ultimo_correlativo) VALUES ('B001',0),('E001',0) ON CONFLICT (serie) DO NOTHING;

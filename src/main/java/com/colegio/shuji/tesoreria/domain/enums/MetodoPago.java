@@ -6,5 +6,6 @@ public enum MetodoPago {
   YAPE,
   PLIN,
   TRANSFERENCIA,
+  PAGO_EFECTIVO,
   EFECTIVO
 }

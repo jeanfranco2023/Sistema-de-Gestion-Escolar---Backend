@@ -45,8 +45,9 @@ class TesoreriaMercadoPagoFlowTest {
   private final ActorActualPort actor = mock(ActorActualPort.class);
   private final ApoderadoRepositoryPort apoderados = mock(ApoderadoRepositoryPort.class);
   private final EstudianteApoderadoRepositoryPort vinculos = mock(EstudianteApoderadoRepositoryPort.class);
+  private final PagoRepositoryPort pagos = mock(PagoRepositoryPort.class);
   private final TesoreriaService service = new TesoreriaService(
-      mapper, obligaciones, mock(PagoRepositoryPort.class), conceptos, matriculas,
+      mapper, obligaciones, pagos, conceptos, matriculas,
       mock(AnioLectivoRepositoryPort.class), mock(VerificarPagoPort.class), mercadoPago,
       mock(EmitirComprobanteUseCase.class), actor, apoderados, vinculos,
       mock(GestionarPagoMatriculaPublicaUseCase.class));
@@ -83,5 +84,19 @@ class TesoreriaMercadoPagoFlowTest {
 
     assertSame(preferencia, service.crearPreferenciaMercadoPago(new CrearPreferenciaMercadoPagoDto(40L, null, null)));
     verify(mercadoPago).crearPreferencia(obligacion, "Pensión - Cuota 1", null, null);
+  }
+
+  @Test
+  void unAbonoAnteriorNoConfirmaUnCheckoutNuevoPorElSaldoRestante() {
+    var obligacion = ObligacionPago.builder().id(40L).montoBase(new BigDecimal("350.00"))
+        .montoMora(BigDecimal.ZERO).montoDescuento(BigDecimal.ZERO).totalPagado(new BigDecimal("100.00")).build();
+    when(obligaciones.buscarPorId(40L)).thenReturn(Optional.of(obligacion));
+    when(mercadoPago.buscarPagoAprobado("40")).thenReturn(Optional.of(
+        new VerificarPagoPort.PagoVerificado("123", 40L, new BigDecimal("100.00"), "PEN",
+            com.colegio.shuji.tesoreria.domain.enums.MetodoPago.YAPE, true, "40")));
+    when(pagos.buscarPorPasarelaTransaccionId("123")).thenReturn(List.of(
+        com.colegio.shuji.tesoreria.domain.model.PagoTransaccion.builder().id(7L).build()));
+    org.junit.jupiter.api.Assertions.assertNull(service.confirmarPagoMercadoPago(40L));
+    verify(pagos, never()).guardar(any());
   }
 }

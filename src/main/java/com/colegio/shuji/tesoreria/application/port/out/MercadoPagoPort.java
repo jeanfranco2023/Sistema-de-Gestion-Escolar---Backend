@@ -12,4 +12,6 @@ public interface MercadoPagoPort {
       String referencia, BigDecimal monto, String descripcion);
 
   VerificarPagoPort.PagoVerificado consultarPago(String paymentId);
+
+  java.util.Optional<VerificarPagoPort.PagoVerificado> buscarPagoAprobado(String referencia);
 }

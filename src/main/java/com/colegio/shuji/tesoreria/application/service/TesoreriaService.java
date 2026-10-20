@@ -177,6 +177,31 @@ public class TesoreriaService
 
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(CrearPreferenciaMercadoPagoDto r) {
     var o = requerido(obligaciones.buscarPorId(r.obligacionPagoId()));
+    autorizarPago(o);
+    exigir(
+        o.getEstado() == EstadoObligacion.PENDIENTE
+            || o.getEstado() == EstadoObligacion.PAGADO_PARCIAL
+            || o.getEstado() == EstadoObligacion.VENCIDO,
+        "La obligación no está pendiente de pago");
+    exigir(o.saldo().compareTo(BigDecimal.ZERO) > 0, "No hay saldo pendiente");
+    var concepto = requerido(conceptos.buscarPorId(o.getConceptoId()));
+    var descripcion = concepto.getDescripcion() + " - Cuota " + o.getNumeroCuota();
+    return mercadoPagoPort.crearPreferencia(o, descripcion, r.backUrlSuccess(), r.backUrlFailure());
+  }
+
+  public TransaccionResponseDto confirmarPagoMercadoPago(Long obligacionId) {
+    var o = requerido(obligaciones.buscarPorId(obligacionId));
+    autorizarPago(o);
+    return mercadoPagoPort.buscarPagoAprobado(obligacionId.toString())
+        .map(pago -> {
+          exigir(obligacionId.equals(pago.obligacionPagoId()), "El pago no pertenece a esta obligación");
+          if (o.saldo().signum() > 0 && !pagos.buscarPorPasarelaTransaccionId(pago.transaccionId()).isEmpty())
+            return null;
+          return registrarPagoVerificado(PasarelaProveedor.MERCADO_PAGO, pago);
+        }).orElse(null);
+  }
+
+  private void autorizarPago(ObligacionPago o) {
     boolean soloApoderado =
         actor.tieneRol("APODERADO")
             && !actor.tieneRol("DIRECCION")
@@ -201,15 +226,6 @@ public class TesoreriaService
             "Solo el responsable económico puede gestionar el pago");
       }
     }
-    exigir(
-        o.getEstado() == EstadoObligacion.PENDIENTE
-            || o.getEstado() == EstadoObligacion.PAGADO_PARCIAL
-            || o.getEstado() == EstadoObligacion.VENCIDO,
-        "La obligación no está pendiente de pago");
-    exigir(o.saldo().compareTo(BigDecimal.ZERO) > 0, "No hay saldo pendiente");
-    var concepto = requerido(conceptos.buscarPorId(o.getConceptoId()));
-    var descripcion = concepto.getDescripcion() + " - Cuota " + o.getNumeroCuota();
-    return mercadoPagoPort.crearPreferencia(o, descripcion, r.backUrlSuccess(), r.backUrlFailure());
   }
 
   public TransaccionResponseDto procesarWebhook(
@@ -224,12 +240,18 @@ public class TesoreriaService
     } else {
       confirmado = verificador.verificar(proveedor, r.transaccionId(), credencial);
     }
+    if (!confirmado.aprobado()) return null;
     if (r.obligacionPagoId() != null) {
       exigir(
           confirmado.obligacionPagoId().equals(r.obligacionPagoId()),
           "Referencia de pago incorrecta");
     }
     exigir(confirmado.transaccionId().equals(r.transaccionId()), "Referencia de pago incorrecta");
+    return registrarPagoVerificado(proveedor, confirmado);
+  }
+
+  private TransaccionResponseDto registrarPagoVerificado(PasarelaProveedor proveedor, VerificarPagoPort.PagoVerificado confirmado) {
+    exigir(confirmado.obligacionPagoId() != null, "Referencia de obligación inválida");
     exigir(confirmado.aprobado() && "PEN".equals(confirmado.moneda()), "Pago no aprobado en soles");
     var p =
         PagoTransaccion.builder()

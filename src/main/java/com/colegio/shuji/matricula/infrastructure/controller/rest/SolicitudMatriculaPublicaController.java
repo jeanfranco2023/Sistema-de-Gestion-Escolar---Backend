@@ -170,6 +170,12 @@ public class SolicitudMatriculaPublicaController {
     return pagos.confirmarRetorno(id, token, request.paymentId());
   }
 
+  @PostMapping("/public/{id}/consultar-pago")
+  public SolicitudMatriculaPublicaResponseDto consultarPago(
+      @PathVariable UUID id, @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+    return pagos.consultarPago(id, token);
+  }
+
   @GetMapping("/public/{id}/comprobante")
   public ResponseEntity<byte[]> descargarComprobante(
       @PathVariable UUID id,

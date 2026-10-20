@@ -10,7 +10,7 @@ services:
     autoDeployTrigger: commit
     healthCheckPath: /actuator/health
     previews:
-      generation: off
+      generation: "off"
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: render-test
@@ -35,4 +35,10 @@ services:
       - key: MERCADOPAGO_WEBHOOK_SECRET
         sync: false
       - key: MERCADOPAGO_RETURN_URL_HOSTS
-        sync: false
+        value: shuji-backend.onrender.com
+      - key: MERCADOPAGO_SANDBOX
+        value: "true"
+      - key: MERCADOPAGO_NOTIFICATION_URL
+        value: https://shuji-backend.onrender.com/api/v1/pagos/webhook/mercadopago
+      - key: MERCADOPAGO_MATRICULA_RETURN_URL
+        value: https://shuji-backend.onrender.com/api/v1/pagos/retorno
