@@ -80,8 +80,8 @@ class ReniecHttpAdapterTest {
     var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/dni", exchange -> {
       String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-      assertTrue(request.contains("\"dni\":\"73602651\""));
-      var json = "{\"success\":true,\"data\":{\"numero\":\"73602651\","
+      assertTrue(request.contains("\"dni\":\"12345678\""));
+      var json = "{\"success\":true,\"data\":{\"numero\":\"12345678\","
           + "\"nombres\":\"Persona de prueba\",\"apellido_paterno\":\"Muestra\","
           + "\"apellido_materno\":\"Controlada\"}}";
       byte[] data = json.getBytes(StandardCharsets.UTF_8);
@@ -93,9 +93,9 @@ class ReniecHttpAdapterTest {
     try {
       var adapter = new ReniecHttpAdapter(
           "http://127.0.0.1:" + server.getAddress().getPort() + "/dni", "token-test", "");
-      var identidad = adapter.consultar("73602651");
+      var identidad = adapter.consultar("12345678");
       assertTrue(identidad.isPresent());
-      assertEquals("73602651", identidad.get().numeroDocumento());
+      assertEquals("12345678", identidad.get().numeroDocumento());
       assertEquals("Persona de prueba", identidad.get().nombres());
     } finally {
       server.stop(0);
