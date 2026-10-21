@@ -238,7 +238,7 @@ Para una instalación existente se aplican las migraciones pendientes V19–V22 
 
 La matrícula pública cobra S/ 350 (importe configurado en el servidor). Checkout Pro conserva todos los medios que Mercado Pago habilite para la cuenta de Perú: Yape, tarjetas y PagoEfectivo/CIP. El comprador selecciona el medio en el checkout; el sistema no captura números de tarjeta ni claves bancarias. Plin no se anuncia como disponible sin habilitación del proveedor.
 
-El ambiente de prueba se determina con `MERCADOPAGO_SANDBOX=true` y el tipo real de cuenta obtenido de `/users/me`, no por el prefijo del token: las cuentas de prueba de Checkout Pro también usan `APP_USR-`. El backend rechaza pagos cuyo `live_mode` no corresponde al ambiente. El frontend usa el enlace `initPoint` ya seleccionado y validado por el backend.
+El ambiente de prueba se determina con `MERCADOPAGO_SANDBOX=true` y el tipo real de cuenta obtenido de `/users/me`, no por el prefijo del token: las cuentas de prueba de Checkout Pro también usan `APP_USR-` y sus pagos pueden devolver `live_mode=true`. El backend comprueba que `collector_id` coincida con el vendedor verificado; en producción exige cuenta real y `live_mode=true`. Las credenciales legacy `TEST-` solo admiten pagos con `live_mode=false`. El frontend usa el enlace `initPoint` ya seleccionado y validado por el backend.
 
 Configuración por variables de proceso o entorno de despliegue (sin necesidad de editar `.env`):
 

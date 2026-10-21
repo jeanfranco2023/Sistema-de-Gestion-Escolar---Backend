@@ -36,6 +36,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   @Value("${integraciones.pagos.mercadopago.notification-url:}")
   private String notificationUrl = "";
   private volatile Boolean cuentaDePrueba;
+  private String cuentaId;
 
   public MercadoPagoHttpAdapter(
       @Value("${integraciones.pagos.mercadopago.api-url:https://api.mercadopago.com}") String apiUrl,
@@ -175,6 +176,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
       throw new BusinessException("Mercado Pago no configurado (access token ausente)");
     }
 
+    validarAmbiente();
     var response =
         client
             .get()
@@ -185,9 +187,14 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
 
     if (response == null || response.get("external_reference") == null
         || !paymentId.equals(String.valueOf(response.get("id")))
-        || !(response.get("live_mode") instanceof Boolean live) || live == sandbox) {
+        || !(response.get("live_mode") instanceof Boolean live)) {
       throw new BusinessException("Respuesta incompleta de Mercado Pago para el pago: " + paymentId);
     }
+    if (!cuentaId.equals(String.valueOf(response.get("collector_id"))))
+      throw new BusinessException("El pago no pertenece al vendedor configurado");
+    // Las cuentas test APP_USR también devuelven live_mode=true; se verifica su identidad en /users/me.
+    if ((!sandbox && !live) || (sandbox && accessToken.startsWith("TEST-") && live))
+      throw new BusinessException("El pago no corresponde al ambiente configurado");
 
     String referenciaExterna = response.get("external_reference").toString();
     Long obligacionPagoId = null;
@@ -257,8 +264,10 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
       var cuenta = client.get().uri(apiUrl + "/users/me")
           .header("Authorization", "Bearer " + accessToken).retrieve()
           .body(new ParameterizedTypeReference<Map<String, Object>>() {});
-      if (cuenta == null || !"PE".equals(cuenta.get("country_id")))
+      if (cuenta == null || !"PE".equals(cuenta.get("country_id"))
+          || !String.valueOf(cuenta.get("id")).matches("[0-9]+"))
         throw new BusinessException("Se requiere una cuenta de Mercado Pago de Perú");
+      cuentaId = String.valueOf(cuenta.get("id"));
       cuentaDePrueba = cuenta.get("tags") instanceof List<?> tags && tags.contains("test_user");
     }
     if (sandbox != cuentaDePrueba)

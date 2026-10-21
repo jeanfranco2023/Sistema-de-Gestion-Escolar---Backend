@@ -28,7 +28,7 @@ class MercadoPagoHttpAdapterTest {
     server.createContext("/", exchange -> {
       String path = exchange.getRequestURI().getPath();
       String body = switch (path) {
-        case "/users/me" -> "{\"country_id\":\"PE\",\"tags\":" + (testUser ? "[\"test_user\"]" : "[]") + "}";
+        case "/users/me" -> "{\"id\":77,\"country_id\":\"PE\",\"tags\":" + (testUser ? "[\"test_user\"]" : "[]") + "}";
         case "/checkout/preferences" -> {
           preferenciaEnviada = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
           yield "{\"id\":\"pref-test\",\"init_point\":\"https://www.mercadopago.com.pe/checkout/test\",\"sandbox_init_point\":\"https://sandbox.mercadopago.com.pe/checkout/test\"}";
@@ -78,9 +78,33 @@ class MercadoPagoHttpAdapterTest {
     assertEquals(MetodoPago.PAGO_EFECTIVO, adapter.consultarPago("123").metodo());
   }
 
-  @Test void rechazaMezclarPagoRealEnSandbox() {
+  @Test void aceptaTestAppUsrConLiveModeTrueSoloDelVendedorVerificado() {
     pago = respuesta("yape", "debit_card", "true", "PEN", "350.00");
+    assertTrue(adapter.consultarPago("123").aprobado());
+    pago = pago.replace("\"collector_id\":77", "\"collector_id\":999");
     assertThrows(BusinessException.class, () -> adapter.consultarPago("123"));
+  }
+
+  @Test void cuentaRealNoVerificaPagosEnSandboxAunqueDeclarenLiveModeFalse() {
+    testUser = false;
+    assertThrows(BusinessException.class, () -> adapter.consultarPago("123"));
+  }
+
+  @Test void tokenLegacyTestExigeLiveModeFalse() {
+    adapter = new MercadoPagoHttpAdapter("http://127.0.0.1:" + server.getAddress().getPort(),
+        "TEST-token", "public-key", "colegio.edu.pe", "");
+    pago = respuesta("visa", "credit_card", "true", "PEN", "350.00");
+    assertThrows(BusinessException.class, () -> adapter.consultarPago("123"));
+    pago = respuesta("visa", "credit_card", "false", "PEN", "350.00");
+    assertTrue(adapter.consultarPago("123").aprobado());
+  }
+
+  @Test void produccionExigeCuentaRealYLiveModeTrue() {
+    ReflectionTestUtils.setField(adapter, "sandbox", false);
+    testUser = false;
+    assertThrows(BusinessException.class, () -> adapter.consultarPago("123"));
+    pago = respuesta("visa", "credit_card", "true", "PEN", "350.00");
+    assertTrue(adapter.consultarPago("123").aprobado());
   }
 
   @Test void consultaReferenciaYRevalidaElPagoPorId() {
@@ -98,7 +122,7 @@ class MercadoPagoHttpAdapterTest {
   }
 
   private String respuesta(String metodo, String tipo, String live, String moneda, String monto) {
-    return "{\"id\":123,\"external_reference\":\"42\",\"transaction_amount\":" + monto
+    return "{\"id\":123,\"collector_id\":77,\"external_reference\":\"42\",\"transaction_amount\":" + monto
         + ",\"currency_id\":\"" + moneda + "\",\"payment_method_id\":\"" + metodo
         + "\",\"payment_type_id\":\"" + tipo + "\",\"status\":\"approved\",\"live_mode\":" + live + "}";
   }
