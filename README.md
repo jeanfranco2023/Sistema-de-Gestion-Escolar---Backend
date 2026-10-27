@@ -278,5 +278,3 @@ Las pruebas de esta integración usan datos y documentos sintéticos. Una partid
 - V24: suplencias temporales de recojo en `/api/v1/suplencias`, con solicitud del titular y aprobación/rechazo/revocación de Dirección o Secretaría. Revalida custodia y permiso de recojo; bloquea al estudiante para impedir aprobaciones con fechas solapadas. Conserva historial y auditoría; el vencimiento se deriva de la fecha sin borrar filas.
 
 Estas funciones requieren publicar conjuntamente el backend, la migración V24 y el frontend. Un frontend conectado mediante proxy a un despliegue anterior no dispone de las nuevas API. La ejecución del playbook no modifica `.env` ni publica cambios automáticamente.
-
-El alcance implementado, la evidencia y la lista vigente para cerrar el sistema completo se mantienen en [PENDIENTES.md](PENDIENTES.md).
