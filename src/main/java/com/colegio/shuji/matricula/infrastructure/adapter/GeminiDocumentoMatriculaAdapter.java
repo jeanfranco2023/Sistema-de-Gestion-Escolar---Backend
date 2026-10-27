@@ -60,7 +60,8 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
       byte[] contenido,
       String mimeType,
       String nombresDeclarados,
-      String documentoDeclarado) {
+      String documentoDeclarado,
+      ContextoParental progenitor) {
     if (apiKeys.isEmpty()) {
       throw new org.springframework.web.server.ResponseStatusException(
           org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
@@ -71,6 +72,7 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
         Documento esperado: %s.
         Estudiante declarado: %s; DNI declarado: %s.
         Responde solo el JSON definido por el esquema. Comprueba tipo y legibilidad. Para partida de nacimiento y DNI/C4, indica si la identidad visible coincide razonablemente con los datos declarados. Para recibo de agua/luz, identidadCoincide debe ser true (no aplica). No afirmes autenticidad legal, vigencia oficial ni consulta a registros externos. Si dudas, marca falso y explica concretamente qué debe corregirse.
+        En la partida extrae por separado nombrePadre, dniPadre, nombreMadre y dniMadre, exactamente como aparecen. No deduzcas parentesco por apellidos ni inventes datos. Usa una cadena vacía para todo dato ausente o ilegible. En los demás documentos estos cuatro campos deben quedar vacíos.
         """.formatted(tipo.name(), safe(nombresDeclarados), safe(documentoDeclarado));
 
     Map<String, Object> inline = Map.of(
@@ -84,8 +86,11 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
             "tipoCorrecto", Map.of("type", "BOOLEAN"),
             "legible", Map.of("type", "BOOLEAN"),
             "identidadCoincide", Map.of("type", "BOOLEAN"),
-            "observacion", Map.of("type", "STRING")),
-        "required", List.of("tipoCorrecto", "legible", "identidadCoincide", "observacion"));
+            "observacion", Map.of("type", "STRING"),
+            "nombrePadre", Map.of("type", "STRING"), "dniPadre", Map.of("type", "STRING"),
+            "nombreMadre", Map.of("type", "STRING"), "dniMadre", Map.of("type", "STRING")),
+        "required", List.of("tipoCorrecto", "legible", "identidadCoincide", "observacion",
+            "nombrePadre", "dniPadre", "nombreMadre", "dniMadre"));
     Map<String, Object> body = Map.of(
         "contents", List.of(Map.of("parts", List.of(part, textPart))),
         "generationConfig", Map.of(
@@ -115,21 +120,36 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
           .path("candidates").path(0).path("content").path("parts").path(0).path("text").textValue();
       if (text == null) throw new IllegalArgumentException("Respuesta Gemini vacía");
       JsonNode result = json.readTree(text.toString());
+      return interpretar(result, tipo, progenitor);
+    } catch (Exception ex) {
+      throw new BusinessException("Gemini devolvió una respuesta que no pudo interpretarse");
+    }
+  }
+
+  Resultado interpretar(JsonNode result, TipoDocumentoSolicitud tipo, ContextoParental progenitor) {
       boolean tipoOk = result.path("tipoCorrecto").asBoolean(false);
       boolean legible = result.path("legible").asBoolean(false);
       boolean identidad = result.path("identidadCoincide").asBoolean(false);
       String observacion = result.path("observacion").asText("");
+      Boolean vinculo = null;
+      if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO) {
+        boolean esMadre = progenitor != null && progenitor.parentesco() == com.colegio.shuji.matricula.domain.enums.Parentesco.MADRE;
+        boolean esPadre = progenitor != null && progenitor.parentesco() == com.colegio.shuji.matricula.domain.enums.Parentesco.PADRE;
+        String nombre = result.path(esMadre ? "nombreMadre" : "nombrePadre").asText("");
+        String dni = result.path(esMadre ? "dniMadre" : "dniPadre").asText("").trim();
+        vinculo = (esMadre || esPadre)
+            && com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.nombresCoinciden(progenitor.nombres(), nombre)
+            && (dni.isBlank() || dni.equals(progenitor.dni()));
+        if (!vinculo) observacion = "El padre o madre declarado no coincide con los datos legibles de la partida de nacimiento.";
+      }
       if (!tipoOk || !legible || !identidad) {
         observacion = observacion.isBlank()
             ? "El documento requiere una nueva imagen o revisión."
             : observacion;
-      } else {
+      } else if (!Boolean.FALSE.equals(vinculo)) {
         observacion = "Documento legible y compatible con los datos declarados.";
       }
-      return new Resultado(tipoOk, legible, identidad, observacion.substring(0, Math.min(500, observacion.length())));
-    } catch (Exception ex) {
-      throw new BusinessException("Gemini devolvió una respuesta que no pudo interpretarse");
-    }
+      return new Resultado(tipoOk, legible, identidad, observacion.substring(0, Math.min(500, observacion.length())), true, vinculo);
   }
 
   private Map<String, Object> generar(Map<String, Object> body, String modelo) {

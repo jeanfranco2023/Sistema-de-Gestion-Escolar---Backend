@@ -40,11 +40,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final String REGISTER_PATH = "/api/v1/auth/register";
   private static final String REFRESH_PATH = "/api/v1/auth/refresh";
   private static final String MATRICULA_DNI_PATH = "/api/v1/solicitudes-matricula/public/dni/";
+  private static final String MATRICULA_PUBLICA_PATH = "/api/v1/solicitudes-matricula/public";
+  private static final Pattern DOCUMENTO_PUBLICO_PATH = Pattern.compile(
+      "^/api/v1/solicitudes-matricula/public/[^/]+/documentos/[^/]+/?$");
 
   private static final int LOGIN_LIMIT = 15;
   private static final int REGISTER_LIMIT = 10;
   private static final int REFRESH_LIMIT = 20;
   private static final int MATRICULA_DNI_LIMIT = 8;
+  private static final int MATRICULA_CREAR_LIMIT = 5;
+  private static final int MATRICULA_DOCUMENTO_LIMIT = 10;
   private static final int WEBHOOK_PAGOS_LIMIT = 120;
   private static final int PAGOS_TESORERIA_LIMIT = 30;
 
@@ -68,7 +73,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
 
     String uri = request.getRequestURI();
-    Integer limit = resolveLimit(uri);
+    String bucket = resolveBucket(request);
+    Integer limit = resolveLimit(bucket);
 
     if (limit == null || "OPTIONS".equalsIgnoreCase(request.getMethod())) {
       filterChain.doFilter(request, response);
@@ -76,7 +82,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     String ip = extractClientIp(request);
-    String key = ip + ":" + uri;
+    String key = ip + ":" + bucket;
 
     cleanOldEntriesIfNeeded();
 
@@ -97,6 +103,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   private Integer resolveLimit(String uri) {
     if (uri == null) return null;
+    if (uri.equals("/api/v1/evaluacion/ia/sugerir-conclusion")) return 15;
     if (uri.endsWith(LOGIN_PATH) || uri.equals(LOGIN_PATH)) {
       return LOGIN_LIMIT;
     } else if (uri.endsWith(REGISTER_PATH) || uri.equals(REGISTER_PATH)) {
@@ -105,12 +112,32 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return REFRESH_LIMIT;
     } else if (uri.startsWith(MATRICULA_DNI_PATH)) {
       return MATRICULA_DNI_LIMIT;
+    } else if (uri.equals(MATRICULA_PUBLICA_PATH)) {
+      return MATRICULA_CREAR_LIMIT;
+    } else if (uri.equals(MATRICULA_PUBLICA_PATH + "/documentos")) {
+      return MATRICULA_DOCUMENTO_LIMIT;
     } else if (uri.startsWith("/api/v1/pagos/webhook")) {
       return WEBHOOK_PAGOS_LIMIT;
     } else if (uri.startsWith("/api/v1/pagos") || uri.startsWith("/api/v1/tesoreria")) {
       return PAGOS_TESORERIA_LIMIT;
     }
     return null;
+  }
+
+  private String resolveBucket(HttpServletRequest request) {
+    String uri = request.getRequestURI();
+    if (uri == null) return null;
+    if (uri.startsWith(MATRICULA_DNI_PATH)) return MATRICULA_DNI_PATH;
+    if ("POST".equalsIgnoreCase(request.getMethod())) {
+      if (uri.equals(MATRICULA_PUBLICA_PATH) || uri.equals(MATRICULA_PUBLICA_PATH + "/")) {
+        return MATRICULA_PUBLICA_PATH;
+      }
+      // Compartir el contador evita eludirlo cambiando expediente o tipo de documento.
+      if (DOCUMENTO_PUBLICO_PATH.matcher(uri).matches()) return MATRICULA_PUBLICA_PATH + "/documentos";
+    } else if (uri.equals(MATRICULA_PUBLICA_PATH) || uri.equals(MATRICULA_PUBLICA_PATH + "/")) {
+      return null;
+    }
+    return uri;
   }
 
   public String extractClientIp(HttpServletRequest request) {

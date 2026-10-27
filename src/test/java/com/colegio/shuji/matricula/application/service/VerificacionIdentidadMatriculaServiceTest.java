@@ -25,4 +25,16 @@ class VerificacionIdentidadMatriculaServiceTest {
     assertEquals(VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE, service.verificar("Maria","1234567"));
     verifyNoInteractions(api);
   }
+
+  @Test void noConfundeNombresConPalabrasDistintasAlQuitarEspacios() {
+    when(api.consultar("01234567")).thenReturn(Optional.of(new ReniecServicePort.Identidad("01234567","Ana María","Pérez","López")));
+    assertEquals(VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE,
+        service.verificar("Anamaría Pérez López", "01234567"));
+  }
+
+  @Test void admiteEspaciosAdicionalesSinFusionarLasPalabras() {
+    when(api.consultar("01234567")).thenReturn(Optional.of(new ReniecServicePort.Identidad("01234567","Ana María","Pérez","López")));
+    assertEquals(VerificacionIdentidadMatriculaService.Resultado.COINCIDE,
+        service.verificar("  ANA\tMARIA  PEREZ\nLOPEZ  ", "01234567"));
+  }
 }

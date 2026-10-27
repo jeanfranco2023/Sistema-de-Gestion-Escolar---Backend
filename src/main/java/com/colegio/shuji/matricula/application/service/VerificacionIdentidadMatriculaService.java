@@ -22,13 +22,18 @@ public class VerificacionIdentidadMatriculaService {
     if (respuesta.isEmpty()) return Resultado.NO_DISPONIBLE;
     var identidad = respuesta.get();
     String nombre = identidad.nombres() + " " + identidad.apellidoPaterno() + " " + identidad.apellidoMaterno();
-    return dni.equals(identidad.numeroDocumento()) && normalizar(nombre).equals(normalizar(nombresDeclarados))
+    return dni.equals(identidad.numeroDocumento()) && nombresCoinciden(nombre, nombresDeclarados)
         ? Resultado.COINCIDE : Resultado.NO_COINCIDE;
   }
 
-  private String normalizar(String valor) {
+  public static boolean nombresCoinciden(String primero, String segundo) {
+    return primero != null && segundo != null && !normalizar(primero).isBlank()
+        && normalizar(primero).equals(normalizar(segundo));
+  }
+
+  private static String normalizar(String valor) {
     if (valor == null) return "";
     return Normalizer.normalize(valor, Normalizer.Form.NFD).replaceAll("\\p{M}", "")
-        .replaceAll("[^\\p{L}\\p{N}]", "").toUpperCase(Locale.ROOT);
+        .replaceAll("[^\\p{L}\\p{N}]+", " ").trim().toUpperCase(Locale.ROOT);
   }
 }

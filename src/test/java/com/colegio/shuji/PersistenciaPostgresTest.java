@@ -83,6 +83,12 @@ class PersistenciaPostgresTest {
   private final ConsultarBandejaUseCase bandeja;
   private final com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService solicitudesPublicas;
   private final com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepository seccionesJpa;
+  private final com.colegio.shuji.matricula.application.port.in.ConsultarPortalFamiliarUseCase portalFamiliar;
+  private final com.colegio.shuji.matricula.application.port.in.GestionarSuplenciasUseCase suplencias;
+  private final com.colegio.shuji.evaluacion.application.port.in.ImportarCalificacionesUseCase importacionCneb;
+  private final com.colegio.shuji.evaluacion.application.port.in.GenerarLibretaPdfUseCase pdfLibreta;
+  private final com.colegio.shuji.evaluacion.application.port.in.ConsultarLibretaNotasUseCase libretas;
+  private final com.colegio.shuji.curriculo.application.port.in.ConsultarCatalogoHorariosUseCase catalogoHorarios;
 
   Long usuarioId, estudianteId, matriculaId;
   Short anioId, nivelId;
@@ -197,6 +203,86 @@ class PersistenciaPostgresTest {
         .setAuthentication(new UsernamePasswordAuthenticationToken(p, null, authorities));
   }
 
+  private com.colegio.shuji.matricula.infrastructure.entity.ApoderadoEntity vincularCuentaFamiliar() {
+    var apoderado = em.createQuery("select a from ApoderadoEntity a, EstudianteApoderadoEntity v where v.apoderadoId=a.id and v.estudianteId=:id", com.colegio.shuji.matricula.infrastructure.entity.ApoderadoEntity.class)
+        .setParameter("id", estudianteId).getSingleResult();
+    apoderado.setUsuarioId(usuarioId); em.flush(); return apoderado;
+  }
+
+  @Test
+  void portalFamiliarConsultaSoloHijosBajoCustodiaYEmitePdfReal() throws Exception {
+    vincularCuentaFamiliar(); autenticar("APODERADO");
+    var hijos = portalFamiliar.hijos();
+    assertEquals(1,hijos.size()); assertEquals(estudianteId,hijos.getFirst().estudianteId());
+    assertEquals(dniEstudiante,hijos.getFirst().numeroDocumento());
+    assertTrue(portalFamiliar.calificaciones(matriculaId).isEmpty());
+    assertTrue(portalFamiliar.asistencia(matriculaId).isEmpty());
+    assertFalse(portalFamiliar.periodos(matriculaId).isEmpty());
+    try (var documento=org.apache.pdfbox.Loader.loadPDF(pdfLibreta.generar(matriculaId))) {
+      String contenido=new org.apache.pdfbox.text.PDFTextStripper().getText(documento);
+      assertTrue(contenido.contains(dniEstudiante)); assertTrue(contenido.contains("SHUJI KITAMURA"));
+    }
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->portalFamiliar.alumnosSeguimiento());
+  }
+
+  @Test
+  void custodiaRevocadaBloqueaLibretaPdfYPortal() {
+    vincularCuentaFamiliar();
+    var vinculo=em.createQuery("select v from EstudianteApoderadoEntity v where v.estudianteId=:id",com.colegio.shuji.matricula.infrastructure.entity.EstudianteApoderadoEntity.class)
+        .setParameter("id",estudianteId).getSingleResult();
+    vinculo.setTieneCustodia(false);em.flush();autenticar("APODERADO");
+    assertTrue(portalFamiliar.hijos().isEmpty());
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->libretas.libreta(matriculaId));
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->pdfLibreta.generar(matriculaId));
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->portalFamiliar.calificaciones(matriculaId));
+  }
+
+  @Test
+  void suplenciaPersisteApruebaRevocaYEvitaSolapamiento() {
+    vincularCuentaFamiliar();autenticar("APODERADO");
+    var hoy=LocalDate.now(java.time.ZoneId.of("America/Lima"));
+    var primera=suplencias.solicitar(new com.colegio.shuji.matricula.application.dto.in.CrearSuplenciaRequestDto(
+        estudianteId,"34567891","Elena","Perez","Ruiz","TIA","912345678",hoy,hoy.plusDays(3)));
+    assertEquals("PENDIENTE_APROBACION",primera.estado());assertEquals(1,suplencias.misSolicitudes().size());
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->suplencias.aprobar(primera.id()));
+    var segunda=suplencias.solicitar(new com.colegio.shuji.matricula.application.dto.in.CrearSuplenciaRequestDto(
+        estudianteId,"34567892","Luis","Perez","Ruiz","TIO","912345678",hoy,hoy.plusDays(3)));
+    autenticar("DIRECCION");
+    var aprobada=suplencias.aprobar(primera.id());assertEquals("ACTIVO",aprobada.estado());assertEquals(usuarioId,aprobada.autorizadoPorUsuarioId());
+    assertThrows(com.colegio.shuji.shared.domain.exception.BusinessException.class,()->suplencias.aprobar(segunda.id()));
+    assertEquals("REVOCADO",suplencias.revocar(primera.id(),"Titular retomó el recojo").estado());
+    assertEquals("ACTIVO",suplencias.aprobar(segunda.id()).estado());
+    assertEquals(2,suplencias.bandeja().stream().filter(s -> s.estudianteId().equals(estudianteId)).count());
+  }
+
+  @Test
+  void importacionCnebValidaAntesDeGuardarYConfirmaConPersistenciaReal() {
+    var periodo=calendario.listarPeriodos(anioId).stream().filter(p->p.activo()&&!p.cerrado()).findFirst().orElseThrow();
+    var area=curriculo.crearArea(new CrearAreaRequestDto(nivelId,"PBK","Matemática"));
+    var competencia=curriculo.crearCompetencia(new CrearCompetenciaRequestDto(area.id(),(short)1,"Resuelve problemas de cantidad",null));
+    var asignacion=carga.asignarDocente(new AsignarDocenteRequestDto(usuarioId,seccionId,anioId,nivelId,area.id()));
+    autenticar("DOCENTE");
+    var opcion=catalogoHorarios.catalogo().stream().filter(a->a.asignacionId().equals(asignacion.id())).findFirst().orElseThrow();
+    assertEquals("Matemática",opcion.areaNombre());assertEquals((short)2026,opcion.anio());assertNotNull(opcion.aulaCodigo());
+    autenticar("DIRECCION");
+    var cabecera=List.of("DNI_ESTUDIANTE","COMPETENCIA_ID","NOTA_CNEB","CONCLUSION_DESCRIPTIVA");
+    var malas=List.of(cabecera,List.of(dniEstudiante,competencia.id().toString(),"Z","Error de nota"));
+    assertThrows(com.colegio.shuji.evaluacion.domain.exception.ImportacionCalificacionesException.class,
+        ()->importacionCneb.importar(malas,periodo.id(),seccionId,asignacion.id(),true));
+    assertTrue(evaluacion.listar(asignacion.id(),periodo.id()).isEmpty());
+    var filas=List.of(cabecera,List.of(dniEstudiante,competencia.id().toString(),"B","Explica procedimientos con apoyo"));
+    assertEquals(0,importacionCneb.importar(filas,periodo.id(),seccionId,asignacion.id(),false).filasProcesadas());
+    assertTrue(evaluacion.listar(asignacion.id(),periodo.id()).isEmpty());
+    assertEquals(1,importacionCneb.importar(filas,periodo.id(),seccionId,asignacion.id(),true).filasProcesadas());
+    em.flush();em.clear();assertEquals(1,evaluacion.listar(asignacion.id(),periodo.id()).size());
+    var aula=em.find(com.colegio.shuji.academico.infrastructure.entity.SeccionEntity.class,seccionId).getAula().getCodigo();
+    var sesion=refuerzo.programar(new com.colegio.shuji.evaluacion.application.dto.in.ProgramarRefuerzoRequestDto(
+        anioId,periodo.id(),area.id(),usuarioId,"Refuerzo de cantidades",LocalDate.now(java.time.ZoneId.of("America/Lima")).plusDays(1),
+        LocalTime.of(15,0),LocalTime.of(16,0),aula));
+    assertEquals(1,refuerzo.derivar(sesion.id()).size());
+    assertTrue(refuerzo.inscripciones(sesion.id()).getFirst().nombreEstudiante().contains("Ana"));
+  }
+
   @AfterEach
   void limpiar() {
     SecurityContextHolder.clearContext();
@@ -293,14 +379,21 @@ class PersistenciaPostgresTest {
     String dniNuevo = "5" + String.format("%07d", new Random().nextInt(9999999));
     String dniTutor = "6" + String.format("%07d", new Random().nextInt(9999999));
     var nueva = solicitudesPublicas.crear(new CrearSolicitudMatriculaPublicaRequestDto(
-        anioId, seccionId, dniNuevo, "Maria", "Perez", "Ruiz", LocalDate.of(2018, 2, 1), Genero.F,
+        anioId, seccionId, dniNuevo, "Maria", "Perez", "Ruiz", nacimientoAdmisible(), Genero.F,
         dniTutor, "Luis", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.PADRE, true));
     var s = em.find(com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity.class, nueva.id());
     s.setEstado(metodo == MetodoPago.PAGO_EFECTIVO ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         : EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
-    s.setEstadoPartida(EstadoValidacionDocumento.VALIDADO);
-    s.setEstadoDniC4(EstadoValidacionDocumento.VALIDADO);
-    s.setEstadoRecibo(EstadoValidacionDocumento.VALIDADO);
+    for (var tipo : com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.values()) {
+      var analisis = new com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort.Resultado(
+          true,true,true,"Evidencia sintética del test",true,
+          tipo == com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.PARTIDA_NACIMIENTO ? true : null);
+      solicitudesPublicas.guardarResultadoDocumento(nueva.id(), nueva.token(), tipo, analisis,
+          new com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort.Resultado(
+              com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.VALIDA,"Firma sintética de test",null),
+          tipo == com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.RECIBO_SERVICIO ? null : true,
+          null,"privado","test/"+UUID.randomUUID()+".pdf","application/pdf",100,"a".repeat(64));
+    }
     if (metodo == MetodoPago.YAPE) {
       assertEquals(1, seccionesJpa.reservarVacante(seccionId));
       s.setVacanteReservada(true);
@@ -323,6 +416,45 @@ class PersistenciaPostgresTest {
     assertEquals(confirmada.matriculaId(), solicitudesPublicas.finalizarPagoVerificado(nueva.id(), nueva.token(), pago).matriculaId());
     assertEquals(1L, em.createQuery("select count(p) from PagoTransaccionEntity p where p.pasarelaTransaccionId=:id", Long.class)
         .setParameter("id", transaccionId).getSingleResult());
+  }
+
+  @Test
+  void conservaHistorialParentalYBloqueaPagoMientrasFaltenOtrosPdf() {
+    var nueva = solicitudesPublicas.crear(new CrearSolicitudMatriculaPublicaRequestDto(
+        anioId,seccionId,"7"+String.format("%07d",new Random().nextInt(9999999)),"Maria","Perez","Ruiz",
+        nacimientoAdmisible(),Genero.F,"8"+String.format("%07d",new Random().nextInt(9999999)),
+        "Rosa","Perez","Ruiz","999888777","familia@example.test","Lima","150101",Parentesco.MADRE,true));
+    var tipo = TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
+    var firma = new com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort.Resultado(
+        EstadoFirmaDigital.VALIDA,"Firma sintética del test",null);
+    var rechazo = new com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort.Resultado(
+        true,true,true,"Progenitor distinto",true,false);
+    var observada = solicitudesPublicas.guardarResultadoDocumento(nueva.id(),nueva.token(),tipo,rechazo,firma,true,
+        null,"privado","test/"+UUID.randomUUID()+".pdf","application/pdf",100,"a".repeat(64));
+    var anterior = observada.documentos().stream().filter(d -> d.tipo()==tipo).findFirst().orElseThrow();
+    assertEquals(EstadoValidacionDocumento.OBSERVADO,anterior.estado());
+    assertFalse(anterior.vinculoParentalCoincide());
+    var aprobacion = new com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort.Resultado(
+        true,true,true,"Progenitor coincidente",true,true);
+    var corregida = solicitudesPublicas.guardarResultadoDocumento(nueva.id(),nueva.token(),tipo,aprobacion,firma,true,
+        anterior.versionId(),"privado","test/"+UUID.randomUUID()+".pdf","application/pdf",100,"b".repeat(64));
+    var actual = corregida.documentos().stream().filter(d -> d.tipo()==tipo).findFirst().orElseThrow();
+    assertEquals(EstadoValidacionDocumento.VALIDADO,actual.estado());
+    assertTrue(actual.vinculoParentalCoincide());
+    assertNotEquals(anterior.versionId(),actual.versionId());
+    em.flush(); em.clear();
+    assertFalse(em.find(com.colegio.shuji.matricula.infrastructure.entity.DocumentoMatriculaVersionEntity.class,
+        anterior.versionId()).getVinculoParentalCoincide());
+    assertEquals(409,assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        () -> solicitudesPublicas.crearPago(nueva.id(),nueva.token())).getStatusCode().value());
+  }
+
+  private LocalDate nacimientoAdmisible() {
+    var seccion = em.find(com.colegio.shuji.academico.infrastructure.entity.SeccionEntity.class, seccionId);
+    var grado = seccion.getRelacion1();
+    var rango = com.colegio.shuji.matricula.domain.service.ReglaEdadMatricula.paraGrado(
+        grado.getRelacion0().getCodigo().name(), grado.getNumeroGrado());
+    return LocalDate.of(2026 - rango.minima(), 2, 1);
   }
 
   @Test

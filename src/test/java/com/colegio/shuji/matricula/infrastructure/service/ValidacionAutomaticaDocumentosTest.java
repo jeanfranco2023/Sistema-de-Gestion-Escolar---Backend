@@ -33,12 +33,13 @@ class ValidacionAutomaticaDocumentosTest {
       mock(GeminiDocumentoMatriculaPort.class), mercado,
       mock(com.colegio.shuji.tesoreria.application.port.in.RegistrarCobroMatriculaUseCase.class));
   SolicitudMatriculaPublicaEntity solicitud;
-  final GeminiDocumentoMatriculaPort.Resultado iaCorrecta = new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"Compatible.");
+  final GeminiDocumentoMatriculaPort.Resultado iaCorrecta = new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"Compatible.",true,true);
   final GeminiDocumentoMatriculaPort.Resultado iaNoDisponible = new GeminiDocumentoMatriculaPort.Resultado(false,false,false,"Proveedor no disponible.",false);
 
   @BeforeEach void preparar() throws Exception {
     solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setId(id);
+    solicitud.setParentesco(Parentesco.MADRE);
     solicitud.setTokenHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))));
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
     solicitud.setEstadoPartida(EstadoValidacionDocumento.PENDIENTE);
@@ -59,6 +60,18 @@ class ValidacionAutomaticaDocumentosTest {
   }
   @Test void iaNoPuedeAprobarUnaPartidaSinFirmaDigital() {
     subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.NO_APLICA, iaCorrecta, true);
+    assertEquals(EstadoValidacionDocumento.OBSERVADO, solicitud.getEstadoPartida());
+  }
+
+  @Test void partidaSinEvidenciaParentalNoSeAprueba() {
+    subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.VALIDA,
+        new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"Compatible."), true);
+    assertEquals(EstadoValidacionDocumento.EN_VALIDACION, solicitud.getEstadoPartida());
+  }
+
+  @Test void partidaConProgenitorDiferenteSeObserva() {
+    subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.VALIDA,
+        new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"No coincide.",true,false), true);
     assertEquals(EstadoValidacionDocumento.OBSERVADO, solicitud.getEstadoPartida());
   }
   @Test void firmaInvalidaRechazaAunqueLaIANoEsteDisponible() {

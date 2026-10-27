@@ -81,6 +81,8 @@ class ConcurrenciaPostgresTest {
   private final GenerarCronogramaPensionesUseCase cronograma;
   private final ProcesarPagoPasarelaUseCase pagos;
   private final EmitirComprobanteUseCase comprobantes;
+  private final com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService solicitudesPublicas;
+  private final com.colegio.shuji.matricula.application.port.in.GestionarSuplenciasUseCase suplencias;
 
   Long usuarioId;
   Short anioId, nivelId;
@@ -252,6 +254,77 @@ class ConcurrenciaPostgresTest {
 
     assertEquals(VACANTES, exitos.get(), "Exactamente 3 solicitudes deben haber tenido éxito");
     assertEquals(HILOS - VACANTES, rechazados.get(), "Las solicitudes excedentes debieron ser rechazadas por falta de vacantes");
+  }
+
+  @Test
+  void solicitudPublicaConcurrenteCreaUnExpedienteSinReservarCupoAntesDelPago() throws Exception {
+    var seccion = estructura.listarSecciones(anioId, nivelId).stream()
+        .filter(s -> s.vacantesOcupadas() < s.cupoMaximo()).findFirst().orElseThrow();
+    LocalDate nacimiento = txTemplate.execute(status -> {
+      var entidad = em.find(com.colegio.shuji.academico.infrastructure.entity.SeccionEntity.class, seccion.id());
+      var grado = entidad.getRelacion1();
+      var edades = com.colegio.shuji.matricula.domain.service.ReglaEdadMatricula.paraGrado(
+          grado.getRelacion0().getCodigo().name(), grado.getNumeroGrado());
+      return LocalDate.of(2026 - edades.minima(), 2, 1);
+    });
+    String dni = "4" + String.format("%07d", new Random().nextInt(9999999));
+    var request = new com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto(
+        anioId, seccion.id(), dni, "Ana", "Perez", "Ruiz", nacimiento, Genero.F,
+        "87654321", "Rosa", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.MADRE, true);
+    var inicio = new CountDownLatch(1);
+    var executor = Executors.newFixedThreadPool(4);
+    try {
+      List<Future<Integer>> resultados = new ArrayList<>();
+      for (int i = 0; i < 4; i++) {
+        resultados.add(executor.submit(() -> {
+          inicio.await();
+          try {
+            solicitudesPublicas.crear(request);
+            return 201;
+          } catch (org.springframework.web.server.ResponseStatusException ex) {
+            return ex.getStatusCode().value();
+          } finally {
+            SecurityContextHolder.clearContext();
+          }
+        }));
+      }
+      inicio.countDown();
+      var estados = new ArrayList<Integer>();
+      for (var resultado : resultados) estados.add(resultado.get(60, TimeUnit.SECONDS));
+      assertEquals(1, Collections.frequency(estados, 201));
+      assertEquals(3, Collections.frequency(estados, 409));
+    } finally {
+      executor.shutdownNow();
+    }
+    txTemplate.executeWithoutResult(status -> {
+      long cantidad = em.createQuery(
+          "select count(s) from SolicitudMatriculaPublicaEntity s where s.numeroDocumentoEstudiante = :dni", Long.class)
+          .setParameter("dni", dni).getSingleResult();
+      assertEquals(1L, cantidad);
+      var actual = em.find(com.colegio.shuji.academico.infrastructure.entity.SeccionEntity.class, seccion.id());
+      assertEquals(seccion.vacantesOcupadas(), actual.getVacantesOcupadas());
+    });
+  }
+
+  @Test
+  void aprobacionesSimultaneasNoAutorizanDosSuplentesEnElMismoPeriodo() throws Exception {
+    autenticar("DIRECCION");
+    var estudiante=familias.registrarEstudiante(new RegistrarEstudianteRequestDto(TipoDocumento.DNI,
+        "6"+String.format("%07d",new Random().nextInt(9999999)),"Ana","Perez","Ruiz",LocalDate.of(2018,1,1),Genero.F,null,null,null));
+    var apoderado=familias.registrarApoderado(new com.colegio.shuji.matricula.application.dto.in.RegistrarApoderadoRequestDto(TipoDocumento.DNI,
+        "7"+String.format("%07d",new Random().nextInt(9999999)),"Rosa","Perez","Ruiz","912345678","familia@example.test","Lima","150101",usuarioId));
+    familias.vincular(new com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto(estudiante.id(),apoderado.id(),com.colegio.shuji.matricula.domain.enums.Parentesco.MADRE,true,true,true));
+    autenticar("APODERADO");var hoy=LocalDate.now(java.time.ZoneId.of("America/Lima"));
+    var ids=new ArrayList<Long>();
+    for(String dni:List.of("34567891","34567892")) ids.add(suplencias.solicitar(new com.colegio.shuji.matricula.application.dto.in.CrearSuplenciaRequestDto(estudiante.id(),dni,"Elena","Perez","Ruiz","TIA","912345678",hoy,hoy.plusDays(2))).id());
+    var inicio=new CountDownLatch(1);var executor=Executors.newFixedThreadPool(2);
+    try {
+      var futuros=new ArrayList<Future<Boolean>>();
+      for(Long id:ids) futuros.add(executor.submit(()->{autenticar("DIRECCION");inicio.await();try{suplencias.aprobar(id);return true;}catch(com.colegio.shuji.shared.domain.exception.BusinessException esperado){return false;}finally{SecurityContextHolder.clearContext();}}));
+      inicio.countDown();int aprobadas=0;for(var futuro:futuros)if(futuro.get(60,TimeUnit.SECONDS))aprobadas++;
+      assertEquals(1,aprobadas);
+    } finally { executor.shutdownNow(); }
+    autenticar("DIRECCION");assertEquals(1,suplencias.bandeja().stream().filter(s->s.estudianteId().equals(estudiante.id())&&s.estado().equals("ACTIVO")).count());
   }
 
   private void autenticar(String rol) {

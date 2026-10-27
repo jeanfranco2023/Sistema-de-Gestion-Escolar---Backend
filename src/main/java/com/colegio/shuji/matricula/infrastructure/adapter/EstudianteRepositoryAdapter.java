@@ -70,4 +70,8 @@ public class EstudianteRepositoryAdapter implements EstudianteRepositoryPort {
     if (ids == null || ids.isEmpty()) return List.of();
     return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
   }
+  public List<Estudiante> buscarPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorIds(ids).stream().map(mapper::toDomain).toList();
+  }
 }

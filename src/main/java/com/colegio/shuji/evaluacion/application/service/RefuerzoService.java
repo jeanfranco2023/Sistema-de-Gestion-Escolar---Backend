@@ -49,6 +49,18 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
   private final AnioLectivoRepositoryPort anios;
   private final AsignacionRepositoryPort asignaciones;
   private final ActorActualPort actor;
+  private final com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort estudiantes;
+
+  @Transactional(readOnly = true)
+  public List<com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto> inscripciones(Long sesionId) {
+    var sesion = requerido(refuerzos.buscarPorId(sesionId));
+    actor.verificarDocente(sesion.getDocenteUsuarioId());
+    var filas=inscripciones.buscarPorSesionRefuerzoId(sesionId);
+    var nombres=estudiantes.buscarPorIds(filas.stream().map(i->i.getEstudianteId()).distinct().toList()).stream()
+        .collect(java.util.stream.Collectors.toMap(e->e.getId(),e->e.nombreCompleto()));
+    return filas.stream().map(i->new com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto(
+        i.getId(),i.getSesionRefuerzoId(),i.getEstudianteId(),i.getCalificacionOrigenId(),i.getEstadoAsistencia(),i.getObservaciones(),nombres.get(i.getEstudianteId()))).toList();
+  }
 
   public SesionRefuerzoResponseDto programar(ProgramarRefuerzoRequestDto r) {
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
@@ -98,7 +110,7 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
         calificaciones.buscarPorPeriodoAcademicoId(s.getPeriodoAcademicoId()).stream()
             .filter(
                 c ->
-                    c.necesitaRefuerzo()
+                    (c.necesitaRefuerzo() || c.getCalificacionCualitativa() == com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa.B)
                         && c.getAreaCurricularId().equals(s.getAreaCurricularId())
                         && c.getDocenteUsuarioId().equals(s.getDocenteUsuarioId()))
             .toList();

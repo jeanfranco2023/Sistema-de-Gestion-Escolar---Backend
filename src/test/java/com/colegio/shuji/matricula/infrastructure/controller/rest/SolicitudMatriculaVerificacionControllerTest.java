@@ -39,14 +39,21 @@ class SolicitudMatriculaVerificacionControllerTest {
   final String token = "token-prueba";
   final AlmacenDocumentosMatriculaPort.ArchivoGuardado archivo =
       new AlmacenDocumentosMatriculaPort.ArchivoGuardado("privado","ruta-aleatoria.pdf");
-  final MockMultipartFile pdf = new MockMultipartFile("archivo","original.pdf","application/pdf",
-      "%PDF-1.7\nfixture".getBytes(StandardCharsets.US_ASCII));
+  final MockMultipartFile pdf = pdfValido();
   final GeminiDocumentoMatriculaPort.Resultado ia =
       new GeminiDocumentoMatriculaPort.Resultado(true,true,true,"Compatible.");
 
+  private static MockMultipartFile pdfValido() {
+    try (var documento = new org.apache.pdfbox.pdmodel.PDDocument(); var salida = new java.io.ByteArrayOutputStream()) {
+      documento.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+      documento.save(salida);
+      return new MockMultipartFile("archivo", "original.pdf", "application/pdf", salida.toByteArray());
+    } catch (java.io.IOException ex) { throw new IllegalStateException(ex); }
+  }
+
   void preparar(TipoDocumentoSolicitud tipo) {
     when(solicitudes.prepararValidacion(id,token,tipo))
-        .thenReturn(new SolicitudMatriculaPublicaService.PreparacionDocumento("Maria Perez Lopez","01234567",null));
+        .thenReturn(new SolicitudMatriculaPublicaService.PreparacionDocumento("Maria Perez Lopez","01234567",null, new GeminiDocumentoMatriculaPort.ContextoParental("Rosa Perez Lopez", "87654321", com.colegio.shuji.matricula.domain.enums.Parentesco.MADRE)));
     when(almacenDocumentos.guardar(eq(id),eq(tipo),any(),eq("application/pdf"))).thenReturn(archivo);
   }
 
@@ -64,15 +71,16 @@ class SolicitudMatriculaVerificacionControllerTest {
     preparar(tipo);
     when(firmas.verificar(any(),eq("application/pdf"),eq(true)))
         .thenReturn(new FirmaDigitalDocumentoPort.Resultado(EstadoFirmaDigital.VALIDA,"Verificada.",null));
-    when(identidades.verificar("Maria Perez Lopez","01234567")).thenReturn(VerificacionIdentidadMatriculaService.Resultado.COINCIDE);
-    when(gemini.validar(eq(tipo),any(),eq("application/pdf"),eq("Maria Perez Lopez"),eq("01234567"))).thenReturn(ia);
+    when(identidades.verificar(anyString(),anyString())).thenReturn(VerificacionIdentidadMatriculaService.Resultado.COINCIDE);
+    when(gemini.validar(eq(tipo),any(),eq("application/pdf"),eq("Maria Perez Lopez"),eq("01234567"),any())).thenReturn(ia);
     controller.validarDocumento(id,tipo,token,pdf);
     confirmarEvidencia(tipo,true,EstadoFirmaDigital.VALIDA,true);
+    verify(identidades).verificar("Rosa Perez Lopez", "87654321");
   }
   @Test void reciboNoRequierePkiReniecNiConsultaDni() {
     var tipo = TipoDocumentoSolicitud.RECIBO_SERVICIO;
     preparar(tipo);
-    when(gemini.validar(eq(tipo),any(),eq("application/pdf"),anyString(),anyString())).thenReturn(ia);
+    when(gemini.validar(eq(tipo),any(),eq("application/pdf"),anyString(),anyString(),any())).thenReturn(ia);
     controller.validarDocumento(id,tipo,token,pdf);
     verifyNoInteractions(firmas,identidades);
     confirmarEvidencia(tipo,null,EstadoFirmaDigital.NO_APLICA,true);
@@ -96,7 +104,7 @@ class SolicitudMatriculaVerificacionControllerTest {
   @Test void iaIndisponibleSeRegistraSinInventarValidacion() {
     var tipo = TipoDocumentoSolicitud.RECIBO_SERVICIO;
     preparar(tipo);
-    when(gemini.validar(eq(tipo),any(),anyString(),anyString(),anyString()))
+    when(gemini.validar(eq(tipo),any(),anyString(),anyString(),anyString(),any()))
         .thenThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE));
     controller.validarDocumento(id,tipo,token,pdf);
     confirmarEvidencia(tipo,null,EstadoFirmaDigital.NO_APLICA,false);
@@ -104,11 +112,44 @@ class SolicitudMatriculaVerificacionControllerTest {
   @Test void falloPersistiendoElResultadoLimpiaLaCargaNueva() {
     var tipo = TipoDocumentoSolicitud.RECIBO_SERVICIO;
     preparar(tipo);
-    when(gemini.validar(eq(tipo),any(),anyString(),anyString(),anyString())).thenReturn(ia);
+    when(gemini.validar(eq(tipo),any(),anyString(),anyString(),anyString(),any())).thenReturn(ia);
     when(solicitudes.guardarResultadoDocumento(eq(id),eq(token),eq(tipo),any(),any(),isNull(),isNull(),
         anyString(),anyString(),anyString(),anyLong(),anyString()))
         .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
     assertThrows(ResponseStatusException.class,()-> controller.validarDocumento(id,tipo,token,pdf));
     verify(almacenDocumentos).eliminar(archivo);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(TipoDocumentoSolicitud.class)
+  void rechazaImagenDisfrazadaDePdfEnLosTresDocumentos(TipoDocumentoSolicitud tipo) {
+    when(solicitudes.prepararValidacion(id,token,tipo)).thenReturn(
+        new SolicitudMatriculaPublicaService.PreparacionDocumento("Maria Perez Lopez","01234567",null,
+            new GeminiDocumentoMatriculaPort.ContextoParental("Rosa Perez Lopez","87654321",
+                com.colegio.shuji.matricula.domain.enums.Parentesco.MADRE)));
+    var imagen = new MockMultipartFile("archivo","falso.pdf","application/pdf",new byte[]{(byte)0xff,(byte)0xd8,(byte)0xff});
+    assertEquals(400,assertThrows(ResponseStatusException.class,()->controller.validarDocumento(id,tipo,token,imagen)).getStatusCode().value());
+    verifyNoInteractions(gemini,firmas,identidades);
+    verify(almacenDocumentos,never()).guardar(any(),any(),any(),any());
+  }
+
+  @Test void padreConDniDistintoNoPuedeSerAprobadoPorLaIa() {
+    var tipo = TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
+    preparar(tipo);
+    when(firmas.verificar(any(),eq("application/pdf"),eq(true)))
+        .thenReturn(new FirmaDigitalDocumentoPort.Resultado(EstadoFirmaDigital.VALIDA,"Verificada.",null));
+    when(identidades.verificar("Maria Perez Lopez","01234567")).thenReturn(VerificacionIdentidadMatriculaService.Resultado.COINCIDE);
+    when(identidades.verificar("Rosa Perez Lopez","87654321")).thenReturn(VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE);
+    controller.validarDocumento(id,tipo,token,pdf);
+    verifyNoInteractions(gemini);
+    confirmarEvidencia(tipo,false,EstadoFirmaDigital.VALIDA,false);
+  }
+
+  @Test void pdfTruncadoSeRechazaAntesDeConsultarProveedores() {
+    when(solicitudes.prepararValidacion(id,token,TipoDocumentoSolicitud.RECIBO_SERVICIO)).thenReturn(
+        new SolicitudMatriculaPublicaService.PreparacionDocumento("Maria","01234567",null,null));
+    var falso = new MockMultipartFile("archivo","truncado.pdf","application/pdf","%PDF-1.7\nfixture".getBytes(StandardCharsets.US_ASCII));
+    assertEquals(400,assertThrows(ResponseStatusException.class,()->controller.validarDocumento(id,TipoDocumentoSolicitud.RECIBO_SERVICIO,token,falso)).getStatusCode().value());
+    verifyNoInteractions(gemini,firmas,identidades);
   }
 }

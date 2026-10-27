@@ -17,6 +17,7 @@ public interface EstudianteRepositoryPort {
   List<Estudiante> buscarPorNumeroDocumento(String valor);
 
   List<Estudiante> buscarPorNumerosDocumento(Collection<String> numeros);
+  List<Estudiante> buscarPorIds(Collection<Long> ids);
 
   List<Estudiante> bloquearPorIds(Collection<Long> ids);
 }

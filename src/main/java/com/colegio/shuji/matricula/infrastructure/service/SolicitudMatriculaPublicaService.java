@@ -24,6 +24,7 @@ import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
+import com.colegio.shuji.matricula.domain.service.ReglaEdadMatricula;
 import com.colegio.shuji.matricula.infrastructure.entity.ApoderadoEntity;
 import com.colegio.shuji.matricula.infrastructure.entity.EstudianteApoderadoEntity;
 import com.colegio.shuji.matricula.infrastructure.entity.EstudianteEntity;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -104,11 +106,12 @@ public class SolicitudMatriculaPublicaService {
         .map(s -> {
           var grado = s.getRelacion1();
           var nivel = grado == null ? null : grado.getRelacion0();
+          var edades = limitesEdad(s);
           return new SeccionMatriculaPublicaOpcionDto(
               s.getId(), s.getAnioLectivoId(),
               nivel == null ? "Nivel" : nivel.getNombre(),
               grado == null ? "Grado" : grado.getNombre(),
-              s.getLetra(), s.getCupoMaximo() - s.getVacantesOcupadas());
+              s.getLetra(), s.getCupoMaximo() - s.getVacantesOcupadas(), edades.minima(), edades.maxima());
         })
         .toList();
     return new CatalogoMatriculaPublicaResponseDto(aniosAbiertos, opciones);
@@ -116,15 +119,22 @@ public class SolicitudMatriculaPublicaService {
 
   @Transactional
   public SolicitudMatriculaPublicaResponseDto crear(CrearSolicitudMatriculaPublicaRequestDto r) {
+    exigirProgenitor(r.parentesco());
     var anio = anios.findById(r.anioLectivoId())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Año lectivo inexistente"));
     if (!Boolean.TRUE.equals(anio.getAbierto())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El año lectivo no admite matrículas");
     }
-    var seccion = secciones.findById(r.seccionId())
+    var seccion = secciones.bloquearPorId(r.seccionId())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sección inexistente"));
     if (!seccion.getAnioLectivoId().equals(r.anioLectivoId())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La sección no corresponde al año lectivo");
+    }
+    var edades = limitesEdad(seccion);
+    if (!edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio())) {
+      throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+          "Para esta sección la edad al 31 de marzo de " + anio.getAnio() + " debe estar entre "
+              + edades.minima() + " y " + edades.maxima() + " años. Los casos excepcionales requieren autorización institucional.");
     }
     if (seccion.getCupoMaximo() <= seccion.getVacantesOcupadas()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección seleccionada ya no tiene vacantes");
@@ -163,47 +173,72 @@ public class SolicitudMatriculaPublicaService {
     s.setParentesco(r.parentesco());
     s.setConsentimientoGemini(r.consentimientoGemini());
     s.setPagoMonto(obtenerMontoMatriculaPublica());
-    var guardado = solicitudes.saveAndFlush(s);
-    return respuesta(guardado, token);
+    try {
+      return respuesta(solicitudes.saveAndFlush(s), token);
+    } catch (DataIntegrityViolationException ex) {
+      // Una solicitud simultánea en otra sección puede ganar el índice único del DNI.
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "La solicitud entra en conflicto con un registro existente; consulta tu expediente antes de reintentar", ex);
+    }
+  }
+
+  private ReglaEdadMatricula.Rango limitesEdad(
+      com.colegio.shuji.academico.infrastructure.entity.SeccionEntity seccion) {
+    var grado = seccion.getRelacion1();
+    var nivel = grado == null ? null : grado.getRelacion0();
+    try {
+      return ReglaEdadMatricula.paraGrado(nivel == null || nivel.getCodigo() == null ? null : nivel.getCodigo().name(),
+          grado == null ? null : grado.getNumeroGrado());
+    } catch (IllegalArgumentException ex) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+    }
   }
 
   @Transactional(readOnly = true)
   public PreparacionDocumento prepararValidacion(UUID id, String token, TipoDocumentoSolicitud tipo) {
     var s = solicitudConToken(id, token);
+    exigirProgenitor(s.getParentesco());
     if (!s.isConsentimientoGemini()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No se autorizó enviar los documentos a Gemini");
     }
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La etapa documental ya está cerrada");
     }
     var estado = s.estadoDocumento(tipo);
-    if (estado == EstadoValidacionDocumento.VALIDADO) {
+    if (estado == EstadoValidacionDocumento.VALIDADO && !requiereNuevaEvidencia(id, tipo)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Este documento ya fue validado");
     }
     var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
     return new PreparacionDocumento(nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
-        actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null));
+        actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null),
+        new GeminiDocumentoMatriculaPort.ContextoParental(nombreApoderado(s), s.getNumeroDocumentoApoderado(), s.getParentesco()));
   }
 
-  public record PreparacionDocumento(String nombres, String dni, UUID versionActual) {}
+  public record PreparacionDocumento(String nombres, String dni, UUID versionActual,
+      GeminiDocumentoMatriculaPort.ContextoParental progenitor) {}
 
   @Transactional
   public SolicitudMatriculaPublicaResponseDto guardarResultadoDocumento(
       UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
       FirmaDigitalDocumentoPort.Resultado firma, Boolean dniApiCoincide, UUID versionEsperada,
       String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
+    if (!"application/pdf".equals(mimeType)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+        "Los tres documentos deben ser PDF");
     var s = solicitudConTokenBloqueada(id, token);
+    exigirProgenitor(s.getParentesco());
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud cambió mientras se validaba el archivo");
     }
     var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
-    if (s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO
+    if ((s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO && !requiereNuevaEvidencia(id, tipo))
         || !java.util.Objects.equals(versionEsperada, actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null))) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El documento fue actualizado o revisado; consulta el trámite nuevamente");
     }
@@ -218,6 +253,7 @@ public class SolicitudMatriculaPublicaService {
     version.setSha256(sha256);
     version.setIaValida(resultado.disponible() ? resultado.valido() : null);
     version.setDniApiCoincide(dniApiCoincide);
+    version.setVinculoParentalCoincide(resultado.vinculoParentalCoincide());
     version.setObservacionIa(resultado.observacion());
     version.setEstadoFirma(firma.estado());
     version.setDetalleFirma(firma.detalle());
@@ -237,13 +273,16 @@ public class SolicitudMatriculaPublicaService {
     boolean firmaAceptada = firma.estado() == EstadoFirmaDigital.VALIDA
         || (tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA);
     boolean dniAceptado = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || Boolean.TRUE.equals(dniApiCoincide);
+    boolean vinculoAceptado = tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
+        || Boolean.TRUE.equals(resultado.vinculoParentalCoincide());
     boolean rechazo = Boolean.FALSE.equals(dniApiCoincide) || firma.estado() == EstadoFirmaDigital.INVALIDA
+        || Boolean.FALSE.equals(resultado.vinculoParentalCoincide())
         || (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA)
         || (resultado.disponible() && !resultado.valido());
-    boolean pendiente = !rechazo && (!dniAceptado || !resultado.disponible() || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
+    boolean pendiente = !rechazo && (!dniAceptado || !vinculoAceptado || !resultado.disponible() || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
         || firma.estado() == EstadoFirmaDigital.ERROR_SERVICIO);
     s.actualizarDocumento(tipo, pendiente ? EstadoValidacionDocumento.EN_VALIDACION
-        : resultado.valido() && firmaAceptada && dniAceptado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
+        : resultado.valido() && firmaAceptada && dniAceptado && vinculoAceptado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
         Boolean.FALSE.equals(dniApiCoincide) ? "El DNI y los nombres declarados no coinciden con la API de identidad."
         : !firmaAceptada ? tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA
             ? "Adjunta la partida original en PDF con firma digital de RENIEC; una fotografía no contiene la firma verificable."
@@ -329,6 +368,7 @@ public class SolicitudMatriculaPublicaService {
     }
     if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
         "Los documentos todavía no completaron la verificación automática");
+    exigirEvidenciaDocumental(s);
     var ahora = OffsetDateTime.now(ZoneOffset.UTC);
     if (s.isVacanteReservada() && s.getFechaExpiracionPago() != null && s.getFechaExpiracionPago().isAfter(ahora)
         && s.getPagoEnlace() != null && !s.getPagoEnlace().isBlank()) {
@@ -372,6 +412,7 @@ public class SolicitudMatriculaPublicaService {
     }
     if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
         "Pago recibido; la documentación requiere conciliación administrativa");
+    exigirEvidenciaDocumental(s);
     if (pago.monto() == null || s.getPagoMonto() == null || pago.monto().compareTo(s.getPagoMonto()) != 0
         || !"PEN".equalsIgnoreCase(pago.moneda())) {
       throw new ResponseStatusException(
@@ -577,6 +618,39 @@ public class SolicitudMatriculaPublicaService {
         && s.getEstadoRecibo() == EstadoValidacionDocumento.VALIDADO;
   }
 
+  private void exigirProgenitor(Parentesco parentesco) {
+    if (parentesco != Parentesco.PADRE && parentesco != Parentesco.MADRE) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "La solicitud pública solo admite al padre o a la madre");
+    }
+  }
+
+  private void exigirEvidenciaDocumental(SolicitudMatriculaPublicaEntity s) {
+    exigirProgenitor(s.getParentesco());
+    var actuales = cargarVersiones(List.of(s.getId()));
+    for (var tipo : TipoDocumentoSolicitud.values()) {
+      var version = actuales.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
+      if (!evidenciaCompleta(tipo, version)) throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "Revalida los tres PDF y el vínculo del padre o madre antes de continuar");
+    }
+  }
+
+  private boolean requiereNuevaEvidencia(UUID id, TipoDocumentoSolicitud tipo) {
+    var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
+    var version = actual.flatMap(a -> versiones.findById(a.getVersionId())).orElse(null);
+    return !evidenciaCompleta(tipo, version);
+  }
+
+  private boolean evidenciaCompleta(TipoDocumentoSolicitud tipo, DocumentoMatriculaVersionEntity version) {
+    if (version == null || !"application/pdf".equals(version.getMimeType())
+        || !Boolean.TRUE.equals(version.getIaValida())) return false;
+    if (tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO) return true;
+    if (!Boolean.TRUE.equals(version.getDniApiCoincide())) return false;
+    return tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
+        ? version.getEstadoFirma() == EstadoFirmaDigital.VALIDA && Boolean.TRUE.equals(version.getVinculoParentalCoincide())
+        : version.getEstadoFirma() == EstadoFirmaDigital.VALIDA || version.getEstadoFirma() == EstadoFirmaDigital.NO_APLICA;
+  }
+
   private boolean hayDocumentoObservado(SolicitudMatriculaPublicaEntity s) {
     return s.getEstadoPartida() == EstadoValidacionDocumento.OBSERVADO
         || s.getEstadoDniC4() == EstadoValidacionDocumento.OBSERVADO
@@ -603,10 +677,15 @@ public class SolicitudMatriculaPublicaService {
       java.util.Map<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity> archivos) {
     return java.util.Arrays.stream(TipoDocumentoSolicitud.values()).map(tipo -> {
       var v = archivos.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
-      return new DocumentoSolicitudResponseDto(tipo, s.estadoDocumento(tipo), s.observacionDocumento(tipo),
+      boolean revalidar = s.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
+          && s.getEstado() != EstadoSolicitudMatriculaPublica.RECHAZADA
+          && s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO && !evidenciaCompleta(tipo, v);
+      return new DocumentoSolicitudResponseDto(tipo, revalidar ? EstadoValidacionDocumento.EN_VALIDACION : s.estadoDocumento(tipo),
+          revalidar ? "Actualiza la evidencia: se requieren tres PDF y el vínculo del padre o madre con la partida." : s.observacionDocumento(tipo),
           v == null ? null : v.getId(), v == null ? null : v.getIaValida(),
           v == null ? null : v.getDniApiCoincide(),
-          v == null ? null : v.getEstadoFirma(), v == null ? null : v.getDetalleFirma());
+          v == null ? null : v.getEstadoFirma(), v == null ? null : v.getDetalleFirma(),
+          v == null ? null : v.getVinculoParentalCoincide());
     }).toList();
   }
 
@@ -626,7 +705,7 @@ public class SolicitudMatriculaPublicaService {
     var lista = versiones.findBySolicitudIdAndTipoOrderByFechaCargaDesc(id, tipo);
     return lista.stream().map(v -> new VersionDocumentoMatriculaResponseDto(v.getId(), v.getSha256(), v.getMimeType(),
         v.getTamanoBytes(), v.getFechaCarga(), v.getIaValida(), v.getDniApiCoincide(), v.getObservacionIa(), v.getEstadoFirma(), v.getDetalleFirma(),
-        v.getCertificadoSha256())).toList();
+        v.getCertificadoSha256(), v.getVinculoParentalCoincide())).toList();
   }
   private SolicitudMatriculaPublicaResponseDto respuesta(SolicitudMatriculaPublicaEntity s, String token) {
     return new SolicitudMatriculaPublicaResponseDto(

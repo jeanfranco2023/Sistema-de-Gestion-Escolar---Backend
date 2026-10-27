@@ -32,6 +32,7 @@ public class DocumentoMatriculaVersionEntity {
   @Column(name = "huella_sha256", nullable = false, length = 64) private String sha256;
   @Column(name = "ia_valida") private Boolean iaValida;
   @Column(name = "dni_api_coincide") private Boolean dniApiCoincide;
+  @Column(name = "vinculo_parental_coincide") private Boolean vinculoParentalCoincide;
   @Column(name = "observacion_ia", length = 500) private String observacionIa;
   @Enumerated(EnumType.STRING)
   @Column(name = "estado_firma", nullable = false, length = 20) private EstadoFirmaDigital estadoFirma;

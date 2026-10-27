@@ -29,6 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class RefuerzoController {
   private final DerivarAlumnosRefuerzoUseCase refuerzo;
 
+  @GetMapping("/{id}/inscripciones")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  public List<com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto> inscripciones(@PathVariable @Positive Long id) {
+    return refuerzo.inscripciones(id);
+  }
+
   @PostMapping("")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
   @Operation(summary = "refuerzo.programar")
