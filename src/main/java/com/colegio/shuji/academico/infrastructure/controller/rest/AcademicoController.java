@@ -53,7 +53,7 @@ public class AcademicoController {
   }
 
   @GetMapping("/aulas")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
   @Operation(summary = "estructura.listarAulas")
   public List<AulaResponseDto> listarAulas() {
     return aulas.listarAulas();
@@ -67,7 +67,7 @@ public class AcademicoController {
   }
 
   @GetMapping("/anios")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR')")
   @Operation(summary = "calendario.listarAnios")
   public List<AnioLectivoResponseDto> listarAnios() {
     return calendario.listarAnios();

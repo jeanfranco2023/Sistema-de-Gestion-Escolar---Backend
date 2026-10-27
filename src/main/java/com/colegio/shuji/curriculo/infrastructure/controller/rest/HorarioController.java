@@ -26,6 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Curriculo")
 public class HorarioController {
   private final GenerarMallaHorariaUseCase horarios;
+  private final com.colegio.shuji.curriculo.application.port.in.ConsultarCatalogoHorariosUseCase catalogo;
+  @GetMapping("/catalogo")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  public java.util.List<com.colegio.shuji.curriculo.application.dto.out.AsignacionHorarioOpcionDto> catalogo() {
+    return catalogo.catalogo();
+  }
 
   @PostMapping("")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")

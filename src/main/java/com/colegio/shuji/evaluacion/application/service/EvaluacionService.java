@@ -46,6 +46,7 @@ public class EvaluacionService
   private final MatriculaRepositoryPort matriculas;
   private final CompetenciaRepositoryPort competencias;
   private final ActorActualPort actor;
+  private final com.colegio.shuji.matricula.application.port.out.AccesoFamiliarPort accesoFamiliar;
 
   @Transactional(readOnly = true)
   public List<FilaCalificacionResponseDto> listarMatriz(Long asignacionDocenteId, Short periodoAcademicoId, Short competenciaId) {
@@ -154,8 +155,17 @@ public class EvaluacionService
 
   @Transactional(readOnly = true)
   public LibretaNotasResponseDto libreta(Long matriculaId) {
+    var matricula = requerido(matriculas.buscarPorId(matriculaId));
+    boolean gestion = actor.tieneRol("DIRECCION") || actor.tieneRol("SECRETARIA");
+    boolean familiar = !gestion && actor.tieneRol("APODERADO")
+        && accesoFamiliar.tieneCustodia(matricula.getEstudianteId(), actor.usuarioId());
+    if (!gestion) {
+      boolean docente = actor.tieneRol("DOCENTE") && asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId()).stream()
+          .anyMatch(a -> a.getSeccionId().equals(matricula.getSeccionId()) && a.getAnioLectivoId().equals(matricula.getAnioLectivoId()));
+      if (!docente && !familiar) throw new org.springframework.security.access.AccessDeniedException("La matrícula no está vinculada al usuario");
+    }
     var notas = calificaciones.buscarPorMatriculaId(matriculaId);
-    if (actor.tieneRol("DOCENTE") && !actor.tieneRol("DIRECCION") && !actor.tieneRol("SECRETARIA"))
+    if (actor.tieneRol("DOCENTE") && !gestion && !familiar)
       notas =
           notas.stream().filter(c -> c.getDocenteUsuarioId().equals(actor.usuarioId())).toList();
     return new LibretaNotasResponseDto(
@@ -167,7 +177,8 @@ public class EvaluacionService
     return new EstudiantesEnRiesgoResponseDto(
         periodoId,
         calificaciones.buscarPorPeriodoAcademicoId(periodoId).stream()
-            .filter(CalificacionCneb::necesitaRefuerzo)
+            .filter(c -> c.necesitaRefuerzo()
+                || c.getCalificacionCualitativa() == com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa.B)
             .filter(
                 c ->
                     actor.tieneRol("DIRECCION")

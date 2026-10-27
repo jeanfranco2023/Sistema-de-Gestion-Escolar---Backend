@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaEstudianteRepository extends JpaRepository<EstudianteEntity, Long> {
+  @Query("select e from EstudianteEntity e where e.id in :ids order by e.id")
+  List<EstudianteEntity> buscarPorIds(@Param("ids") Collection<Long> ids);
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select e from EstudianteEntity e where e.id = :id")
   Optional<EstudianteEntity> bloquearPorId(@Param("id") Long id);

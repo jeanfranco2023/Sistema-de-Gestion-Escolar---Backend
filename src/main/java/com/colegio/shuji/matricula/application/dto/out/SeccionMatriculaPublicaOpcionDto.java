@@ -6,4 +6,6 @@ public record SeccionMatriculaPublicaOpcionDto(
     String nivel,
     String grado,
     String letra,
-    int vacantesDisponibles) {}
+    int vacantesDisponibles,
+    int edadMinimaAlCorte,
+    int edadMaximaAlCorte) {}

@@ -115,6 +115,10 @@ public class SolicitudMatriculaPublicaController {
         var identidad = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
             ? com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE
             : identidades.verificar(declarados.nombres(), declarados.dni());
+        if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
+            && identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE) {
+          identidad = identidades.verificar(declarados.progenitor().nombres(), declarados.progenitor().dni());
+        }
         if (tipo != TipoDocumentoSolicitud.RECIBO_SERVICIO) {
           dniApiCoincide = identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE
               ? null : identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE;
@@ -128,7 +132,7 @@ public class SolicitudMatriculaPublicaController {
           resultado = new GeminiDocumentoMatriculaPort.Resultado(true, true, false,
               "El DNI y los nombres declarados no coinciden con la API de identidad.", false);
         } else {
-          resultado = gemini.validar(tipo, bytes, mimeType, declarados.nombres(), declarados.dni());
+          resultado = gemini.validar(tipo, bytes, mimeType, declarados.nombres(), declarados.dni(), declarados.progenitor());
         }
       } catch (ResponseStatusException ex) {
         if (!ex.getStatusCode().is5xxServerError()) throw ex;
@@ -232,20 +236,16 @@ public class SolicitudMatriculaPublicaController {
 
   private String detectarMime(byte[] bytes) {
     if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F' && bytes[4] == '-') {
-      return MediaType.APPLICATION_PDF_VALUE;
+      try (var pdf = org.apache.pdfbox.Loader.loadPDF(bytes)) {
+        if (pdf.isEncrypted() || pdf.getNumberOfPages() == 0) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adjunta un PDF legible, con páginas y sin contraseña");
+        }
+        return MediaType.APPLICATION_PDF_VALUE;
+      } catch (IOException ex) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo no es un PDF válido o está protegido");
+      }
     }
-    if (bytes.length >= 3 && (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff) {
-      return MediaType.IMAGE_JPEG_VALUE;
-    }
-    if (bytes.length >= 8 && (bytes[0] & 0xff) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G'
-        && bytes[4] == 13 && bytes[5] == 10 && bytes[6] == 26 && bytes[7] == 10) {
-      return MediaType.IMAGE_PNG_VALUE;
-    }
-    if (bytes.length >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
-        && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
-      return "image/webp";
-    }
-    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato no permitido. Usa PDF, JPG, PNG o WebP");
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los tres documentos deben ser PDF; no se admiten imágenes");
   }
 
   public record ConfirmarPagoPublicoRequest(@NotBlank String paymentId) {}

@@ -1,0 +1,1010 @@
+// COLEGIO SHUJI KITAMURA — DBML V23 (2026-10-26)
+// Pegar TODO este archivo en el editor DBML de dbdiagram.io.
+// 38 tablas; 324 atributos; incluye versiones documentales y el medio PagoEfectivo/CIP.
+// El SQL definitivo conserva funciones, triggers, RLS y catálogos; este archivo representa el modelo.
+
+Project ColegioShujiKitamura {
+  database_type: 'PostgreSQL'
+  Note: 'Modelo V23. Tablas ordenadas por módulos, del contexto institucional a los procesos.'
+}
+
+// ============================================================
+// UsuariosYSeguridad
+// ============================================================
+
+Table roles {
+  id smallint [pk, not null, increment]
+  codigo_rol varchar(20) [not null]
+  nombre_rol varchar(30) [not null]
+
+  indexes {
+    codigo_rol [unique, name: 'roles_codigo_key']
+  }
+}
+
+Table usuarios {
+  id bigint [pk, not null, increment]
+  nombre_usuario varchar(30) [not null]
+  correo_electronico varchar(50) [not null]
+  usuario_password varchar(60) [not null]
+  activo boolean [not null, default: true]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  fecha_actualizacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    correo_electronico [unique, name: 'usuarios_email_key']
+    nombre_usuario [unique, name: 'usuarios_username_key']
+  }
+}
+
+Table usuario_roles {
+  usuario_id bigint [not null]
+  rol_id smallint [not null]
+
+  indexes {
+    (usuario_id, rol_id) [pk, name: 'usuario_roles_pkey']
+    rol_id [name: 'idx_usuario_roles_rol_id', type: btree]
+  }
+}
+
+Table sesiones {
+  id bigint [pk, not null, increment]
+  usuario_id bigint [not null]
+  huella_token varchar(64) [not null]
+  direccion_ip inet [null]
+  agente_usuario text [null]
+  fecha_expiracion timestamptz [not null]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    usuario_id [name: 'idx_sesiones_usuario', type: btree]
+  }
+}
+
+Table auditoria_cambios {
+  id bigint [pk, not null, increment]
+  tabla_afectada varchar(50) [not null]
+  registro_id bigint [not null]
+  accion varchar(10) [not null]
+  datos_anteriores jsonb [null]
+  datos_nuevos jsonb [null]
+  usuario_id bigint [null]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    usuario_id [name: 'idx_auditoria_cambios_usuario_id', type: btree]
+  }
+
+  checks {
+    `((accion)::text = ANY ((ARRAY['INSERT'::character varying, 'UPDATE'::character varying, 'DELETE'::character varying])::text[]))` [name: 'auditoria_cambios_accion_check']
+  }
+}
+
+// ============================================================
+// OrganizacionAcademica
+// ============================================================
+
+Table anios_lectivos {
+  id smallint [pk, not null, increment]
+  anio smallint [not null]
+  fecha_inicio date [not null]
+  fecha_fin date [not null]
+  abierto boolean [not null, default: true]
+
+  indexes {
+    anio [unique, name: 'anios_lectivos_anio_key']
+  }
+
+  checks {
+    `(anio >= 2024)` [name: 'anios_lectivos_anio_check']
+    `(fecha_fin > fecha_inicio)` [name: 'anios_lectivos_check']
+  }
+}
+
+Table niveles {
+  id smallint [pk, not null, increment]
+  codigo_nivel varchar(20) [not null]
+  nombre_nivel varchar(30) [not null]
+
+  indexes {
+    codigo_nivel [unique, name: 'niveles_codigo_key']
+  }
+
+  checks {
+    `((codigo_nivel)::text = ANY ((ARRAY['INICIAL'::character varying, 'PRIMARIA'::character varying, 'SECUNDARIA'::character varying])::text[]))` [name: 'niveles_codigo_check']
+  }
+}
+
+Table grados {
+  id smallint [pk, not null, increment]
+  nivel_id smallint [not null]
+  numero_grado smallint [not null]
+  nombre_grado varchar(30) [not null]
+
+  indexes {
+    (id, nivel_id) [unique, name: 'grados_id_nivel_id_key']
+    (nivel_id, numero_grado) [unique, name: 'grados_nivel_id_numero_grado_key']
+  }
+
+  checks {
+    `((numero_grado >= 1) AND (numero_grado <= 6))` [name: 'grados_numero_grado_check']
+  }
+}
+
+Table aulas {
+  id integer [pk, not null, increment]
+  codigo_aula varchar(30) [not null]
+  nombre_aula varchar(40) [not null]
+  ubicacion varchar(60) [null]
+  capacidad smallint [not null]
+  activa boolean [not null, default: true]
+
+  indexes {
+    codigo_aula [unique, name: 'aulas_codigo_key']
+    `upper((codigo_aula)::text)` [name: 'uq_aulas_codigo_normalizado', type: btree, unique]
+  }
+
+  checks {
+    `(capacidad > 0)` [name: 'aulas_capacidad_check']
+    `((codigo_aula)::text = btrim((codigo_aula)::text))` [name: 'chk_aulas_codigo_sin_espacios_externos']
+  }
+}
+
+Table periodos_academicos {
+  id smallint [pk, not null, increment]
+  anio_lectivo_id smallint [not null]
+  numero_periodo smallint [not null]
+  nombre_periodo varchar(30) [not null]
+  fecha_inicio date [not null]
+  fecha_fin date [not null]
+  cerrado boolean [not null, default: false]
+  activo boolean [not null, default: true]
+
+  indexes {
+    (anio_lectivo_id, numero_periodo) [unique, name: 'periodos_academicos_anio_lectivo_id_numero_periodo_key']
+    (id, anio_lectivo_id) [unique, name: 'periodos_academicos_id_anio_lectivo_id_key']
+  }
+
+  checks {
+    `(fecha_fin > fecha_inicio)` [name: 'periodos_academicos_check']
+    `((numero_periodo >= 1) AND (numero_periodo <= 4))` [name: 'periodos_academicos_numero_periodo_check']
+  }
+}
+
+Table secciones {
+  id integer [pk, not null, increment]
+  anio_lectivo_id smallint [not null]
+  grado_id smallint [not null]
+  nivel_id smallint [not null]
+  letra char(1) [not null]
+  cupo_maximo smallint [not null]
+  vacantes_ocupadas smallint [not null, default: 0]
+  aula_id integer [not null]
+
+  indexes {
+    (anio_lectivo_id, grado_id, letra) [unique, name: 'secciones_anio_lectivo_id_grado_id_letra_key']
+    (id, anio_lectivo_id) [unique, name: 'secciones_id_anio_lectivo_id_key']
+    (id, anio_lectivo_id, nivel_id) [unique, name: 'secciones_id_anio_lectivo_id_nivel_id_key']
+    aula_id [name: 'idx_secciones_aula_id', type: btree]
+    (grado_id, nivel_id) [name: 'idx_secciones_grado_nivel', type: btree]
+    (anio_lectivo_id, aula_id) [name: 'uq_secciones_anio_aula_id', type: btree, unique]
+  }
+
+  checks {
+    `((vacantes_ocupadas >= 0) AND (vacantes_ocupadas <= cupo_maximo))` [name: 'secciones_check']
+    `(cupo_maximo > 0)` [name: 'secciones_cupo_maximo_check']
+    `(letra ~ '^[A-Z]$'::text)` [name: 'secciones_letra_check']
+  }
+}
+
+Table bloques_horarios {
+  id smallint [pk, not null, increment]
+  numero_bloque smallint [not null]
+  hora_inicio time [not null]
+  hora_fin time [not null]
+  es_recreo boolean [not null, default: false]
+
+  indexes {
+    numero_bloque [unique, name: 'bloques_horarios_numero_bloque_key']
+  }
+
+  checks {
+    `(hora_fin > hora_inicio)` [name: 'bloques_horarios_check']
+  }
+}
+
+Table horarios_seccion {
+  id bigint [pk, not null, increment]
+  anio_lectivo_id smallint [not null]
+  seccion_id integer [not null]
+  docente_usuario_id bigint [not null]
+  asignacion_docente_id bigint [not null]
+  dia_semana smallint [not null]
+  bloque_horario_id smallint [not null]
+
+  indexes {
+    (docente_usuario_id, dia_semana, bloque_horario_id, anio_lectivo_id) [unique, name: 'horarios_seccion_docente_usuario_id_dia_semana_bloque_horar_key']
+    (seccion_id, dia_semana, bloque_horario_id, anio_lectivo_id) [unique, name: 'horarios_seccion_seccion_id_dia_semana_bloque_horario_id_an_key']
+    anio_lectivo_id [name: 'idx_horarios_anio_lectivo_id', type: btree]
+    asignacion_docente_id [name: 'idx_horarios_asignacion', type: btree]
+    bloque_horario_id [name: 'idx_horarios_bloque', type: btree]
+    (docente_usuario_id, dia_semana) [name: 'idx_horarios_docente', type: btree]
+  }
+
+  checks {
+    `((dia_semana >= 1) AND (dia_semana <= 5))` [name: 'horarios_seccion_dia_semana_check']
+  }
+}
+
+// ============================================================
+// CurriculoYDocencia
+// ============================================================
+
+Table areas_curriculares {
+  id smallint [pk, not null, increment]
+  nivel_id smallint [not null]
+  codigo_area varchar(20) [not null]
+  nombre_area varchar(60) [not null]
+
+  indexes {
+    (id, nivel_id) [unique, name: 'areas_curriculares_id_nivel_id_key']
+    (nivel_id, codigo_area) [unique, name: 'areas_curriculares_nivel_id_codigo_key']
+  }
+}
+
+Table competencias {
+  id smallint [pk, not null, increment]
+  area_id smallint [not null]
+  numero_orden smallint [not null]
+  nombre_competencia varchar(50) [not null]
+  descripcion text [null]
+
+  indexes {
+    (id, area_id) [unique, name: 'competencias_id_area_id_key']
+    area_id [name: 'idx_competencias_area', type: btree]
+  }
+
+  checks {
+    `(char_length(descripcion) <= 4000)` [name: 'chk_competencias_descripcion_longitud']
+    `(numero_orden > 0)` [name: 'competencias_numero_orden_check']
+  }
+}
+
+Table asignaciones_docentes {
+  id bigint [pk, not null, increment]
+  docente_usuario_id bigint [not null]
+  seccion_id integer [not null]
+  anio_lectivo_id smallint [not null]
+  nivel_id smallint [not null]
+  area_curricular_id smallint [not null]
+
+  indexes {
+    (id, anio_lectivo_id, seccion_id, docente_usuario_id) [unique, name: 'asignaciones_docentes_id_anio_lectivo_id_seccion_id_docente_key']
+    (id, seccion_id, area_curricular_id, anio_lectivo_id, docente_usuario_id) [unique, name: 'asignaciones_docentes_id_seccion_id_area_curricular_id_anio_key']
+    (seccion_id, area_curricular_id, anio_lectivo_id) [unique, name: 'asignaciones_docentes_seccion_id_area_curricular_id_anio_le_key']
+    (area_curricular_id, nivel_id) [name: 'idx_asignaciones_area_nivel', type: btree]
+    docente_usuario_id [name: 'idx_asignaciones_docente', type: btree]
+    seccion_id [name: 'idx_asignaciones_seccion', type: btree]
+  }
+}
+
+// ============================================================
+// MatriculaYFamilia
+// ============================================================
+
+Table estudiantes {
+  id bigint [pk, not null, increment]
+  tipo_documento varchar(3) [not null, default: `'DNI'::character varying`]
+  numero_documento varchar(8) [not null]
+  nombres_estudiante varchar(20) [not null]
+  apellido_paterno_estudiante varchar(20) [not null]
+  apellido_materno_estudiante varchar(20) [not null]
+  fecha_nacimiento date [not null]
+  genero char(1) [not null]
+  codigo_estudiante_siagie varchar(14) [null]
+  validado_reniec boolean [not null, default: false]
+  origen_registro varchar(20) [not null, default: `'RENIEC_API'::character varying`]
+  grupo_sanguineo varchar(5) [null]
+  alergias_condiciones text [null]
+  activo boolean [not null, default: true]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    codigo_estudiante_siagie [unique, name: 'estudiantes_codigo_estudiante_siagie_key']
+    (tipo_documento, numero_documento) [unique, name: 'estudiantes_tipo_documento_numero_documento_key']
+    (apellido_paterno_estudiante, apellido_materno_estudiante) [name: 'idx_estudiantes_apellidos', type: btree]
+  }
+
+  checks {
+    `(((tipo_documento)::text <> 'DNI'::text) OR ((numero_documento)::text ~ '^[0-9]{8}$'::text))` [name: 'chk_estudiantes_dni_8_digitos']
+    `(char_length(alergias_condiciones) <= 4000)` [name: 'chk_estudiantes_salud_longitud']
+    `(genero = ANY (ARRAY['M'::bpchar, 'F'::bpchar]))` [name: 'estudiantes_genero_check']
+    `((origen_registro)::text = ANY ((ARRAY['RENIEC_API'::character varying, 'MANUAL_CONTINGENCIA'::character varying])::text[]))` [name: 'estudiantes_origen_registro_check']
+    `((tipo_documento)::text = ANY ((ARRAY['DNI'::character varying])::text[]))` [name: 'estudiantes_tipo_documento_check']
+  }
+}
+
+Table apoderados {
+  id bigint [pk, not null, increment]
+  usuario_id bigint [null]
+  tipo_documento varchar(3) [not null, default: `'DNI'::character varying`]
+  numero_documento varchar(8) [not null]
+  nombres_apoderado varchar(20) [not null]
+  apellido_paterno_apoderado varchar(20) [not null]
+  apellido_materno_apoderado varchar(20) [not null]
+  celular varchar(9) [not null]
+  correo_electronico varchar(50) [null]
+  direccion varchar(150) [not null]
+  ubigeo_inei varchar(6) [not null]
+  validado_reniec boolean [not null, default: false]
+  origen_registro varchar(20) [not null, default: `'RENIEC_API'::character varying`]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (tipo_documento, numero_documento) [unique, name: 'apoderados_tipo_documento_numero_documento_key']
+    usuario_id [unique, name: 'apoderados_usuario_id_key']
+  }
+
+  checks {
+    `((celular)::text ~ '^9[0-9]{8}$'::text)` [name: 'apoderados_celular_check']
+    `((origen_registro)::text = ANY ((ARRAY['RENIEC_API'::character varying, 'MANUAL_CONTINGENCIA'::character varying])::text[]))` [name: 'apoderados_origen_registro_check']
+    `((tipo_documento)::text = ANY ((ARRAY['DNI'::character varying])::text[]))` [name: 'apoderados_tipo_documento_check']
+    `((ubigeo_inei)::text ~ '^[0-9]{6}$'::text)` [name: 'apoderados_ubigeo_inei_check']
+    `(((tipo_documento)::text <> 'DNI'::text) OR ((numero_documento)::text ~ '^[0-9]{8}$'::text))` [name: 'chk_apoderados_dni_8_digitos']
+  }
+}
+
+Table estudiante_apoderados {
+  id bigint [pk, not null, increment]
+  estudiante_id bigint [not null]
+  apoderado_id bigint [not null]
+  parentesco varchar(30) [not null]
+  es_responsable_economico boolean [not null, default: false]
+  tiene_custodia boolean [not null, default: true]
+  permite_recojo boolean [not null, default: true]
+
+  indexes {
+    (estudiante_id, apoderado_id) [unique, name: 'estudiante_apoderados_estudiante_id_apoderado_id_key']
+    apoderado_id [name: 'idx_estudiante_apoderados_apod', type: btree]
+  }
+
+  checks {
+    `((parentesco)::text = ANY ((ARRAY['PADRE'::character varying, 'MADRE'::character varying, 'TUTOR_LEGAL'::character varying, 'ABUELO_A'::character varying, 'OTRO'::character varying])::text[]))` [name: 'estudiante_apoderados_parentesco_check']
+  }
+}
+
+Table matriculas {
+  id bigint [pk, not null, increment]
+  anio_lectivo_id smallint [not null]
+  estudiante_id bigint [not null]
+  seccion_id integer [not null]
+  fecha_matricula timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  estado_matricula varchar(25) [not null, default: `'SOLICITADA'::character varying`]
+  fecha_expiracion_reserva timestamptz [null]
+  observaciones text [null]
+
+  indexes {
+    (anio_lectivo_id, estudiante_id) [unique, name: 'matriculas_anio_lectivo_id_estudiante_id_key']
+    (id, anio_lectivo_id) [unique, name: 'matriculas_id_anio_lectivo_id_key']
+    (id, anio_lectivo_id, seccion_id) [unique, name: 'matriculas_id_anio_lectivo_id_seccion_id_key']
+    estudiante_id [name: 'idx_matriculas_estudiante_id', type: btree]
+    (seccion_id, estado_matricula) [name: 'idx_matriculas_seccion', type: btree]
+  }
+
+  checks {
+    `(char_length(observaciones) <= 500)` [name: 'chk_matriculas_observaciones_longitud']
+    `(((estado_matricula)::text <> 'RESERVADA_TEMPORAL'::text) OR (fecha_expiracion_reserva IS NOT NULL))` [name: 'matriculas_check']
+    `((estado_matricula)::text = ANY ((ARRAY['SOLICITADA'::character varying, 'RESERVADA_TEMPORAL'::character varying, 'MATRICULADO'::character varying, 'TRASLADADO'::character varying, 'RETIRADO'::character varying, 'CANCELADA'::character varying])::text[]))` [name: 'matriculas_estado_matricula_check']
+  }
+}
+
+Table solicitudes_matricula_publica {
+  id uuid [pk, not null]
+  huella_token varchar(64) [not null]
+  estado varchar(30) [not null]
+  anio_lectivo_id smallint [not null]
+  seccion_id integer [not null]
+  numero_documento_estudiante varchar(8) [not null]
+  nombres_estudiante varchar(20) [not null]
+  apellido_paterno_estudiante varchar(20) [not null]
+  apellido_materno_estudiante varchar(20) [not null]
+  fecha_nacimiento_estudiante date [not null]
+  genero_estudiante char(1) [not null]
+  numero_documento_apoderado varchar(8) [not null]
+  nombres_apoderado varchar(20) [not null]
+  apellido_paterno_apoderado varchar(20) [not null]
+  apellido_materno_apoderado varchar(20) [not null]
+  celular_apoderado varchar(9) [not null]
+  correo_apoderado varchar(50) [null]
+  direccion_apoderado varchar(150) [not null]
+  ubigeo_apoderado varchar(6) [not null]
+  parentesco varchar(30) [not null]
+  consentimiento_gemini boolean [not null]
+  estado_partida varchar(15) [not null, default: `'PENDIENTE'::character varying`]
+  observacion_partida varchar(500) [null]
+  estado_dni_c4 varchar(15) [not null, default: `'PENDIENTE'::character varying`]
+  observacion_dni_c4 varchar(500) [null]
+  estado_recibo varchar(15) [not null, default: `'PENDIENTE'::character varying`]
+  observacion_recibo varchar(500) [null]
+  pago_preferencia_id varchar(100) [null]
+  pago_enlace varchar(1000) [null]
+  pago_id varchar(100) [null]
+  pago_monto numeric(10,2) [not null, default: 350.00]
+  fecha_expiracion_pago timestamptz [null]
+  vacante_reservada boolean [not null, default: false]
+  estudiante_id bigint [null]
+  apoderado_id bigint [null]
+  matricula_id bigint [null]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  fecha_actualizacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  version bigint [not null, default: 0]
+  comprobante_pago_codigo varchar(40) [null]
+  fecha_emision_documentos timestamptz [null]
+
+  indexes {
+    huella_token [unique, name: 'solicitudes_matricula_publica_token_hash_key']
+    anio_lectivo_id [name: 'idx_solicitudes_matricula_anio', type: btree]
+    apoderado_id [name: 'idx_solicitudes_matricula_apoderado', type: btree, note: 'Índice parcial: WHERE (apoderado_id IS NOT NULL)']
+    `estado, fecha_creacion DESC` [name: 'idx_solicitudes_matricula_estado_fecha', type: btree]
+    estudiante_id [name: 'idx_solicitudes_matricula_estudiante', type: btree, note: 'Índice parcial: WHERE (estudiante_id IS NOT NULL)']
+    matricula_id [name: 'idx_solicitudes_matricula_matricula', type: btree, note: 'Índice parcial: WHERE (matricula_id IS NOT NULL)']
+    fecha_expiracion_pago [name: 'idx_solicitudes_matricula_reservas', type: btree, note: 'Índice parcial: WHERE (vacante_reservada IS TRUE)']
+    (seccion_id, anio_lectivo_id) [name: 'idx_solicitudes_matricula_seccion_anio', type: btree]
+    comprobante_pago_codigo [name: 'uq_solicitud_matricula_comprobante', type: btree, unique, note: 'Índice parcial: WHERE (comprobante_pago_codigo IS NOT NULL)']
+    numero_documento_estudiante [name: 'uq_solicitud_matricula_dni_activa', type: btree, unique, note: 'Índice parcial: WHERE (estado NOT IN (\'MATRICULADA\', \'RECHAZADA\'))']
+  }
+
+  checks {
+    `(((estado)::text <> 'MATRICULADA'::text) OR (comprobante_pago_codigo IS NOT NULL))` [name: 'chk_solicitud_matricula_comprobante_confirmada']
+    `((comprobante_pago_codigo IS NULL) = (fecha_emision_documentos IS NULL))` [name: 'chk_solicitud_matricula_documentos_emitidos']
+    `(pago_monto > (0)::numeric)` [name: 'chk_solicitudes_matricula_pago_monto_positivo']
+    `((celular_apoderado)::text ~ '^9[0-9]{8}$'::text)` [name: 'solicitudes_matricula_publica_celular_apoderado_check']
+    `((NOT vacante_reservada) OR (fecha_expiracion_pago IS NOT NULL))` [name: 'solicitudes_matricula_publica_check']
+    `(((estado)::text <> 'MATRICULADA'::text) OR ((estudiante_id IS NOT NULL) AND (apoderado_id IS NOT NULL) AND (matricula_id IS NOT NULL) AND (pago_id IS NOT NULL)))` [name: 'solicitudes_matricula_publica_check1']
+    `(consentimiento_gemini IS TRUE)` [name: 'solicitudes_matricula_publica_consentimiento_gemini_check']
+    `((estado)::text = ANY ((ARRAY['DOCUMENTOS_PENDIENTES'::character varying, 'DOCUMENTOS_EN_VALIDACION'::character varying, 'DOCUMENTOS_OBSERVADOS'::character varying, 'DOCUMENTOS_VALIDADOS'::character varying, 'PAGO_PENDIENTE'::character varying, 'MATRICULADA'::character varying, 'RECHAZADA'::character varying])::text[]))` [name: 'solicitudes_matricula_publica_estado_check']
+    `((estado_dni_c4)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'EN_VALIDACION'::character varying, 'VALIDADO'::character varying, 'OBSERVADO'::character varying])::text[]))` [name: 'solicitudes_matricula_publica_estado_dni_c4_check']
+    `((estado_partida)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'EN_VALIDACION'::character varying, 'VALIDADO'::character varying, 'OBSERVADO'::character varying])::text[]))` [name: 'solicitudes_matricula_publica_estado_partida_check']
+    `((estado_recibo)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'EN_VALIDACION'::character varying, 'VALIDADO'::character varying, 'OBSERVADO'::character varying])::text[]))` [name: 'solicitudes_matricula_publica_estado_recibo_check']
+    `(genero_estudiante = ANY (ARRAY['M'::bpchar, 'F'::bpchar]))` [name: 'solicitudes_matricula_publica_genero_estudiante_check']
+    `((numero_documento_apoderado)::text ~ '^[0-9]{8}$'::text)` [name: 'solicitudes_matricula_publica_numero_documento_apoderado_check']
+    `((numero_documento_estudiante)::text ~ '^[0-9]{8}$'::text)` [name: 'solicitudes_matricula_publica_numero_documento_estudiante_check']
+    `((parentesco)::text = ANY ((ARRAY['PADRE'::character varying, 'MADRE'::character varying, 'TUTOR_LEGAL'::character varying, 'ABUELO_A'::character varying, 'OTRO'::character varying])::text[]))` [name: 'solicitudes_matricula_publica_parentesco_check']
+    `((ubigeo_apoderado)::text ~ '^[0-9]{6}$'::text)` [name: 'solicitudes_matricula_publica_ubigeo_apoderado_check']
+  }
+}
+
+Table solicitudes_matricula_documentos {
+  version_id uuid [not null]
+  solicitud_id uuid [not null]
+  tipo varchar(30) [not null]
+  contenedor varchar(100) [not null]
+  ruta_objeto varchar(500) [not null]
+  tipo_contenido varchar(30) [not null]
+  tamano_bytes bigint [not null]
+  huella_sha256 char(64) [not null]
+  fecha_actualizacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (contenedor, ruta_objeto) [unique, name: 'solicitudes_matricula_documentos_bucket_object_key_key']
+    (solicitud_id, tipo) [pk, name: 'solicitudes_matricula_documentos_pkey']
+  }
+
+  checks {
+    `((tipo_contenido)::text = ANY (ARRAY[('application/pdf'::character varying)::text, ('image/jpeg'::character varying)::text, ('image/png'::character varying)::text, ('image/webp'::character varying)::text]))` [name: 'solicitudes_matricula_documentos_mime_type_check']
+    `((tamano_bytes >= 1) AND (tamano_bytes <= 5242880))` [name: 'solicitudes_matricula_documentos_tamano_bytes_check']
+    `((tipo)::text = ANY ((ARRAY['PARTIDA_NACIMIENTO'::character varying, 'DNI_C4'::character varying, 'RECIBO_SERVICIO'::character varying])::text[]))` [name: 'solicitudes_matricula_documentos_tipo_check']
+  }
+}
+
+// ============================================================
+// EvaluacionYRefuerzo
+// ============================================================
+
+Table calificaciones_cneb {
+  id bigint [pk, not null, increment]
+  matricula_id bigint [not null]
+  anio_lectivo_id smallint [not null]
+  seccion_id integer [not null]
+  periodo_academico_id smallint [not null]
+  asignacion_docente_id bigint [not null]
+  area_curricular_id smallint [not null]
+  docente_usuario_id bigint [not null]
+  competencia_id smallint [not null]
+  calificacion_cualitativa varchar(2) [not null]
+  conclusion_descriptiva text [null]
+  sugerencia_ia_utilizada boolean [not null, default: false]
+  requiere_refuerzo boolean [null, note: 'Calculado por PostgreSQL; no se modifica manualmente.']
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  fecha_actualizacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (matricula_id, competencia_id, periodo_academico_id) [unique, name: 'calificaciones_cneb_matricula_id_competencia_id_periodo_aca_key']
+    (asignacion_docente_id, periodo_academico_id) [name: 'idx_calificaciones_asignacion_periodo', type: btree]
+    competencia_id [name: 'idx_calificaciones_competencia', type: btree]
+    docente_usuario_id [name: 'idx_calificaciones_docente', type: btree]
+    periodo_academico_id [name: 'idx_calificaciones_periodo', type: btree]
+    (periodo_academico_id, requiere_refuerzo) [name: 'idx_calificaciones_refuerzo', type: btree, note: 'Índice parcial: WHERE (requiere_refuerzo = true)']
+  }
+
+  checks {
+    `((calificacion_cualitativa)::text = ANY ((ARRAY['AD'::character varying, 'A'::character varying, 'B'::character varying, 'C'::character varying])::text[]))` [name: 'calificaciones_cneb_calificacion_cualitativa_check']
+    `(char_length(conclusion_descriptiva) <= 4000)` [name: 'chk_calificaciones_conclusion_longitud']
+  }
+}
+
+Table sesiones_refuerzo {
+  id bigint [pk, not null, increment]
+  anio_lectivo_id smallint [not null]
+  periodo_academico_id smallint [not null]
+  area_curricular_id smallint [not null]
+  docente_usuario_id bigint [not null]
+  tema_refuerzo varchar(40) [not null]
+  fecha_programada date [not null]
+  hora_inicio time [not null]
+  hora_fin time [not null]
+  codigo_aula varchar(30) [null]
+
+  indexes {
+    area_curricular_id [name: 'idx_sesiones_refuerzo_area', type: btree]
+    codigo_aula [name: 'idx_sesiones_refuerzo_aula_asignada', type: btree]
+    docente_usuario_id [name: 'idx_sesiones_refuerzo_docente_id', type: btree]
+    periodo_academico_id [name: 'idx_sesiones_refuerzo_periodo', type: btree]
+  }
+
+  checks {
+    `(hora_fin > hora_inicio)` [name: 'sesiones_refuerzo_check']
+  }
+}
+
+Table inscripciones_refuerzo {
+  id bigint [pk, not null, increment]
+  sesion_refuerzo_id bigint [not null]
+  estudiante_id bigint [not null]
+  calificacion_origen_id bigint [null]
+  estado_asistencia varchar(20) [not null, default: `'PENDIENTE'::character varying`]
+  observaciones text [null]
+
+  indexes {
+    (sesion_refuerzo_id, estudiante_id) [unique, name: 'inscripciones_refuerzo_sesion_refuerzo_id_estudiante_id_key']
+    calificacion_origen_id [name: 'idx_inscripciones_calificacion_origen_id', type: btree]
+    estudiante_id [name: 'idx_inscripciones_refuerzo_est', type: btree]
+  }
+
+  checks {
+    `(char_length(observaciones) <= 500)` [name: 'chk_refuerzo_observaciones_longitud']
+    `((estado_asistencia)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'ASISTIO'::character varying, 'FALTO'::character varying, 'JUSTIFICADO'::character varying])::text[]))` [name: 'inscripciones_refuerzo_estado_asistencia_check']
+  }
+}
+
+// ============================================================
+// Asistencia
+// ============================================================
+
+Table lotes_biometrico {
+  id bigint [pk, not null, increment]
+  nombre_archivo varchar(150) [not null]
+  total_filas integer [not null]
+  marcas_validas integer [not null]
+  marcas_erroneas integer [not null]
+  importado_por_usuario_id bigint [null]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  huella_contenido varchar(64) [not null]
+
+  indexes {
+    huella_contenido [unique, name: 'uq_lotes_biometrico_hash_contenido']
+    importado_por_usuario_id [name: 'idx_lotes_biometrico_importado_por', type: btree]
+  }
+
+  checks {
+    `(marcas_erroneas >= 0)` [name: 'lotes_biometrico_marcas_erroneas_check']
+    `(marcas_validas >= 0)` [name: 'lotes_biometrico_marcas_validas_check']
+    `(total_filas >= 0)` [name: 'lotes_biometrico_total_filas_check']
+  }
+}
+
+Table marcas_biometrico_porteria {
+  id bigint [pk, not null, increment]
+  lote_id bigint [null]
+  dni_leido varchar(8) [not null]
+  fecha_hora timestamptz [not null]
+  dispositivo_codigo varchar(30) [not null, default: `'PORTERIA_01'::character varying`]
+  estudiante_id bigint [null]
+  estado_procesamiento varchar(25) [not null, default: `'PENDIENTE'::character varying`]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    lote_id [name: 'idx_marcas_lote', type: btree]
+    (dni_leido, fecha_hora) [name: 'idx_marcas_porteria_dni_fecha', type: btree]
+    dni_leido [name: 'idx_marcas_porteria_dni_leido', type: btree]
+    estudiante_id [name: 'idx_marcas_porteria_estudiante_id', type: btree]
+    fecha_hora [name: 'idx_marcas_porteria_fecha_hora', type: btree]
+    (dni_leido, fecha_hora, dispositivo_codigo) [name: 'uq_marcas_porteria_evento_valido', type: btree, unique, note: 'Índice parcial: WHERE ((estado_procesamiento)::text <> \'DUPLICADO\'::text)']
+  }
+
+  checks {
+    `((dni_leido)::text ~ '^[0-9]{8}$'::text)` [name: 'chk_marcas_porteria_dni_8_digitos']
+    `((estado_procesamiento)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'CONCILIADO'::character varying, 'DNI_NO_IDENTIFICADO'::character varying, 'DUPLICADO'::character varying])::text[]))` [name: 'marcas_biometrico_porteria_estado_procesamiento_check']
+  }
+}
+
+Table asistencias_aula {
+  id bigint [pk, not null, increment]
+  matricula_id bigint [not null]
+  fecha_sesion date [not null]
+  hora_registro time [not null]
+  estado varchar(25) [not null]
+  auxiliar_usuario_id bigint [null]
+  justificada boolean [not null, default: false]
+  motivo_justificacion text [null]
+  documento_sustento_url varchar(255) [null]
+
+  indexes {
+    (matricula_id, fecha_sesion) [unique, name: 'asistencias_aula_matricula_id_fecha_sesion_key']
+    auxiliar_usuario_id [name: 'idx_asistencias_aula_auxiliar_id', type: btree]
+  }
+
+  checks {
+    `((estado)::text = ANY ((ARRAY['PRESENTE'::character varying, 'TARDANZA'::character varying, 'FALTA_INJUSTIFICADA'::character varying, 'FALTA_JUSTIFICADA'::character varying])::text[]))` [name: 'asistencias_aula_estado_check']
+    `(char_length(motivo_justificacion) <= 4000)` [name: 'chk_asistencias_justificacion_longitud']
+  }
+}
+
+Table conciliaciones_asistencia {
+  id bigint [pk, not null, increment]
+  fecha date [not null]
+  estudiante_id bigint [not null]
+  marco_porteria boolean [not null]
+  presente_aula boolean [not null]
+  tipo_discrepancia varchar(35) [not null]
+  alerta_notificada boolean [not null, default: false]
+
+  indexes {
+    (fecha, estudiante_id) [unique, name: 'conciliaciones_asistencia_fecha_estudiante_id_key']
+    estudiante_id [name: 'idx_conciliaciones_estudiante_id', type: btree]
+  }
+
+  checks {
+    `((tipo_discrepancia)::text = ANY ((ARRAY['ASISTENCIA_CONCILIADA'::character varying, 'DISCREPANCIA_FUGA'::character varying, 'DISCREPANCIA_OMISION_PORTERIA'::character varying, 'PENDIENTE_CIERRE_TURNO'::character varying])::text[]))` [name: 'conciliaciones_asistencia_tipo_discrepancia_check']
+  }
+}
+
+// ============================================================
+// Comunicacion
+// ============================================================
+
+Table comunicados_oficiales {
+  id bigint [pk, not null, increment]
+  titulo_comunicado varchar(40) [not null]
+  contenido text [not null]
+  remitente_usuario_id bigint [not null]
+  fecha_publicacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  requiere_acuse boolean [not null, default: false]
+
+  indexes {
+    remitente_usuario_id [name: 'idx_comunicados_remitente', type: btree]
+  }
+
+  checks {
+    `(char_length(contenido) <= 20000)` [name: 'chk_comunicados_contenido_longitud']
+  }
+}
+
+Table comunicado_destinatarios {
+  id bigint [pk, not null, increment]
+  comunicado_id bigint [not null]
+  apoderado_id bigint [not null]
+  leido boolean [not null, default: false]
+  fecha_lectura timestamptz [null]
+  acuse_confirmado boolean [not null, default: false]
+  fecha_acuse timestamptz [null]
+
+  indexes {
+    (comunicado_id, apoderado_id) [unique, name: 'comunicado_destinatarios_comunicado_id_apoderado_id_key']
+    apoderado_id [name: 'idx_comunicado_dest_apod', type: btree]
+  }
+}
+
+// ============================================================
+// Convivencia
+// ============================================================
+
+Table incidencias_conductuales {
+  id bigint [pk, not null, increment]
+  matricula_id bigint [not null]
+  fecha_incidencia date [not null]
+  tipo_falta varchar(20) [not null]
+  descripcion text [not null]
+  reportado_por_usuario_id bigint [not null]
+  requiere_citacion boolean [not null, default: false]
+  estado varchar(20) [not null, default: `'ABIERTA'::character varying`]
+  fecha_creacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    matricula_id [name: 'idx_incidencias_matricula', type: btree]
+    reportado_por_usuario_id [name: 'idx_incidencias_reportado', type: btree]
+  }
+
+  checks {
+    `(char_length(descripcion) <= 10000)` [name: 'chk_incidencias_descripcion_longitud']
+    `((estado)::text = ANY ((ARRAY['ABIERTA'::character varying, 'ATENDIDA'::character varying, 'CERRADA'::character varying])::text[]))` [name: 'incidencias_conductuales_estado_check']
+    `((tipo_falta)::text = ANY ((ARRAY['LEVE'::character varying, 'GRAVE'::character varying, 'MUY_GRAVE'::character varying])::text[]))` [name: 'incidencias_conductuales_tipo_falta_check']
+  }
+}
+
+// ============================================================
+// Tesoreria
+// ============================================================
+
+Table conceptos_cobro {
+  id smallint [pk, not null, increment]
+  codigo_concepto varchar(30) [not null]
+  nombre_concepto varchar(50) [not null]
+  tipo_concepto varchar(20) [not null]
+  monto_sugerido numeric(10,2) [not null]
+
+  indexes {
+    codigo_concepto [unique, name: 'conceptos_cobro_codigo_key']
+    (id, tipo_concepto) [unique, name: 'conceptos_cobro_id_tipo_concepto_key']
+  }
+
+  checks {
+    `(monto_sugerido >= 0.00)` [name: 'conceptos_cobro_monto_sugerido_check']
+    `((tipo_concepto)::text = ANY ((ARRAY['MATRICULA'::character varying, 'PENSION'::character varying, 'CERTIFICADO'::character varying, 'OTRO'::character varying])::text[]))` [name: 'conceptos_cobro_tipo_concepto_check']
+  }
+}
+
+Table obligaciones_pago {
+  id bigint [pk, not null, increment]
+  matricula_id bigint [not null]
+  concepto_id smallint [not null]
+  tipo_concepto varchar(20) [not null]
+  numero_cuota smallint [not null]
+  descripcion varchar(150) [not null]
+  fecha_vencimiento date [not null]
+  monto_base numeric(10,2) [not null]
+  monto_mora numeric(10,2) [not null, default: 0.00]
+  monto_descuento numeric(10,2) [not null, default: 0.00]
+  total_pagado numeric(10,2) [not null, default: 0.00]
+  saldo_pendiente numeric(10,2) [null, note: 'Calculado por PostgreSQL; no se modifica manualmente.']
+  estado varchar(25) [not null, default: `'PENDIENTE'::character varying`]
+
+  indexes {
+    (matricula_id, concepto_id, numero_cuota) [unique, name: 'obligaciones_pago_matricula_id_concepto_id_numero_cuota_key']
+    concepto_id [name: 'idx_obligaciones_concepto', type: btree]
+    (estado, fecha_vencimiento) [name: 'idx_obligaciones_estado_venc', type: btree]
+    matricula_id [name: 'idx_obligaciones_matricula', type: btree]
+  }
+
+  checks {
+    `(total_pagado <= ((monto_base + monto_mora) - monto_descuento))` [name: 'obligaciones_pago_check']
+    `((((tipo_concepto)::text = 'MATRICULA'::text) AND (numero_cuota = 0)) OR (((tipo_concepto)::text = 'PENSION'::text) AND ((numero_cuota >= 1) AND (numero_cuota <= 10))) OR ((tipo_concepto)::text <> ALL ((ARRAY['MATRICULA'::character varying, 'PENSION'::character varying])::text[])))` [name: 'obligaciones_pago_check1']
+    `((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'PAGADO_TOTAL'::character varying, 'PAGADO_PARCIAL'::character varying, 'VENCIDO'::character varying, 'CANCELADO_POR_TRASLADO'::character varying])::text[]))` [name: 'obligaciones_pago_estado_check']
+    `(monto_base >= 0.00)` [name: 'obligaciones_pago_monto_base_check']
+    `(monto_descuento >= 0.00)` [name: 'obligaciones_pago_monto_descuento_check']
+    `(monto_mora >= 0.00)` [name: 'obligaciones_pago_monto_mora_check']
+    `((numero_cuota >= 0) AND (numero_cuota <= 10))` [name: 'obligaciones_pago_numero_cuota_check']
+    `(total_pagado >= 0.00)` [name: 'obligaciones_pago_total_pagado_check']
+  }
+}
+
+Table pagos_transacciones {
+  id bigint [pk, not null, increment]
+  obligacion_pago_id bigint [not null]
+  pasarela_proveedor varchar(30) [not null]
+  pasarela_transaccion_id varchar(100) [not null]
+  metodo_pago varchar(30) [not null]
+  monto_pagado numeric(10,2) [not null]
+  fecha_pago timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  estado_pago varchar(20) [not null, default: `'APROBADO'::character varying`]
+  payload_webhook jsonb [null]
+
+  indexes {
+    pasarela_transaccion_id [unique, name: 'pagos_transacciones_pasarela_transaccion_id_key']
+    obligacion_pago_id [name: 'idx_pagos_obligacion_id', type: btree]
+  }
+
+  checks {
+    `((estado_pago)::text = ANY ((ARRAY['APROBADO'::character varying, 'RECHAZADO'::character varying, 'REVERTIDO'::character varying])::text[]))` [name: 'pagos_transacciones_estado_pago_check']
+    `((metodo_pago)::text = ANY ((ARRAY['TARJETA_CREDITO'::character varying, 'TARJETA_DEBITO'::character varying, 'YAPE'::character varying, 'PLIN'::character varying, 'TRANSFERENCIA'::character varying, 'EFECTIVO'::character varying, 'PAGO_EFECTIVO'::character varying])::text[]))` [name: 'pagos_transacciones_metodo_pago_check']
+    `(monto_pagado > 0.00)` [name: 'pagos_transacciones_monto_pagado_check']
+    `((pasarela_proveedor)::text = ANY ((ARRAY['CULQI'::character varying, 'NIUBIZ'::character varying, 'MERCADO_PAGO'::character varying, 'CAJA_EFECTIVO'::character varying, 'TRANSFERENCIA'::character varying])::text[]))` [name: 'pagos_transacciones_pasarela_proveedor_check']
+  }
+}
+
+Table series_comprobante {
+  serie varchar(4) [pk, not null]
+  ultimo_correlativo integer [not null, default: 0]
+  fecha_actualizacion timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  checks {
+    `((serie)::text ~ '^[BE][0-9]{3}$'::text)` [name: 'series_comprobante_serie_check']
+    `(ultimo_correlativo >= 0)` [name: 'series_comprobante_ultimo_correlativo_check']
+  }
+}
+
+Table comprobantes_pago {
+  id bigint [pk, not null, increment]
+  pago_transaccion_id bigint [not null]
+  tipo_comprobante varchar(20) [not null, default: `'RECIBO_INTERNO'::character varying`]
+  serie varchar(4) [not null]
+  correlativo integer [not null]
+  fecha_emision timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  monto_total numeric(10,2) [not null]
+  estado_comprobante varchar(20) [not null, default: `'EMITIDO'::character varying`]
+  fecha_anulacion timestamptz [null]
+  motivo_anulacion varchar(255) [null]
+  url_pdf_comprobante varchar(255) [null]
+
+  indexes {
+    pago_transaccion_id [unique, name: 'comprobantes_pago_pago_transaccion_id_key']
+    (serie, correlativo) [unique, name: 'comprobantes_pago_serie_correlativo_key']
+  }
+
+  checks {
+    `((((estado_comprobante)::text = 'EMITIDO'::text) AND (fecha_anulacion IS NULL) AND (motivo_anulacion IS NULL)) OR (((estado_comprobante)::text = 'ANULADO'::text) AND (fecha_anulacion IS NOT NULL) AND (motivo_anulacion IS NOT NULL)))` [name: 'comprobantes_pago_check']
+    `(correlativo > 0)` [name: 'comprobantes_pago_correlativo_check']
+    `((estado_comprobante)::text = ANY ((ARRAY['EMITIDO'::character varying, 'ANULADO'::character varying])::text[]))` [name: 'comprobantes_pago_estado_comprobante_check']
+    `(monto_total > 0.00)` [name: 'comprobantes_pago_monto_total_check']
+    `((serie)::text ~ '^[BE][0-9]{3}$'::text)` [name: 'comprobantes_pago_serie_check']
+    `((tipo_comprobante)::text = ANY ((ARRAY['BOLETA'::character varying, 'RECIBO_INTERNO'::character varying])::text[]))` [name: 'comprobantes_pago_tipo_comprobante_check']
+  }
+}
+
+// RELACIONES: claves foráneas simples y compuestas del esquema real.
+
+Ref usuario_roles_rol_id_fkey: usuario_roles.rol_id > roles.id [update: no action, delete: restrict]
+Ref usuario_roles_usuario_id_fkey: usuario_roles.usuario_id > usuarios.id [update: no action, delete: cascade]
+Ref sesiones_usuario_id_fkey: sesiones.usuario_id > usuarios.id [update: no action, delete: cascade]
+Ref auditoria_cambios_usuario_id_fkey: auditoria_cambios.usuario_id > usuarios.id [update: no action, delete: set null]
+Ref grados_nivel_id_fkey: grados.nivel_id > niveles.id [update: no action, delete: restrict]
+Ref periodos_academicos_anio_lectivo_id_fkey: periodos_academicos.anio_lectivo_id > anios_lectivos.id [update: no action, delete: restrict]
+Ref fk_secciones_aula: secciones.aula_id > aulas.id [update: no action, delete: restrict]
+Ref secciones_anio_lectivo_id_fkey: secciones.anio_lectivo_id > anios_lectivos.id [update: no action, delete: restrict]
+Ref secciones_grado_id_nivel_id_fkey: secciones.(grado_id, nivel_id) > grados.(id, nivel_id) [update: no action, delete: restrict]
+Ref horarios_seccion_anio_lectivo_id_fkey: horarios_seccion.anio_lectivo_id > anios_lectivos.id [update: no action, delete: restrict]
+Ref horarios_seccion_asignacion_docente_id_anio_lectivo_id_sec_fkey: horarios_seccion.(asignacion_docente_id, anio_lectivo_id, seccion_id, docente_usuario_id) > asignaciones_docentes.(id, anio_lectivo_id, seccion_id, docente_usuario_id) [update: no action, delete: restrict]
+Ref horarios_seccion_bloque_horario_id_fkey: horarios_seccion.bloque_horario_id > bloques_horarios.id [update: no action, delete: restrict]
+Ref horarios_seccion_docente_usuario_id_fkey: horarios_seccion.docente_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref areas_curriculares_nivel_id_fkey: areas_curriculares.nivel_id > niveles.id [update: no action, delete: restrict]
+Ref fk_competencias_area_id: competencias.area_id > areas_curriculares.id [update: restrict, delete: restrict]
+Ref asignaciones_docentes_area_curricular_id_nivel_id_fkey: asignaciones_docentes.(area_curricular_id, nivel_id) > areas_curriculares.(id, nivel_id) [update: no action, delete: restrict]
+Ref asignaciones_docentes_docente_usuario_id_fkey: asignaciones_docentes.docente_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref asignaciones_docentes_seccion_id_anio_lectivo_id_nivel_id_fkey: asignaciones_docentes.(seccion_id, anio_lectivo_id, nivel_id) > secciones.(id, anio_lectivo_id, nivel_id) [update: no action, delete: restrict]
+Ref apoderados_usuario_id_fkey: usuarios.id - apoderados.usuario_id [update: no action, delete: set null]
+Ref estudiante_apoderados_apoderado_id_fkey: estudiante_apoderados.apoderado_id > apoderados.id [update: no action, delete: restrict]
+Ref estudiante_apoderados_estudiante_id_fkey: estudiante_apoderados.estudiante_id > estudiantes.id [update: no action, delete: restrict]
+Ref matriculas_estudiante_id_fkey: matriculas.estudiante_id > estudiantes.id [update: no action, delete: restrict]
+Ref matriculas_seccion_id_anio_lectivo_id_fkey: matriculas.(seccion_id, anio_lectivo_id) > secciones.(id, anio_lectivo_id) [update: no action, delete: restrict]
+Ref solicitudes_matricula_publica_anio_lectivo_id_fkey: solicitudes_matricula_publica.anio_lectivo_id > anios_lectivos.id [update: no action, delete: restrict]
+Ref solicitudes_matricula_publica_apoderado_id_fkey: solicitudes_matricula_publica.apoderado_id > apoderados.id [update: no action, delete: restrict]
+Ref solicitudes_matricula_publica_estudiante_id_fkey: solicitudes_matricula_publica.estudiante_id > estudiantes.id [update: no action, delete: restrict]
+Ref solicitudes_matricula_publica_matricula_id_fkey: solicitudes_matricula_publica.matricula_id > matriculas.id [update: no action, delete: restrict]
+Ref solicitudes_matricula_publica_seccion_id_anio_lectivo_id_fkey: solicitudes_matricula_publica.(seccion_id, anio_lectivo_id) > secciones.(id, anio_lectivo_id) [update: no action, delete: restrict]
+Ref fk_solicitudes_documentos_solicitud: solicitudes_matricula_documentos.solicitud_id > solicitudes_matricula_publica.id [update: restrict, delete: restrict]
+Ref calificaciones_cneb_asignacion_docente_id_seccion_id_area__fkey: calificaciones_cneb.(asignacion_docente_id, seccion_id, area_curricular_id, anio_lectivo_id, docente_usuario_id) > asignaciones_docentes.(id, seccion_id, area_curricular_id, anio_lectivo_id, docente_usuario_id) [update: no action, delete: restrict]
+Ref calificaciones_cneb_competencia_id_area_curricular_id_fkey: calificaciones_cneb.(competencia_id, area_curricular_id) > competencias.(id, area_id) [update: no action, delete: restrict]
+Ref calificaciones_cneb_matricula_id_anio_lectivo_id_seccion_i_fkey: calificaciones_cneb.(matricula_id, anio_lectivo_id, seccion_id) > matriculas.(id, anio_lectivo_id, seccion_id) [update: no action, delete: restrict]
+Ref calificaciones_cneb_periodo_academico_id_anio_lectivo_id_fkey: calificaciones_cneb.(periodo_academico_id, anio_lectivo_id) > periodos_academicos.(id, anio_lectivo_id) [update: no action, delete: restrict]
+Ref fk_sesiones_refuerzo_aula_codigo: sesiones_refuerzo.codigo_aula > aulas.codigo_aula [update: restrict, delete: restrict]
+Ref sesiones_refuerzo_area_curricular_id_fkey: sesiones_refuerzo.area_curricular_id > areas_curriculares.id [update: no action, delete: restrict]
+Ref sesiones_refuerzo_docente_usuario_id_fkey: sesiones_refuerzo.docente_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref sesiones_refuerzo_periodo_academico_id_anio_lectivo_id_fkey: sesiones_refuerzo.(periodo_academico_id, anio_lectivo_id) > periodos_academicos.(id, anio_lectivo_id) [update: no action, delete: restrict]
+Ref inscripciones_refuerzo_calificacion_origen_id_fkey: inscripciones_refuerzo.calificacion_origen_id > calificaciones_cneb.id [update: no action, delete: set null]
+Ref inscripciones_refuerzo_estudiante_id_fkey: inscripciones_refuerzo.estudiante_id > estudiantes.id [update: no action, delete: restrict]
+Ref inscripciones_refuerzo_sesion_refuerzo_id_fkey: inscripciones_refuerzo.sesion_refuerzo_id > sesiones_refuerzo.id [update: no action, delete: restrict]
+Ref lotes_biometrico_importado_por_usuario_id_fkey: lotes_biometrico.importado_por_usuario_id > usuarios.id [update: no action, delete: set null]
+Ref marcas_biometrico_porteria_estudiante_id_fkey: marcas_biometrico_porteria.estudiante_id > estudiantes.id [update: no action, delete: set null]
+Ref marcas_biometrico_porteria_lote_id_fkey: marcas_biometrico_porteria.lote_id > lotes_biometrico.id [update: no action, delete: set null]
+Ref asistencias_aula_auxiliar_usuario_id_fkey: asistencias_aula.auxiliar_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref asistencias_aula_matricula_id_fkey: asistencias_aula.matricula_id > matriculas.id [update: no action, delete: restrict]
+Ref conciliaciones_asistencia_estudiante_id_fkey: conciliaciones_asistencia.estudiante_id > estudiantes.id [update: no action, delete: restrict]
+Ref comunicados_oficiales_remitente_usuario_id_fkey: comunicados_oficiales.remitente_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref comunicado_destinatarios_apoderado_id_fkey: comunicado_destinatarios.apoderado_id > apoderados.id [update: no action, delete: restrict]
+Ref comunicado_destinatarios_comunicado_id_fkey: comunicado_destinatarios.comunicado_id > comunicados_oficiales.id [update: no action, delete: restrict]
+Ref incidencias_conductuales_matricula_id_fkey: incidencias_conductuales.matricula_id > matriculas.id [update: no action, delete: restrict]
+Ref incidencias_conductuales_reportado_por_usuario_id_fkey: incidencias_conductuales.reportado_por_usuario_id > usuarios.id [update: no action, delete: restrict]
+Ref obligaciones_pago_concepto_id_tipo_concepto_fkey: obligaciones_pago.(concepto_id, tipo_concepto) > conceptos_cobro.(id, tipo_concepto) [update: no action, delete: restrict]
+Ref obligaciones_pago_matricula_id_fkey: obligaciones_pago.matricula_id > matriculas.id [update: no action, delete: restrict]
+Ref pagos_transacciones_obligacion_pago_id_fkey: pagos_transacciones.obligacion_pago_id > obligaciones_pago.id [update: no action, delete: restrict]
+Ref comprobantes_pago_pago_transaccion_id_fkey: pagos_transacciones.id - comprobantes_pago.pago_transaccion_id [update: no action, delete: restrict]
+Ref fk_comprobantes_pago_serie: comprobantes_pago.serie > series_comprobante.serie [update: restrict, delete: restrict]
+
+// AGRUPACIÓN VISUAL POR MÓDULO.
+
+TableGroup UsuariosYSeguridad {
+  roles
+  usuarios
+  usuario_roles
+  sesiones
+  auditoria_cambios
+}
+
+TableGroup OrganizacionAcademica {
+  anios_lectivos
+  niveles
+  grados
+  aulas
+  periodos_academicos
+  secciones
+  bloques_horarios
+  horarios_seccion
+}
+
+TableGroup CurriculoYDocencia {
+  areas_curriculares
+  competencias
+  asignaciones_docentes
+}
+
+TableGroup MatriculaYFamilia {
+  versiones_documentos_matricula
+  estudiantes
+  apoderados
+  estudiante_apoderados
+  matriculas
+  solicitudes_matricula_publica
+  solicitudes_matricula_documentos
+}
+
+TableGroup EvaluacionYRefuerzo {
+  calificaciones_cneb
+  sesiones_refuerzo
+  inscripciones_refuerzo
+}
+
+TableGroup Asistencia {
+  lotes_biometrico
+  marcas_biometrico_porteria
+  asistencias_aula
+  conciliaciones_asistencia
+}
+
+TableGroup Comunicacion {
+  comunicados_oficiales
+  comunicado_destinatarios
+}
+
+TableGroup Convivencia {
+  incidencias_conductuales
+}
+
+TableGroup Tesoreria {
+  conceptos_cobro
+  obligaciones_pago
+  pagos_transacciones
+  series_comprobante
+  comprobantes_pago
+}
+
+// Verificaciones automáticas de documentos — V20
+Table versiones_documentos_matricula {
+  id uuid [pk, not null]
+  solicitud_id uuid [not null]
+  tipo varchar(30) [not null]
+  contenedor varchar(100) [not null]
+  ruta_objeto varchar(500) [not null]
+  tipo_contenido varchar(30) [not null]
+  tamano_bytes bigint [not null]
+  huella_sha256 char(64) [not null]
+  ia_valida boolean [null]
+  dni_api_coincide boolean [null]
+  vinculo_parental_coincide boolean [null]
+  observacion_ia varchar(500) [null]
+  estado_firma varchar(20) [not null]
+  detalle_firma varchar(500) [not null]
+  certificado_sha256 char(64) [null]
+  fecha_carga timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (id, solicitud_id, tipo) [unique]
+    (solicitud_id, tipo, fecha_carga) [name: 'idx_versiones_documentos_solicitud_tipo']
+  }
+  checks {
+    `tipo IN ('PARTIDA_NACIMIENTO','DNI_C4','RECIBO_SERVICIO')`
+    `tamano_bytes > 0 AND tamano_bytes <= 5242880`
+    `estado_firma IN ('VALIDA','INVALIDA','NO_APLICA','NO_VERIFICABLE','ERROR_SERVICIO')`
+    `huella_sha256 ~ '^[0-9a-f]{64}$'`
+  }
+}
+Ref: versiones_documentos_matricula.solicitud_id > solicitudes_matricula_publica.id
+Ref: solicitudes_matricula_documentos.(version_id, solicitud_id, tipo) > versiones_documentos_matricula.(id, solicitud_id, tipo)

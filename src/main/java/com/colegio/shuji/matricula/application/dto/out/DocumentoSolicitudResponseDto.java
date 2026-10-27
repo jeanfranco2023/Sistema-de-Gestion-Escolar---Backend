@@ -11,4 +11,5 @@ public record DocumentoSolicitudResponseDto(
     Boolean iaValida,
     Boolean dniApiCoincide,
     com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital estadoFirma,
-    String detalleFirma) {}
+    String detalleFirma,
+    Boolean vinculoParentalCoincide) {}

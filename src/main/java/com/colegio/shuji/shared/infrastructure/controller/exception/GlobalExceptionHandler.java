@@ -33,6 +33,12 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+  @ExceptionHandler(com.colegio.shuji.evaluacion.domain.exception.ImportacionCalificacionesException.class)
+  public ResponseEntity<ErrorResponse> handleImportacionCalificaciones(
+      com.colegio.shuji.evaluacion.domain.exception.ImportacionCalificacionesException ex, HttpServletRequest request) {
+    return ResponseEntity.unprocessableEntity().body(ErrorResponse.ofValidation(422, ex.getMessage(),
+        request.getRequestURI(), ex.errores()));
+  }
 
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleResourceNotFoundException(

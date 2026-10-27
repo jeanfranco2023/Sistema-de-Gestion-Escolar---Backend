@@ -14,4 +14,5 @@ public interface DerivarAlumnosRefuerzoUseCase {
   InscripcionRefuerzoResponseDto registrarAsistencia(RegistrarAsistenciaRefuerzoRequestDto r);
 
   List<SesionRefuerzoResponseDto> sesiones(Short periodoId);
+  List<com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto> inscripciones(Long sesionId);
 }

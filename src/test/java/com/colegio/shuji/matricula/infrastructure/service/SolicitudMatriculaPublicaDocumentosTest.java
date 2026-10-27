@@ -60,6 +60,52 @@ class SolicitudMatriculaPublicaDocumentosTest {
   @InjectMocks private SolicitudMatriculaPublicaService service;
 
   @Test
+  void crearBloqueaLaSeccionYRechazaEdadFueraDeRangoSinPersistir() {
+    prepararAdmision();
+    var request = solicitudPublicaConNacimiento(java.time.LocalDate.of(2020, 4, 1));
+    var error = assertThrows(ResponseStatusException.class, () -> service.crear(request));
+    assertEquals(422, error.getStatusCode().value());
+    verify(secciones).bloquearPorId(9);
+    org.mockito.Mockito.verifyNoInteractions(solicitudes, estudiantes, mercadoPago);
+  }
+
+  @Test
+  void colisionDeInsercionDevuelveConflictoSinConsultarLaTransaccionAbortada() {
+    prepararAdmision();
+    when(solicitudes.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+        .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Colisión concurrente sintética"));
+    var request = solicitudPublicaConNacimiento(java.time.LocalDate.of(2020, 3, 31));
+    var error = assertThrows(ResponseStatusException.class, () -> service.crear(request));
+    assertEquals(409, error.getStatusCode().value());
+    var orden = org.mockito.Mockito.inOrder(solicitudes);
+    orden.verify(solicitudes).existsByNumeroDocumentoEstudianteAndEstadoIn(
+        org.mockito.ArgumentMatchers.eq("12345678"), org.mockito.ArgumentMatchers.anyList());
+    orden.verify(solicitudes).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    orden.verifyNoMoreInteractions();
+    org.mockito.Mockito.verifyNoInteractions(mercadoPago);
+  }
+
+  private void prepararAdmision() {
+    var anio = new AnioLectivoEntity();
+    anio.setAnio((short) 2026); anio.setAbierto(true);
+    when(anios.findById((short) 2026)).thenReturn(Optional.of(anio));
+    var nivel = new NivelEntity();
+    nivel.setCodigo(com.colegio.shuji.academico.domain.enums.NivelCodigo.PRIMARIA);
+    var grado = new GradoEntity(); grado.setNumeroGrado((short) 1); grado.setRelacion0(nivel);
+    var seccion = new SeccionEntity();
+    seccion.setAnioLectivoId((short) 2026); seccion.setRelacion1(grado);
+    seccion.setCupoMaximo((short) 20); seccion.setVacantesOcupadas((short) 0);
+    when(secciones.bloquearPorId(9)).thenReturn(Optional.of(seccion));
+  }
+
+  private com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto solicitudPublicaConNacimiento(
+      java.time.LocalDate nacimiento) {
+    return new com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto(
+        (short) 2026, 9, "12345678", "Ana", "Perez", "Ruiz", nacimiento, Genero.F,
+        "87654321", "Rosa", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.MADRE, true);
+  }
+
+  @Test
   void generaComprobanteInternoAlConfirmarseElPagoYEscapaDatos() throws Exception {
     var solicitud = solicitudConfirmada();
     solicitud.setNombresEstudiante("Ana <Lopez>");
@@ -122,6 +168,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setEstadoDniC4(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
     solicitud.setEstadoRecibo(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
     solicitud.setSeccionId(9);
+    prepararEvidenciaCompleta(solicitud);
     when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
     when(secciones.reservarVacante(9)).thenReturn(1);
     when(mercadoPago.crearPreferenciaMatriculaPublica(
@@ -151,6 +198,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setEstadoRecibo(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
     solicitud.setSeccionId(9);
     solicitud.setAnioLectivoId((short) 2026);
+    prepararEvidenciaCompleta(solicitud);
     when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
     when(secciones.reservarVacante(9)).thenReturn(0);
     var pago = new PagoVerificado(
@@ -164,6 +212,23 @@ class SolicitudMatriculaPublicaDocumentosTest {
     assertEquals(409, error.getStatusCode().value());
     assertTrue(error.getReason().contains("Pago aprobado, pero la vacante"));
   }
+  private void prepararEvidenciaCompleta(SolicitudMatriculaPublicaEntity solicitud) {
+    solicitud.setParentesco(Parentesco.MADRE);
+    var archivos = new java.util.ArrayList<com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocumentoEntity>();
+    var evidencias = new java.util.ArrayList<com.colegio.shuji.matricula.infrastructure.entity.DocumentoMatriculaVersionEntity>();
+    for (var tipo : com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.values()) {
+      var version = new com.colegio.shuji.matricula.infrastructure.entity.DocumentoMatriculaVersionEntity();
+      version.setId(UUID.randomUUID()); version.setMimeType("application/pdf"); version.setIaValida(true);
+      version.setDniApiCoincide(true); version.setVinculoParentalCoincide(tipo == com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.PARTIDA_NACIMIENTO ? true : null);
+      version.setEstadoFirma(com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.VALIDA);
+      var archivo = new com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocumentoEntity();
+      archivo.setId(new com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaDocumentoId(SOLICITUD_ID,tipo));
+      archivo.setVersionId(version.getId()); archivos.add(archivo); evidencias.add(version);
+    }
+    when(documentos.findByIdSolicitudIdIn(java.util.List.of(SOLICITUD_ID))).thenReturn(archivos);
+    when(versiones.findAllById(org.mockito.ArgumentMatchers.any())).thenReturn(evidencias);
+  }
+
   private SolicitudMatriculaPublicaEntity solicitudConfirmada() throws Exception {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setTokenHash(hash(TOKEN));

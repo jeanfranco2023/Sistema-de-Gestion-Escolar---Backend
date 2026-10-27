@@ -39,7 +39,7 @@ public interface JpaSeccionRepository extends JpaRepository<SeccionEntity, Integ
   @Query("select e from SeccionEntity e where e.id in :ids order by e.id")
   List<SeccionEntity> bloquearPorIds(@Param("ids") Collection<Integer> ids);
 
-  @EntityGraph(attributePaths = "aula")
+  @EntityGraph(attributePaths = {"aula", "relacion1.relacion0"})
   @Query("select e from SeccionEntity e where e.anioLectivoId = :valor order by e.id")
   List<SeccionEntity> buscarPorAnioLectivoId(@Param("valor") Short valor);
 

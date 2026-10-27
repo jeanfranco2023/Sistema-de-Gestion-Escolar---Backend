@@ -232,7 +232,11 @@ Configuración opcional mediante propiedades de Spring (sin necesidad de cambiar
 
 La política valida la firma y el certificado a la fecha actual. No implementa validación histórica PAdES-LTV, XAdES, CAdES separado, sellos de tiempo como sustituto de firma institucional ni determina parentesco/autorización del apoderado. Los formatos no admitidos y revisiones posteriores a la última firma quedan sin confirmar.
 
-Para una instalación existente se aplican las migraciones pendientes V19–V22 con Flyway. El SQL consolidado y `colegio_shuji_v22.dbml` describen el esquema local V22; el consolidado es exclusivamente para una base vacía.
+Para una instalación existente se aplican las migraciones pendientes hasta V24 con Flyway. El SQL consolidado y `colegio_shuji_v24.dbml` describen el esquema local V24 (39 tablas); el consolidado es exclusivamente para una base vacía.
+
+La admisión pública valida la edad al 31 de marzo del año lectivo solicitado según los rangos EBR de la RM 010-2026-MINEDU (VI.9). Inicial usa grados internos 1/2/3 para las aulas de 3/4/5 años. El catálogo expone `edadMinimaAlCorte` y `edadMaximaAlCorte` para que la interfaz use la misma regla. El formulario público no puede autorizar excepciones institucionales. La creación bloquea la sección mientras verifica disponibilidad; la reserva efectiva del cupo continúa al generar el pago, mediante incremento condicional atómico.
+
+Por IP y minuto se permiten cinco creaciones de solicitud, diez cargas documentales (contador compartido entre expedientes/tipos) y ocho consultas de DNI (contador compartido entre números). Los contadores son locales a cada instancia; un despliegue con varias réplicas requiere un limitador compartido o en el proxy.
 
 ### Pagos en Perú (2026-10-20)
 
@@ -252,6 +256,27 @@ La firma HMAC del webhook acepta timestamps en segundos o milisegundos y conserv
 
 La confirmación de matrícula registra obligación, transacción y boleta B001 en una sola transacción PostgreSQL; el bloqueo de solicitud y la idempotencia impiden emitirlos dos veces. El importe aprobado se compara con el reservado en la solicitud. Una confirmación diferida de PagoEfectivo puede recuperar la vacante liberada; si ya no existe cupo o el año cerró, requiere conciliación administrativa. El documento emitido por el sistema no equivale a integración de facturación electrónica SUNAT.
 
-PagoEfectivo usa el método explícito `PAGO_EFECTIVO`, distinto de caja y transferencias directas: aplicar Flyway V22; consolidados y `colegio_shuji_v22.dbml` actualizados. No ejecutar un consolidado sobre una base con datos.
+PagoEfectivo usa el método explícito `PAGO_EFECTIVO`, distinto de caja y transferencias directas: requiere Flyway V22; el esquema consolidado vigente incluye V24 y su diagrama es `colegio_shuji_v24.dbml`. No ejecutar un consolidado sobre una base con datos.
 
 Las transferencias directas sin API bancaria se registran solo por Dirección/Secretaría tras verificar el abono en el banco, consignando banco y operación; una captura no se aprueba automáticamente. Conectar una API bancaria directa requiere contrato, especificación y credenciales institucionales del banco. La cobertura de banca móvil/agentes disponible se obtiene mediante PagoEfectivo/CIP en la pasarela existente.
+
+### Validación parental y tres documentos PDF
+
+La solicitud pública admite únicamente PADRE o MADRE. Partida, DNI/C4 del estudiante y recibo se reciben solo como PDF válidos, legibles, sin contraseña y de hasta 5 MB. La partida exige además firma RENIEC verificable. El backend contrasta la identidad del estudiante y del progenitor con la API de DNI; Gemini extrae los datos parentales del PDF ya autorizado y la coincidencia con el padre o madre declarado se comprueba localmente. No se añaden nombres ni DNI declarados del progenitor al prompt de Gemini. Si el DNI figura en la partida también debe coincidir; si no figura, se contrasta el nombre completo con la identidad confirmada por la API.
+
+V23 añade `vinculo_parental_coincide` a las versiones documentales y restricciones PDF para nuevas cargas; no elimina evidencia ni actualiza estados históricos. `NOT VALID` conserva imágenes antiguas, pero impide nuevas filas no PDF. Una evidencia antigua sin vínculo parental confirmado debe revalidarse, conservando su versión anterior. Pago y finalización comprueban las tres versiones vigentes, firma, IA, identidades y vínculo parental; un estado global VALIDADO aislado no habilita el pago. Los expedientes finalizados no se reabren.
+
+Las pruebas de esta integración usan datos y documentos sintéticos. Una partida real autorizada sigue siendo necesaria para validar el recorrido completo con los proveedores reales.
+
+### Implementación del playbook (2026-10-26)
+
+- Etapa 9: rutas y navegación por rol para tutoría, observaciones, suplencias, aprobación y portal familiar. Los contenedores Angular consultan las API; tutoría muestra incidencias y asistencia de hoy, con filtro de periodo para incidencias.
+- IA pedagógica: `POST /api/v1/evaluacion/ia/sugerir-conclusion`, para Dirección, Secretaría y Docente. Gemini recibe contexto académico y evidencia observada, sin identificadores ni nombre del estudiante. Devuelve tres campos editables; el docente revisa antes de guardar y se conserva la procedencia IA. Reutiliza la configuración Gemini existente; si el proveedor falla devuelve indisponibilidad, sin presentar respuestas fijas como generación real. Límite local: 15 solicitudes por IP/minuto.
+- Horarios y refuerzo: pantallas con consultas y programación según rol; catálogo de asignaciones en `GET /api/v1/horarios/catalogo`. El refuerzo permite derivar candidatos B/C y registrar asistencia; la marca obligatoria generada en base de datos conserva su regla C. El aula se resuelve por su relación existente.
+- Calificaciones: `GET /api/v1/evaluacion/cneb/plantilla` genera CSV desde alumnos/competencias reales. `POST /api/v1/evaluacion/cneb/carga-masiva` recibe `archivo`, `periodoId`, `seccionId`, `asignacionDocenteId` y `confirmar` (por defecto `false`). Admite CSV UTF-8 y XLSX, hasta 5 MB y 500 filas; valida todas antes de escribir, devuelve errores por fila y confirma en una sola transacción. Rechaza fórmulas y entidades XML externas. Al editar la plantilla conservar DNI como texto para no perder ceros iniciales. La confirmación reutiliza el registro JPA por fila; no supone una sola sentencia SQL ni un rendimiento de 500 filas ya medido.
+- Portal: `/api/v1/portal-familiar` consulta hijos, notas, periodos y asistencia. La cuenta debe estar vinculada explícitamente a su ficha de apoderado y conservar custodia. La libreta de `GET /api/v1/evaluacion/libreta/{matriculaId}/pdf` incluye datos y calificaciones reales, paginación y las mismas guardas de acceso. Es un informe informativo, sin firma digital institucional.
+- V24: suplencias temporales de recojo en `/api/v1/suplencias`, con solicitud del titular y aprobación/rechazo/revocación de Dirección o Secretaría. Revalida custodia y permiso de recojo; bloquea al estudiante para impedir aprobaciones con fechas solapadas. Conserva historial y auditoría; el vencimiento se deriva de la fecha sin borrar filas.
+
+Estas funciones requieren publicar conjuntamente el backend, la migración V24 y el frontend. Un frontend conectado mediante proxy a un despliegue anterior no dispone de las nuevas API. La ejecución del playbook no modifica `.env` ni publica cambios automáticamente.
+
+El alcance implementado, la evidencia y la lista vigente para cerrar el sistema completo se mantienen en [PENDIENTES.md](PENDIENTES.md).
