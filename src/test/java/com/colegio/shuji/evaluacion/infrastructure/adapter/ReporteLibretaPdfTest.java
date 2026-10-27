@@ -20,8 +20,9 @@ class ReporteLibretaPdfTest {
       String texto = new PDFTextStripper().getText(doc);
       assertTrue(texto.contains("Competencia 69")); assertTrue(texto.contains("FIN DEL INFORME"));
       var imagen = new PDFRenderer(doc).renderImageWithDPI(0, 120);
-      javax.imageio.ImageIO.write(imagen, "png", Path.of("..", ".runtime", "playbook-libreta-preview.png").toFile());
-      Files.write(Path.of("..", ".runtime", "playbook-libreta-prueba.pdf"), bytes);
+      Files.createDirectories(Path.of("target", "playbook"));
+      javax.imageio.ImageIO.write(imagen, "png", Path.of("target", "playbook", "playbook-libreta-preview.png").toFile());
+      Files.write(Path.of("target", "playbook", "playbook-libreta-prueba.pdf"), bytes);
     }
   }
 }
