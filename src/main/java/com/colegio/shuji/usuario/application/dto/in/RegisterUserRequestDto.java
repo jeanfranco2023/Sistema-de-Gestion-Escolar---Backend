@@ -25,7 +25,7 @@ public class RegisterUserRequestDto {
 
   @NotBlank(message = "El correo electrónico es obligatorio")
   @Email(message = "El formato del correo electrónico no es válido")
-  @Size(max = 50, message = "El correo electrónico no puede superar los 50 caracteres")
+  @Size(max = 100, message = "El correo electrónico no puede superar los 100 caracteres")
   private String email;
 
   @NotBlank(message = "La contraseña es obligatoria")

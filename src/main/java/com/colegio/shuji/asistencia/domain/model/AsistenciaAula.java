@@ -24,16 +24,17 @@ public class AsistenciaAula {
   private Long auxiliarUsuarioId;
   private Boolean justificada;
   private String motivoJustificacion;
-  private String documentoSustentoUrl;
+  private String documentoSustentoKey;
 
-  public void justificar(String motivo, String documentoUrl) {
+  public void justificar(String motivo, String documentoKey) {
     if (estado != EstadoAsistenciaAula.FALTA_INJUSTIFICADA) {
       throw new BusinessException("Solo se justifican inasistencias injustificadas");
     }
     if (motivo == null || motivo.isBlank()) throw new BusinessException("Indique el motivo");
+    if (documentoKey == null || documentoKey.isBlank()) throw new BusinessException("Adjunte el sustento en PDF");
     this.justificada = true;
     this.motivoJustificacion = motivo;
-    this.documentoSustentoUrl = documentoUrl;
+    this.documentoSustentoKey = documentoKey;
     this.estado = EstadoAsistenciaAula.FALTA_JUSTIFICADA;
   }
 
@@ -41,7 +42,7 @@ public class AsistenciaAula {
     if (nuevoEstado == null || nuevoEstado == EstadoAsistenciaAula.FALTA_JUSTIFICADA)
       throw new BusinessException("Registre la justificación con su motivo");
     this.motivoJustificacion = null;
-    this.documentoSustentoUrl = null;
+    this.documentoSustentoKey = null;
     this.estado = nuevoEstado;
     this.justificada = false;
   }

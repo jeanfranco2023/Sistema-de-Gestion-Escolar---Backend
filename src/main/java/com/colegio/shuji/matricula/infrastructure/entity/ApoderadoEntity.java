@@ -55,7 +55,7 @@ public class ApoderadoEntity {
   @Column(name = "celular", nullable = false, length = 9)
   private String celular;
 
-  @Column(name = "correo_electronico", length = 50)
+  @Column(name = "correo_electronico", length = 100)
   private String email;
 
   @Column(name = "direccion", nullable = false, length = 150)

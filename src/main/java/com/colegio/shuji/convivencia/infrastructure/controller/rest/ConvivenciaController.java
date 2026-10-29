@@ -35,20 +35,20 @@ public class ConvivenciaController {
   private final GestionarIncidenciasUseCase gestion;
 
   @GetMapping("/incidencias")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
   public List<IncidenciaResponseDto> listarIncidencias() {
     return gestion.listar();
   }
 
   @PostMapping("/incidencias")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasRole('TUTOR')")
   @Operation(summary = "registro.registrar")
   public IncidenciaResponseDto registrarIncidencia(@Valid @RequestBody RegistrarIncidenciaRequestDto r) {
     return registro.registrar(r);
   }
 
   @PutMapping("/incidencias/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasRole('TUTOR')")
   @Operation(summary = "gestion.actualizar")
   public IncidenciaResponseDto actualizarEstadoIncidencia(
       @PathVariable @Positive Long id, @Valid @RequestBody ActualizarEstadoIncidenciaRequestDto r) {
@@ -56,14 +56,14 @@ public class ConvivenciaController {
   }
 
   @GetMapping("/matricula/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.historial")
   public HistorialConductualEstudianteResponseDto consultarHistorialConductual(@PathVariable @Positive Long id) {
     return gestion.historial(id);
   }
 
   @GetMapping("/incidencias/citaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.citaciones")
   public List<IncidenciaResponseDto> listarCitaciones(
       @RequestParam(name = "page", defaultValue = "0") @PositiveOrZero int page,

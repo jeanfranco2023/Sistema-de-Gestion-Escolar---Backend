@@ -46,7 +46,7 @@ public class CurriculoService implements GestionarCurriculoUseCase, AsignarCarga
 
   @Transactional(readOnly = true)
   public List<AsignacionDocenteResponseDto> listarAsignaciones() {
-    var lista = actor.tieneRol("DIRECCION") || actor.tieneRol("SECRETARIA")
+    var lista = actor.tieneRol("DIRECCION")
         ? asignaciones.listar() : asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId());
     return lista.stream().map(mapper::toResponse).toList();
   }

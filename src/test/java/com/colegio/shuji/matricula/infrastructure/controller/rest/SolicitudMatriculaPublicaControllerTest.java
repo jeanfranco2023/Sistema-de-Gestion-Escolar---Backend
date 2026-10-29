@@ -42,7 +42,8 @@ class SolicitudMatriculaPublicaControllerTest {
         mock(FirmaDigitalDocumentoPort.class),
         mock(VerificacionIdentidadMatriculaService.class),
         mock(ReniecServicePort.class),
-        mock(AlmacenDocumentosMatriculaPort.class));
+        mock(AlmacenDocumentosMatriculaPort.class),
+        mock(com.colegio.shuji.shared.application.port.out.ActorActualPort.class));
     MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();

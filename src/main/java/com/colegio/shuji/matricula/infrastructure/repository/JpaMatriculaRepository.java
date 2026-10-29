@@ -25,6 +25,9 @@ public interface JpaMatriculaRepository extends JpaRepository<MatriculaEntity, L
   @Query("select e from MatriculaEntity e where e.seccionId = :valor order by e.id")
   List<MatriculaEntity> buscarPorSeccionId(@Param("valor") Integer valor);
 
+  @Query("select e from MatriculaEntity e where e.seccionId in :ids order by e.id")
+  List<MatriculaEntity> buscarPorSeccionIds(@Param("ids") Collection<Integer> ids);
+
   @Query("select e from MatriculaEntity e where e.estadoMatricula = :valor order by e.id")
   List<MatriculaEntity> buscarPorEstadoMatricula(@Param("valor") EstadoMatricula valor);
 

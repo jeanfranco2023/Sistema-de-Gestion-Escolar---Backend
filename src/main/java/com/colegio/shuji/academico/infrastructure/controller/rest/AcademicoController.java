@@ -46,7 +46,7 @@ public class AcademicoController {
   private final GestionarAulasUseCase aulas;
 
   @PostMapping("/aulas")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "estructura.crearAula")
   public AulaResponseDto crearAula(@Valid @RequestBody CrearAulaRequestDto request) {
     return aulas.crearAula(request);
@@ -60,7 +60,7 @@ public class AcademicoController {
   }
 
   @PostMapping("/anios")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "calendario.crearAnio")
   public AnioLectivoResponseDto crearAnio(@Valid @RequestBody CrearAnioLectivoRequestDto r) {
     return calendario.crearAnio(r);
@@ -74,14 +74,14 @@ public class AcademicoController {
   }
 
   @PutMapping("/anios/{id}/cierre")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "calendario.cerrarAnio")
   public void cerrarAnio(@PathVariable @Positive Short id) {
     calendario.cerrarAnio(id);
   }
 
   @PostMapping("/periodos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "calendario.crearPeriodo")
   public PeriodoResponseDto crearPeriodo(@Valid @RequestBody CrearPeriodoRequestDto r) {
     return calendario.crearPeriodo(r);
@@ -95,14 +95,14 @@ public class AcademicoController {
   }
 
   @PutMapping("/periodos/{id}/cierre")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "calendario.cerrarPeriodo")
   public void cerrarPeriodo(@PathVariable @Positive Short id) {
     calendario.cerrarPeriodo(id);
   }
 
   @PutMapping("/periodos/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "calendario.cambiarEstadoPeriodo")
   public void cambiarEstadoPeriodo(
       @PathVariable @Positive Short id, @Valid @RequestBody CambiarEstadoPeriodoRequestDto request) {
@@ -124,14 +124,14 @@ public class AcademicoController {
   }
 
   @PostMapping("/grados")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "estructura.crearGrado")
   public GradoResponseDto crearGrado(@Valid @RequestBody CrearGradoRequestDto r) {
     return estructura.crearGrado(r);
   }
 
   @PostMapping("/secciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   @Operation(summary = "estructura.crearSeccion")
   public SeccionResponseDto crearSeccion(@Valid @RequestBody CrearSeccionRequestDto r) {
     return estructura.crearSeccion(r);

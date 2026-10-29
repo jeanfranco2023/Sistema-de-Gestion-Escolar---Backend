@@ -9,6 +9,9 @@ public interface ConsultarPortalFamiliarUseCase {
   List<HijoPortalResponseDto> hijos();
   List<HijoPortalResponseDto> hijosPropios();
   List<HijoPortalResponseDto> alumnosSeguimiento();
+  List<PeriodoResponseDto> periodosSeguimiento(Short anioId);
+  List<com.colegio.shuji.evaluacion.application.dto.out.CalificacionRiesgoTutorResponseDto>
+      calificacionesRiesgoTutor();
   List<AsistenciaAulaResponseDto> asistencia(Long matriculaId);
   List<PeriodoResponseDto> periodos(Long matriculaId);
   List<com.colegio.shuji.evaluacion.application.dto.out.CalificacionPortalResponseDto> calificaciones(Long matriculaId);

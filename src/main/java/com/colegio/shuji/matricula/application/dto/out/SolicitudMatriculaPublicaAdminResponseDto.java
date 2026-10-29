@@ -18,4 +18,8 @@ public record SolicitudMatriculaPublicaAdminResponseDto(
     List<DocumentoSolicitudResponseDto> documentos,
     OffsetDateTime creadaAt,
     Long estudianteId,
-    Long matriculaId) {}
+    Long matriculaId,
+    boolean requiereAutorizacionEdad,
+    String motivoAutorizacionEdad,
+    Long autorizadoPorUsuarioId,
+    OffsetDateTime fechaAutorizacionEdad) {}

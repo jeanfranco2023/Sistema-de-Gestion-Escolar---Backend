@@ -7,6 +7,7 @@ import com.colegio.shuji.asistencia.infrastructure.repository.JpaAsistenciaAulaR
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -64,6 +65,14 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
 
   public List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor) {
     return repository.buscarPorFechaSesion(valor).stream().map(mapper::toDomain).toList();
+  }
+
+  public List<AsistenciaAula> buscarPorFechaSesionYMatriculaIds(
+      LocalDate fecha, Collection<Long> matriculaIds) {
+    if (matriculaIds == null || matriculaIds.isEmpty()) return List.of();
+    return repository.buscarPorFechaSesionYMatriculaIds(fecha, matriculaIds).stream()
+        .map(mapper::toDomain)
+        .toList();
   }
 
   public List<AsistenciaAula> buscarPorEstado(EstadoAsistenciaAula valor) {

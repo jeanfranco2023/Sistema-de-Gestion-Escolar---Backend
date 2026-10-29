@@ -73,6 +73,7 @@ public class SolicitudMatriculaPublicaService {
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION,
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS,
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS,
+      EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE,
       EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
 
   private final JpaSolicitudMatriculaPublicaRepository solicitudes;
@@ -131,11 +132,7 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La sección no corresponde al año lectivo");
     }
     var edades = limitesEdad(seccion);
-    if (!edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio())) {
-      throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-          "Para esta sección la edad al 31 de marzo de " + anio.getAnio() + " debe estar entre "
-              + edades.minima() + " y " + edades.maxima() + " años. Los casos excepcionales requieren autorización institucional.");
-    }
+    boolean requiereAutorizacionEdad = !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
     if (seccion.getCupoMaximo() <= seccion.getVacantesOcupadas()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección seleccionada ya no tiene vacantes");
     }
@@ -153,7 +150,10 @@ public class SolicitudMatriculaPublicaService {
     var s = new SolicitudMatriculaPublicaEntity();
     s.setId(UUID.randomUUID());
     s.setTokenHash(hashToken(token));
-    s.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
+    s.setEstado(requiereAutorizacionEdad
+        ? EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE
+        : EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
+    s.setRequiereAutorizacionEdad(requiereAutorizacionEdad);
     s.setAnioLectivoId(r.anioLectivoId());
     s.setSeccionId(r.seccionId());
     s.setNumeroDocumentoEstudiante(r.numeroDocumentoEstudiante().trim());
@@ -513,7 +513,33 @@ public class SolicitudMatriculaPublicaService {
             s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
             nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(),
             s.getAnioLectivoId(), s.getSeccionId(), documentos(s, archivos), s.getFechaCreacion(),
-            s.getEstudianteId(), s.getMatriculaId())).toList();
+            s.getEstudianteId(), s.getMatriculaId(), s.isRequiereAutorizacionEdad(),
+            s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(), s.getFechaAutorizacionEdad())).toList();
+  }
+
+  @Transactional
+  public SolicitudMatriculaPublicaAdminResponseDto autorizarExcepcionEdad(
+      UUID id, String motivo, Long usuarioId) {
+    var s = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
+    if (s.getEstado() != EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE
+        || !s.isRequiereAutorizacionEdad()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "La solicitud no está pendiente de autorización por edad");
+    }
+    if (!todosDocumentosValidados(s)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "Autoriza la excepción solo después de validar los tres documentos automáticamente");
+    }
+    if (usuarioId == null || motivo == null || motivo.isBlank() || motivo.trim().length() < 10
+        || motivo.trim().length() > 500) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "Registra una justificación institucional de 10 a 500 caracteres");
+    }
+    s.setMotivoAutorizacionEdad(motivo.trim());
+    s.setAutorizadoPorUsuarioId(usuarioId);
+    s.setFechaAutorizacionEdad(OffsetDateTime.now(ZoneOffset.UTC));
+    s.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
+    return adminResponse(solicitudes.saveAndFlush(s));
   }
 
   @Transactional
@@ -691,6 +717,11 @@ public class SolicitudMatriculaPublicaService {
 
   private void actualizarEtapaDocumental(SolicitudMatriculaPublicaEntity s) {
     if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) return;
+    if (s.isRequiereAutorizacionEdad() && s.getFechaAutorizacionEdad() == null
+        && todosDocumentosValidados(s)) {
+      s.setEstado(EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE);
+      return;
+    }
     boolean cargados = java.util.Arrays.stream(TipoDocumentoSolicitud.values())
         .allMatch(tipo -> s.estadoDocumento(tipo) != EstadoValidacionDocumento.PENDIENTE);
     s.setEstado(todosDocumentosValidados(s) ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
@@ -721,7 +752,9 @@ public class SolicitudMatriculaPublicaService {
     return new SolicitudMatriculaPublicaAdminResponseDto(
         s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
         nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(), s.getAnioLectivoId(),
-        s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId());
+        s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId(),
+        s.isRequiereAutorizacionEdad(), s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(),
+        s.getFechaAutorizacionEdad());
   }
 
   private String nombreEstudiante(SolicitudMatriculaPublicaEntity s) {

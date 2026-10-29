@@ -7,4 +7,5 @@ public record HorarioSeccionResponseDto(
     Long docenteUsuarioId,
     Long asignacionDocenteId,
     Short diaSemana,
-    Short bloqueHorarioId) {}
+    Short bloqueHorarioId,
+    Boolean activo) {}

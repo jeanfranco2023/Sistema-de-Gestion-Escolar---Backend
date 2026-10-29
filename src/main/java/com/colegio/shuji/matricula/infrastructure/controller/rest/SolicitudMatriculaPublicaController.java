@@ -14,6 +14,7 @@ import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.application.port.out.AlmacenDocumentosMatriculaPort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
 import com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService;
+import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
@@ -58,13 +59,16 @@ public class SolicitudMatriculaPublicaController {
   private final com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService identidades;
   private final ReniecServicePort consultaDni;
   private final AlmacenDocumentosMatriculaPort almacenDocumentos;
+  private final ActorActualPort actor;
 
   @GetMapping("/public/catalogo")
+  @PreAuthorize("permitAll()")
   public CatalogoMatriculaPublicaResponseDto catalogo() {
     return solicitudes.catalogo();
   }
 
   @GetMapping("/public/dni/{dni}")
+  @PreAuthorize("permitAll()")
   public ReniecServicePort.Identidad consultarDni(@PathVariable @jakarta.validation.constraints.Pattern(regexp = "[0-9]{8}") String dni) {
     return consultaDni.consultar(dni)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -79,6 +83,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @GetMapping("/public/{id}")
+  @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto consultar(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
@@ -86,6 +91,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping(value = "/public/{id}/documentos/{tipo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto validarDocumento(
       @PathVariable UUID id,
       @PathVariable TipoDocumentoSolicitud tipo,
@@ -160,6 +166,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping("/public/{id}/pago")
+  @PreAuthorize("permitAll()")
   public PagoMatriculaPublicaResponseDto crearPago(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
@@ -167,6 +174,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping("/public/{id}/confirmar-pago")
+  @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto confirmarPago(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token,
@@ -175,12 +183,14 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping("/public/{id}/consultar-pago")
+  @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto consultarPago(
       @PathVariable UUID id, @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
     return pagos.consultarPago(id, token);
   }
 
   @GetMapping("/public/{id}/comprobante")
+  @PreAuthorize("permitAll()")
   public ResponseEntity<byte[]> descargarComprobante(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
@@ -188,6 +198,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @GetMapping("/public/{id}/ficha")
+  @PreAuthorize("permitAll()")
   public ResponseEntity<byte[]> descargarFicha(
       @PathVariable UUID id,
       @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
@@ -201,7 +212,7 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PutMapping("/admin/{id}/observar")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
       @PathVariable UUID id,
       @Valid @RequestBody ObservarSolicitudMatriculaPublicaRequestDto request) {
@@ -216,10 +227,21 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PostMapping("/admin/{id}/rechazar")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   public void rechazarAdmin(@PathVariable UUID id) {
     solicitudes.rechazarAdmin(id);
   }
+
+  @PostMapping("/admin/{id}/autorizar-excepcion-edad")
+  @PreAuthorize("hasRole('DIRECCION')")
+  public SolicitudMatriculaPublicaAdminResponseDto autorizarExcepcionEdad(
+      @PathVariable UUID id, @Valid @RequestBody AutorizarExcepcionEdadRequest request) {
+    return solicitudes.autorizarExcepcionEdad(id, request.motivo(), actor.usuarioId());
+  }
+
+  public record AutorizarExcepcionEdadRequest(
+      @jakarta.validation.constraints.NotBlank
+      @jakarta.validation.constraints.Size(min = 10, max = 500) String motivo) {}
 
   @GetMapping("/admin/{id}/documentos/{tipo}/url")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")

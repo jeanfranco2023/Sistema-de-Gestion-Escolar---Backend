@@ -76,7 +76,7 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "celular_apoderado", nullable = false, length = 9)
   private String celularApoderado;
 
-  @Column(name = "correo_apoderado", length = 50)
+  @Column(name = "correo_apoderado", length = 100)
   private String emailApoderado;
 
   @Column(name = "direccion_apoderado", nullable = false, length = 150)
@@ -91,6 +91,18 @@ public class SolicitudMatriculaPublicaEntity {
 
   @Column(name = "consentimiento_gemini", nullable = false)
   private boolean consentimientoGemini;
+
+  @Column(name = "requiere_autorizacion_edad", nullable = false)
+  private boolean requiereAutorizacionEdad;
+
+  @Column(name = "motivo_autorizacion_edad", length = 500)
+  private String motivoAutorizacionEdad;
+
+  @Column(name = "autorizado_por_usuario_id")
+  private Long autorizadoPorUsuarioId;
+
+  @Column(name = "fecha_autorizacion_edad")
+  private OffsetDateTime fechaAutorizacionEdad;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "estado_partida", nullable = false, length = 15)

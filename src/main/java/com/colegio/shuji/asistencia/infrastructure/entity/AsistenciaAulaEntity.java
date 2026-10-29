@@ -53,8 +53,8 @@ public class AsistenciaAulaEntity {
   @Column(name = "motivo_justificacion", columnDefinition = "text")
   private String motivoJustificacion;
 
-  @Column(name = "documento_sustento_url", length = 255)
-  private String documentoSustentoUrl;
+  @Column(name = "documento_sustento_key", length = 255)
+  private String documentoSustentoKey;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({

@@ -30,7 +30,7 @@ public class SuplenciaService implements GestionarSuplenciasUseCase {
   private final EstudianteRepositoryPort estudiantes;
   private final ActorActualPort actor;
   private LocalDate hoy() { return LocalDate.now(ZoneId.of("America/Lima")); }
-  private void gestor() { if (!actor.tieneRol("DIRECCION") && !actor.tieneRol("SECRETARIA")) throw new AccessDeniedException("Solo Dirección o Secretaría puede resolver suplencias"); }
+  private void gestor() { if (!actor.tieneRol("DIRECCION")) throw new AccessDeniedException("Solo Dirección puede resolver suplencias"); }
   private com.colegio.shuji.matricula.domain.model.Apoderado titular() { return apoderados.buscarPorUsuarioId(actor.usuarioId()).stream().findFirst()
       .orElseThrow(() -> new AccessDeniedException("No tienes una ficha de apoderado vinculada")); }
 

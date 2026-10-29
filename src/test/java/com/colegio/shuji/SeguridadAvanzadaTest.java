@@ -9,6 +9,7 @@ import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPor
 import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
@@ -222,7 +223,7 @@ class SeguridadAvanzadaTest {
       var estudianteApoderados = mock(EstudianteApoderadoRepositoryPort.class);
 
       var service = new TesoreriaService(
-          mapper, obligaciones, pagos, conceptos, matriculas,
+          mapper, obligaciones, pagos, conceptos, matriculas, mock(EstudianteRepositoryPort.class),
           anios, verificador, mercadoPago, comprobantes, actor,
           apoderados, estudianteApoderados, mock(GestionarPagoMatriculaPublicaUseCase.class));
 
@@ -279,7 +280,7 @@ class SeguridadAvanzadaTest {
       var estudianteApoderados = mock(EstudianteApoderadoRepositoryPort.class);
 
       var service = new TesoreriaService(
-          mapper, obligaciones, pagos, conceptos, matriculas,
+          mapper, obligaciones, pagos, conceptos, matriculas, mock(EstudianteRepositoryPort.class),
           anios, verificador, mercadoPago, comprobantes, actor,
           apoderados, estudianteApoderados, mock(GestionarPagoMatriculaPublicaUseCase.class));
 

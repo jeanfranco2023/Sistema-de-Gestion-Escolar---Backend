@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.domain.model.Apoderado;
@@ -20,6 +21,7 @@ import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
 import com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto;
+import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
 import com.colegio.shuji.tesoreria.application.mapper.TesoreriaMapper;
 import com.colegio.shuji.tesoreria.application.port.in.EmitirComprobanteUseCase;
 import com.colegio.shuji.tesoreria.application.port.out.ConceptoCobroRepositoryPort;
@@ -47,7 +49,7 @@ class TesoreriaMercadoPagoFlowTest {
   private final EstudianteApoderadoRepositoryPort vinculos = mock(EstudianteApoderadoRepositoryPort.class);
   private final PagoRepositoryPort pagos = mock(PagoRepositoryPort.class);
   private final TesoreriaService service = new TesoreriaService(
-      mapper, obligaciones, pagos, conceptos, matriculas,
+      mapper, obligaciones, pagos, conceptos, matriculas, mock(EstudianteRepositoryPort.class),
       mock(AnioLectivoRepositoryPort.class), mock(VerificarPagoPort.class), mercadoPago,
       mock(EmitirComprobanteUseCase.class), actor, apoderados, vinculos,
       mock(GestionarPagoMatriculaPublicaUseCase.class));
@@ -64,6 +66,9 @@ class TesoreriaMercadoPagoFlowTest {
         .thenReturn(List.of(Matricula.builder().id(30L).estudianteId(10L).build()));
     when(obligaciones.buscarPorMatriculaIds(List.of(30L)))
         .thenReturn(List.of(ObligacionPago.builder().id(40L).matriculaId(30L).build()));
+    when(mapper.toResponse(any(ObligacionPago.class)))
+        .thenReturn(new ObligacionResponseDto(40L, 30L, null, null, null, null, null,
+            null, null, null, null, null, null, null));
 
     assertEquals(1, service.misObligaciones().size());
     verify(matriculas, never()).buscarPorEstudianteId(20L);

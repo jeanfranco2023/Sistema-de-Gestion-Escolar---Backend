@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Requiere un esquema PostgreSQL desechable configurado mediante variables de entorno. */
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres}",
+      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/shuji_audit}",
       "spring.datasource.username=${TEST_DB_USERNAME:postgres}",
       "spring.datasource.password=${TEST_DB_PASSWORD:}",
       "spring.flyway.schemas=${TEST_DB_SCHEMA:public}",
@@ -89,6 +89,7 @@ class PersistenciaPostgresTest {
   private final com.colegio.shuji.evaluacion.application.port.in.GenerarLibretaPdfUseCase pdfLibreta;
   private final com.colegio.shuji.evaluacion.application.port.in.ConsultarLibretaNotasUseCase libretas;
   private final com.colegio.shuji.curriculo.application.port.in.ConsultarCatalogoHorariosUseCase catalogoHorarios;
+  private final com.colegio.shuji.convivencia.application.port.in.RegistrarIncidenciaUseCase registrarIncidencia;
 
   Long usuarioId, estudianteId, matriculaId;
   Short anioId, nivelId;
@@ -262,6 +263,9 @@ class PersistenciaPostgresTest {
     var competencia=curriculo.crearCompetencia(new CrearCompetenciaRequestDto(area.id(),(short)1,"Resuelve problemas de cantidad",null));
     var asignacion=carga.asignarDocente(new AsignarDocenteRequestDto(usuarioId,seccionId,anioId,nivelId,area.id()));
     autenticar("DOCENTE");
+    assertTrue(evaluacion.listarMatriz(asignacion.id(), periodo.id(), competencia.id()).stream()
+        .filter(fila -> fila.matriculaId().equals(matriculaId)).findFirst().orElseThrow()
+        .nombreEstudiante().contains("Ana"));
     var opcion=catalogoHorarios.catalogo().stream().filter(a->a.asignacionId().equals(asignacion.id())).findFirst().orElseThrow();
     assertEquals("Matemática",opcion.areaNombre());assertEquals((short)2026,opcion.anio());assertNotNull(opcion.aulaCodigo());
     autenticar("DIRECCION");
@@ -464,7 +468,7 @@ class PersistenciaPostgresTest {
             .filter(periodo -> periodo.activo() && !periodo.cerrado())
             .findFirst()
             .orElseThrow();
-    var area = curriculo.crearArea(new CrearAreaRequestDto(nivelId, "MAT", "Matemática"));
+    var area = curriculo.crearArea(new CrearAreaRequestDto(nivelId, "MATTEST", "Matemática de prueba"));
     var comp =
         curriculo.crearCompetencia(
             new CrearCompetenciaRequestDto(area.id(), (short) 1, "Resuelve problemas", null));
@@ -479,7 +483,8 @@ class PersistenciaPostgresTest {
             new AsignarDocenteRequestDto(usuarioId, seccionId, anioId, nivelId, area.id()));
     var bloque =
         curriculo.crearBloque(
-            new CrearBloqueRequestDto((short) 1, LocalTime.of(8, 0), LocalTime.of(9, 0), false));
+            new CrearBloqueRequestDto(
+                (short) 9, LocalTime.of(13, 45), LocalTime.of(14, 30), false));
     horarios.programar(
         new ProgramarHorarioRequestDto(asignacion.id(), DiaSemana.LUNES, bloque.id()));
     var notas =
@@ -536,10 +541,52 @@ class PersistenciaPostgresTest {
     aula.registrar(
         new RegistrarAsistenciaAulaRequestDto(
             matriculaId, fecha, LocalTime.of(8, 10), EstadoAsistenciaAula.PRESENTE));
+    assertTrue(aula.reporte(fecha).asistencias().stream()
+        .filter(fila -> fila.matriculaId().equals(matriculaId)).findFirst().orElseThrow()
+        .nombreEstudiante().contains("Ana"));
     assertEquals(
         TipoDiscrepancia.ASISTENCIA_CONCILIADA,
         conciliacion.conciliar(anioId, fecha, true).getFirst().tipoDiscrepancia());
     assertTrue(conciliacion.alertas(fecha).isEmpty());
+  }
+
+  @Test
+  void incidenciasDevuelvenElNombreDelEstudianteDeLaMatricula() {
+    autenticar("DIRECCION");
+    var incidencia = registrarIncidencia.registrar(
+        new com.colegio.shuji.convivencia.application.dto.in.RegistrarIncidenciaRequestDto(
+            matriculaId, LocalDate.of(2026, 9, 18),
+            com.colegio.shuji.convivencia.domain.enums.TipoFalta.LEVE,
+            "Observación de prueba", false));
+    assertTrue(incidencia.nombreEstudiante().contains("Ana"));
+  }
+
+  @Test
+  void mallaPorGradoAdmiteTodosLosGradosYLimitaLosCursosAlNivel() {
+    autenticar("DIRECCION");
+    var otroNivel = estructura.listarNiveles().stream()
+        .filter(n -> !n.id().equals(nivelId)).findFirst().orElseThrow();
+    var grado = estructura.listarGrados(otroNivel.id()).getFirst();
+    var sufijo = Long.toUnsignedString(System.nanoTime(), 36).toUpperCase(Locale.ROOT);
+    var areaDelNivel = curriculo.crearArea(
+        new CrearAreaRequestDto(otroNivel.id(), "M" + sufijo, "Área malla prueba"));
+    var areaDeOtroNivel = curriculo.crearArea(
+        new CrearAreaRequestDto(nivelId, "N" + sufijo, "Área nivel distinto"));
+    var bloques = curriculo.listarBloques().stream().filter(b -> !b.esRecreo()).toList();
+    var existentes = horarios.porGrado(grado.id(), anioId);
+    var espacio = Arrays.stream(DiaSemana.values()).flatMap(dia -> bloques.stream()
+        .map(b -> Map.entry(dia, b)))
+        .filter(celda -> existentes.stream().noneMatch(h -> h.diaSemana() == celda.getKey().getCodigo()
+            && h.bloqueHorarioId().equals(celda.getValue().id())))
+        .findFirst().orElseThrow();
+    var solicitud = new ProgramarMallaHorariaGradoRequestDto(
+        anioId, grado.id(), areaDelNivel.id(), espacio.getKey(), espacio.getValue().id());
+    assertEquals(grado.id(), horarios.programarGrado(solicitud).gradoId());
+
+    var cursoIncompatible = new ProgramarMallaHorariaGradoRequestDto(
+        anioId, grado.id(), areaDeOtroNivel.id(), DiaSemana.MARTES, espacio.getValue().id());
+    assertThrows(com.colegio.shuji.shared.domain.exception.BusinessException.class,
+        () -> horarios.programarGrado(cursoIncompatible));
   }
 
   @Test

@@ -22,7 +22,7 @@ public class ActorActualAdapter implements ActorActualPort {
   }
 
   public void verificarDocente(Long docenteId) {
-    if (!tieneRol("DIRECCION") && !tieneRol("SECRETARIA") && !usuarioId().equals(docenteId))
+    if (!tieneRol("DIRECCION") && !usuarioId().equals(docenteId))
       throw new AccessDeniedException("La asignación pertenece a otro docente");
   }
 }

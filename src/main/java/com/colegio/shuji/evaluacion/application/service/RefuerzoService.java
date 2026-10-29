@@ -156,7 +156,6 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
         .filter(
             s ->
                 actor.tieneRol("DIRECCION")
-                    || actor.tieneRol("SECRETARIA")
                     || s.getDocenteUsuarioId().equals(actor.usuarioId()))
         .map(mapper::toResponse)
         .toList();

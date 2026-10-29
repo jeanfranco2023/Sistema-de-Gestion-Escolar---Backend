@@ -14,18 +14,18 @@ public interface JpaHorarioRepository extends JpaRepository<HorarioSeccionEntity
   @Query("select e from HorarioSeccionEntity e where e.id = :id")
   Optional<HorarioSeccionEntity> bloquearPorId(@Param("id") Long id);
 
-  @Query("select e from HorarioSeccionEntity e where e.anioLectivoId = :valor order by e.id")
+  @Query("select e from HorarioSeccionEntity e where e.anioLectivoId = :valor and e.activo = true order by e.id")
   List<HorarioSeccionEntity> buscarPorAnioLectivoId(@Param("valor") Short valor);
 
-  @Query("select e from HorarioSeccionEntity e where e.seccionId = :valor order by e.id")
+  @Query("select e from HorarioSeccionEntity e where e.seccionId = :valor and e.activo = true order by e.id")
   List<HorarioSeccionEntity> buscarPorSeccionId(@Param("valor") Integer valor);
 
-  @Query("select e from HorarioSeccionEntity e where e.docenteUsuarioId = :valor order by e.id")
+  @Query("select e from HorarioSeccionEntity e where e.docenteUsuarioId = :valor and e.activo = true order by e.id")
   List<HorarioSeccionEntity> buscarPorDocenteUsuarioId(@Param("valor") Long valor);
 
-  @Query("select e from HorarioSeccionEntity e where e.asignacionDocenteId = :valor order by e.id")
+  @Query("select e from HorarioSeccionEntity e where e.asignacionDocenteId = :valor and e.activo = true order by e.id")
   List<HorarioSeccionEntity> buscarPorAsignacionDocenteId(@Param("valor") Long valor);
 
-  @Query("select e from HorarioSeccionEntity e where e.bloqueHorarioId = :valor order by e.id")
+  @Query("select e from HorarioSeccionEntity e where e.bloqueHorarioId = :valor and e.activo = true order by e.id")
   List<HorarioSeccionEntity> buscarPorBloqueHorarioId(@Param("valor") Short valor);
 }

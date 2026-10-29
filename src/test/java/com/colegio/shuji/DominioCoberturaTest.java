@@ -288,11 +288,12 @@ class DominioCoberturaTest {
       assertTrue(asistencia.esFalta());
       assertFalse(asistencia.esPresente());
 
-      asistencia.justificar("Cita médica en Essalud", "https://sustentos.com/doc1.pdf");
+      String clavePrivada = "asistencia/justificaciones/1/123e4567-e89b-12d3-a456-426614174000.pdf";
+      asistencia.justificar("Cita médica en Essalud", clavePrivada);
       assertTrue(asistencia.getJustificada());
       assertEquals(EstadoAsistenciaAula.FALTA_JUSTIFICADA, asistencia.getEstado());
       assertEquals("Cita médica en Essalud", asistencia.getMotivoJustificacion());
-      assertEquals("https://sustentos.com/doc1.pdf", asistencia.getDocumentoSustentoUrl());
+      assertEquals(clavePrivada, asistencia.getDocumentoSustentoKey());
 
       assertThrows(BusinessException.class, () -> asistencia.justificar("Otro", null));
 
@@ -601,7 +602,9 @@ class DominioCoberturaTest {
               .asignacionDocenteId(10L)
               .diaSemana((short) 1)
               .bloqueHorarioId((short) 1)
+              .activo(true)
               .build();
+      assertTrue(horario.estaActivo());
       horario.reprogramar((short) 2, (short) 3);
       assertEquals((short) 2, horario.getDiaSemana());
       assertEquals((short) 3, horario.getBloqueHorarioId());
@@ -612,6 +615,8 @@ class DominioCoberturaTest {
 
       horario.reprogramar((DiaSemana) null, (short) 5);
       assertNull(horario.getDiaSemana());
+      horario.retirar();
+      assertFalse(horario.estaActivo());
     }
   }
 

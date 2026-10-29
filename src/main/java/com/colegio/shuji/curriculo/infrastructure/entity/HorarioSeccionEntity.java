@@ -44,6 +44,9 @@ public class HorarioSeccionEntity {
   @Column(name = "bloque_horario_id", nullable = false)
   private Short bloqueHorarioId;
 
+  @Column(name = "activo", nullable = false)
+  private Boolean activo;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
     @JoinColumn(

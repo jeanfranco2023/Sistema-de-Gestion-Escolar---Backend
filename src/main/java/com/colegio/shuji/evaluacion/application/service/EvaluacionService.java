@@ -44,6 +44,7 @@ public class EvaluacionService
   private final AnioLectivoRepositoryPort anios;
   private final AsignacionRepositoryPort asignaciones;
   private final MatriculaRepositoryPort matriculas;
+  private final com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort estudiantes;
   private final CompetenciaRepositoryPort competencias;
   private final ActorActualPort actor;
   private final com.colegio.shuji.matricula.application.port.out.AccesoFamiliarPort accesoFamiliar;
@@ -59,12 +60,19 @@ public class EvaluacionService
     var notas = calificaciones.buscarPorAsignacionYPeriodo(asignacionDocenteId, periodoAcademicoId).stream()
         .filter(c -> c.getCompetenciaId().equals(competenciaId))
         .collect(Collectors.toMap(CalificacionCneb::getMatriculaId, Function.identity(), (a, b) -> a));
-    return matriculas.buscarPorSeccionId(asignacion.getSeccionId()).stream()
+    var matriculasActivas = matriculas.buscarPorSeccionId(asignacion.getSeccionId()).stream()
         .filter(m -> m.getEstadoMatricula() == EstadoMatricula.MATRICULADO
             && m.getAnioLectivoId().equals(asignacion.getAnioLectivoId()))
+        .toList();
+    var estudiantesPorId = estudiantes.buscarPorIds(
+            matriculasActivas.stream().map(Matricula::getEstudianteId).distinct().toList()).stream()
+        .collect(Collectors.toMap(com.colegio.shuji.matricula.domain.model.Estudiante::getId,
+            com.colegio.shuji.matricula.domain.model.Estudiante::nombreCompleto));
+    return matriculasActivas.stream()
         .map(m -> {
           var nota = notas.get(m.getId());
-          return new FilaCalificacionResponseDto(m.getId(), competenciaId,
+          return new FilaCalificacionResponseDto(m.getId(),
+              estudiantesPorId.getOrDefault(m.getEstudianteId(), "Estudiante sin datos"), competenciaId,
               nota == null ? null : nota.getCalificacionCualitativa(),
               nota == null ? null : nota.getConclusionDescriptiva(),
               nota == null ? false : nota.necesitaRefuerzo());
@@ -156,7 +164,7 @@ public class EvaluacionService
   @Transactional(readOnly = true)
   public LibretaNotasResponseDto libreta(Long matriculaId) {
     var matricula = requerido(matriculas.buscarPorId(matriculaId));
-    boolean gestion = actor.tieneRol("DIRECCION") || actor.tieneRol("SECRETARIA");
+    boolean gestion = actor.tieneRol("DIRECCION");
     boolean familiar = !gestion && actor.tieneRol("APODERADO")
         && accesoFamiliar.tieneCustodia(matricula.getEstudianteId(), actor.usuarioId());
     if (!gestion) {
@@ -179,11 +187,8 @@ public class EvaluacionService
         calificaciones.buscarPorPeriodoAcademicoId(periodoId).stream()
             .filter(c -> c.necesitaRefuerzo()
                 || c.getCalificacionCualitativa() == com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa.B)
-            .filter(
-                c ->
-                    actor.tieneRol("DIRECCION")
-                        || actor.tieneRol("SECRETARIA")
-                        || c.getDocenteUsuarioId().equals(actor.usuarioId()))
+            .filter(c -> actor.tieneRol("DIRECCION")
+                || c.getDocenteUsuarioId().equals(actor.usuarioId()))
             .map(mapper::toResponse)
             .toList());
   }

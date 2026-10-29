@@ -4,9 +4,10 @@ import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.asistencia.application.dto.in.ImportarLoteBiometricoRequestDto;
-import com.colegio.shuji.asistencia.application.dto.in.JustificarInasistenciaRequestDto;
 import com.colegio.shuji.asistencia.application.dto.in.RegistrarAsistenciaAulaRequestDto;
 import com.colegio.shuji.asistencia.application.dto.out.AsistenciaAulaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.DocenteAsistenciaDiariaResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.DocenteMatriculaAsistenciaDto;
 import com.colegio.shuji.asistencia.application.dto.out.LoteBiometricoResponseDto;
 import com.colegio.shuji.asistencia.application.dto.out.ReporteAsistenciaDiariaResponseDto;
 import com.colegio.shuji.asistencia.application.mapper.AsistenciaMapper;
@@ -19,6 +20,9 @@ import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
 import com.colegio.shuji.asistencia.domain.model.LoteBiometrico;
 import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
+import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.curriculo.application.port.out.AsignacionRepositoryPort;
+import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
@@ -31,9 +35,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +54,8 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
   private final EstudianteRepositoryPort estudiantes;
   private final MatriculaRepositoryPort matriculas;
   private final AsistenciaAulaRepositoryPort asistencias;
+  private final AsignacionRepositoryPort asignaciones;
+  private final AnioLectivoRepositoryPort anios;
   private final ActorActualPort actor;
 
   public LoteBiometricoResponseDto importar(ImportarLoteBiometricoRequestDto r) {
@@ -150,6 +159,7 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
 
   public AsistenciaAulaResponseDto registrar(RegistrarAsistenciaAulaRequestDto r) {
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
+    if (actor.tieneRol("DOCENTE") || actor.tieneRol("TUTOR")) exigirAccesoDocente(m);
     exigir(m.getEstadoMatricula() == EstadoMatricula.MATRICULADO, "Matrícula no activa");
     if (asistencias.buscarPorMatriculaId(r.matriculaId()).stream()
         .anyMatch(a -> a.getFechaSesion().equals(r.fechaSesion())))
@@ -163,15 +173,131 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     return mapper.toResponse(asistencias.guardar(a));
   }
 
-  public AsistenciaAulaResponseDto justificar(JustificarInasistenciaRequestDto r) {
-    var a = requerido(asistencias.bloquearPorId(r.asistenciaId()));
-    a.justificar(r.motivo(), r.documentoSustentoUrl());
+  public AsistenciaAulaResponseDto justificar(Long asistenciaId, String motivo, String documentoSustentoKey) {
+    var a = requerido(asistencias.bloquearPorId(asistenciaId));
+    if (actor.tieneRol("DOCENTE") || actor.tieneRol("TUTOR")) {
+      exigirAccesoDocente(requerido(matriculas.bloquearPorId(a.getMatriculaId())));
+    }
+    a.justificar(motivo, documentoSustentoKey);
     return mapper.toResponse(asistencias.guardar(a));
   }
 
   @Transactional(readOnly = true)
+  public String documentoSustentoKey(Long asistenciaId) {
+    var asistencia = requerido(asistencias.buscarPorId(asistenciaId));
+    exigir(asistencia.getDocumentoSustentoKey() != null && !asistencia.getDocumentoSustentoKey().isBlank(),
+        "La asistencia no tiene un documento de sustento");
+    return asistencia.getDocumentoSustentoKey();
+  }
+
+  @Transactional(readOnly = true)
   public ReporteAsistenciaDiariaResponseDto reporte(LocalDate fecha) {
+    var registros = asistencias.buscarPorFechaSesion(fecha);
     return new ReporteAsistenciaDiariaResponseDto(
-        fecha, asistencias.buscarPorFechaSesion(fecha).stream().map(mapper::toResponse).toList());
+        fecha, respuestasConNombres(registros));
+  }
+
+  private List<AsistenciaAulaResponseDto> respuestasConNombres(
+      List<com.colegio.shuji.asistencia.domain.model.AsistenciaAula> registros) {
+    if (registros.isEmpty()) return List.of();
+    var matriculasPorId = matriculas.buscarPorIds(registros.stream()
+        .map(com.colegio.shuji.asistencia.domain.model.AsistenciaAula::getMatriculaId).distinct().toList())
+        .stream().collect(Collectors.toMap(Matricula::getId, Function.identity()));
+    var estudiantesPorId = estudiantes.buscarPorIds(matriculasPorId.values().stream()
+        .map(Matricula::getEstudianteId).distinct().toList()).stream()
+        .collect(Collectors.toMap(com.colegio.shuji.matricula.domain.model.Estudiante::getId, Function.identity()));
+    return registros.stream().map(registro -> {
+      var dto = mapper.toResponse(registro);
+      var matricula = matriculasPorId.get(registro.getMatriculaId());
+      var estudiante = matricula == null ? null : estudiantesPorId.get(matricula.getEstudianteId());
+      String nombre = estudiante == null ? "Estudiante sin datos" : estudiante.nombreCompleto();
+      return new AsistenciaAulaResponseDto(dto.id(), dto.matriculaId(), nombre,
+          dto.fechaSesion(), dto.horaRegistro(), dto.estado(), dto.auxiliarUsuarioId(),
+          dto.justificada(), dto.motivoJustificacion(), dto.tieneDocumentoSustento());
+    }).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<DocenteMatriculaAsistenciaDto> matriculasDelDocente() {
+    exigirRolDocente();
+    var matriculasAsignadas = cargarMatriculasAsignadas();
+    var nombres = nombresPorEstudiante(matriculasAsignadas);
+    return matriculasAsignadas.stream()
+        .map(m -> new DocenteMatriculaAsistenciaDto(m.getId(), nombres.get(m.getId())))
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<DocenteAsistenciaDiariaResponseDto> reporteDelDocente(LocalDate fecha) {
+    exigirRolDocente();
+    var asignadas = cargarMatriculasAsignadas();
+    if (asignadas.isEmpty()) return List.of();
+    var nombres = nombresPorEstudiante(asignadas);
+    return asistencias.buscarPorFechaSesionYMatriculaIds(
+            fecha, asignadas.stream().map(Matricula::getId).toList())
+        .stream()
+        .map(
+            a ->
+                new DocenteAsistenciaDiariaResponseDto(
+                    a.getId(),
+                    a.getMatriculaId(),
+                    nombres.get(a.getMatriculaId()),
+                    a.getFechaSesion(),
+                    a.getHoraRegistro(),
+                    a.getEstado()))
+        .toList();
+  }
+
+  private void exigirAccesoDocente(Matricula matricula) {
+    exigirRolDocente();
+    var asignadas = asignacionesAbiertas();
+    if (!asignadas.getOrDefault(matricula.getSeccionId(), Set.of())
+        .contains(matricula.getAnioLectivoId())) {
+      throw new AccessDeniedException("La matrícula no pertenece a una sección asignada al docente");
+    }
+  }
+
+  private List<Matricula> cargarMatriculasAsignadas() {
+    var asignadas = asignacionesAbiertas();
+    if (asignadas.isEmpty()) return List.of();
+    var candidatas = matriculas.buscarPorSeccionIds(asignadas.keySet()).stream()
+        .filter(Matricula::estaMatriculado)
+        .filter(m -> asignadas.getOrDefault(m.getSeccionId(), Set.of()).contains(m.getAnioLectivoId()))
+        .toList();
+    if (candidatas.isEmpty()) return List.of();
+    var estudiantesActivos =
+        estudiantes.buscarPorIds(candidatas.stream().map(Matricula::getEstudianteId).distinct().toList())
+            .stream()
+            .filter(e -> Boolean.TRUE.equals(e.getActivo()))
+            .map(e -> e.getId())
+            .collect(Collectors.toSet());
+    return candidatas.stream().filter(m -> estudiantesActivos.contains(m.getEstudianteId())).toList();
+  }
+
+  private Map<Integer, Set<Short>> asignacionesAbiertas() {
+    var aniosAbiertos =
+        anios.listar().stream().filter(a -> a.estaAbierto()).map(a -> a.getId()).collect(Collectors.toSet());
+    return asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId()).stream()
+        .filter(a -> a.getSeccionId() != null && aniosAbiertos.contains(a.getAnioLectivoId()))
+        .collect(Collectors.groupingBy(
+            a -> a.getSeccionId(), Collectors.mapping(a -> a.getAnioLectivoId(), Collectors.toSet())));
+  }
+
+  private Map<Long, String> nombresPorEstudiante(List<Matricula> matriculasAsignadas) {
+    var nombresPorEstudiante =
+        estudiantes.buscarPorIds(
+                matriculasAsignadas.stream().map(Matricula::getEstudianteId).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(e -> e.getId(), e -> e.nombreCompleto()));
+    return matriculasAsignadas.stream()
+        .collect(Collectors.toMap(
+            Matricula::getId,
+            matricula -> nombresPorEstudiante.getOrDefault(matricula.getEstudianteId(), "Estudiante")));
+  }
+
+  private void exigirRolDocente() {
+    if (!actor.tieneRol("DOCENTE") && !actor.tieneRol("TUTOR")) {
+      throw new AccessDeniedException("El endpoint es exclusivo para docentes y tutores");
+    }
   }
 }

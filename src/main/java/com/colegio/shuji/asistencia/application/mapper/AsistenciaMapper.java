@@ -10,6 +10,7 @@ import com.colegio.shuji.asistencia.domain.model.ConciliacionAsistencia;
 import com.colegio.shuji.asistencia.domain.model.LoteBiometrico;
 import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
@@ -20,6 +21,8 @@ public interface AsistenciaMapper {
 
   MarcaPorteriaResponseDto toResponse(MarcaPorteria model);
 
+  @Mapping(target = "tieneDocumentoSustento", expression = "java(model.getDocumentoSustentoKey() != null && !model.getDocumentoSustentoKey().isBlank())")
+  @Mapping(target = "nombreEstudiante", ignore = true)
   AsistenciaAulaResponseDto toResponse(AsistenciaAula model);
 
   ConciliacionAsistenciaResponseDto toResponse(ConciliacionAsistencia model);

@@ -4,6 +4,7 @@ import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
 import com.colegio.shuji.convivencia.infrastructure.entity.IncidenciaConductualEntity;
 import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -17,6 +18,9 @@ public interface JpaIncidenciaRepository extends JpaRepository<IncidenciaConduct
 
   @Query("select e from IncidenciaConductualEntity e where e.matriculaId = :valor order by e.id")
   List<IncidenciaConductualEntity> buscarPorMatriculaId(@Param("valor") Long valor);
+
+  @Query("select e from IncidenciaConductualEntity e where e.matriculaId in :ids order by e.id")
+  List<IncidenciaConductualEntity> buscarPorMatriculaIds(@Param("ids") Collection<Long> ids);
 
   @Query(
       "select e from IncidenciaConductualEntity e where e.reportadoPorUsuarioId = :valor order by"

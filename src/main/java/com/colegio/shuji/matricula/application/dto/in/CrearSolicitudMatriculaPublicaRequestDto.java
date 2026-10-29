@@ -26,7 +26,7 @@ public record CrearSolicitudMatriculaPublicaRequestDto(
     @NotBlank @Size(max = 20) String apellidoPaternoApoderado,
     @NotBlank @Size(max = 20) String apellidoMaternoApoderado,
     @NotBlank @Pattern(regexp = "9[0-9]{8}") String celularApoderado,
-    @Email @Size(max = 50) String emailApoderado,
+    @Email @Size(max = 100) String emailApoderado,
     @NotBlank @Size(max = 150) String direccionApoderado,
     @NotBlank @Pattern(regexp = "[0-9]{6}") String ubigeoApoderado,
     @NotNull Parentesco parentesco,

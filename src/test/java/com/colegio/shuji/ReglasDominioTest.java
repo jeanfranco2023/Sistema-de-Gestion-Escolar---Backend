@@ -79,7 +79,7 @@ class ReglasDominioTest {
     a.setEstado(EstadoAsistenciaAula.PRESENTE);
     assertThrows(BusinessException.class, () -> a.justificar("Enfermedad", null));
     a.setEstado(EstadoAsistenciaAula.FALTA_INJUSTIFICADA);
-    a.justificar("Enfermedad", null);
+    a.justificar("Enfermedad", "asistencia/justificaciones/sustento.pdf");
     assertTrue(a.getJustificada());
     assertEquals(EstadoAsistenciaAula.FALTA_JUSTIFICADA, a.getEstado());
   }

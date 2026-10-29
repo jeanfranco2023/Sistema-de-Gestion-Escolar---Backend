@@ -60,13 +60,16 @@ class SolicitudMatriculaPublicaDocumentosTest {
   @InjectMocks private SolicitudMatriculaPublicaService service;
 
   @Test
-  void crearBloqueaLaSeccionYRechazaEdadFueraDeRangoSinPersistir() {
+  void edadFueraDeRangoQuedaPendienteDeAutorizacionSinIniciarPago() {
     prepararAdmision();
+    when(solicitudes.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     var request = solicitudPublicaConNacimiento(java.time.LocalDate.of(2020, 4, 1));
-    var error = assertThrows(ResponseStatusException.class, () -> service.crear(request));
-    assertEquals(422, error.getStatusCode().value());
+    var respuesta = service.crear(request);
+    assertEquals(EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE, respuesta.estado());
     verify(secciones).bloquearPorId(9);
-    org.mockito.Mockito.verifyNoInteractions(solicitudes, estudiantes, mercadoPago);
+    verify(solicitudes).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.verifyNoInteractions(mercadoPago, cobrosMatricula);
   }
 
   @Test

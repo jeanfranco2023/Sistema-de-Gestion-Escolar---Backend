@@ -37,7 +37,7 @@ public class EvaluacionController {
   private final com.colegio.shuji.evaluacion.application.port.in.DescargarPlantillaCnebUseCase plantilla;
 
   @GetMapping("/cneb/plantilla")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   public org.springframework.http.ResponseEntity<byte[]> plantilla(@RequestParam Long asignacionDocenteId,
       @RequestParam Short periodoId, @RequestParam Short competenciaId) {
     return org.springframework.http.ResponseEntity.ok()
@@ -47,7 +47,7 @@ public class EvaluacionController {
   }
 
   @GetMapping("/libreta/{matriculaId}/pdf")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE','APODERADO')")
   public org.springframework.http.ResponseEntity<byte[]> descargarLibretaPdf(@PathVariable @Positive Long matriculaId) {
     return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
         .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"libreta_" + matriculaId + ".pdf\"")
@@ -55,7 +55,7 @@ public class EvaluacionController {
   }
 
   @PostMapping(value = "/cneb/carga-masiva", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   public com.colegio.shuji.evaluacion.application.dto.out.ImportacionCalificacionesResponseDto cargarPlanilla(
       @RequestParam("archivo") org.springframework.web.multipart.MultipartFile archivo,
       @RequestParam Short periodoId, @RequestParam Integer seccionId, @RequestParam Long asignacionDocenteId,
@@ -68,7 +68,7 @@ public class EvaluacionController {
   }
 
   @PostMapping("/ia/sugerir-conclusion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   @Operation(summary = "evaluacion.sugerirIa")
   public com.colegio.shuji.evaluacion.application.dto.out.SugerenciaConclusionDescriptivaResponseDto sugerirConclusionIa(
       @Valid @RequestBody com.colegio.shuji.evaluacion.application.dto.in.SugerirConclusionDescriptivaRequestDto request) {
@@ -76,7 +76,7 @@ public class EvaluacionController {
   }
 
   @PostMapping("/cneb")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   @Operation(summary = "registro.registrar")
   public List<CalificacionResponseDto> registrarCalificacionesMasivas(
       @Valid @RequestBody RegistrarCalificacionesMasivasRequestDto r) {
@@ -84,14 +84,14 @@ public class EvaluacionController {
   }
 
   @GetMapping("/cneb")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   public List<CalificacionResponseDto> listarCalificaciones(
       @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId) {
     return registro.listar(asignacionDocenteId, periodoAcademicoId);
   }
 
   @GetMapping("/cneb/matriz")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   public List<FilaCalificacionResponseDto> listarMatriz(
       @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId,
       @RequestParam Short competenciaId) {
@@ -99,14 +99,14 @@ public class EvaluacionController {
   }
 
   @GetMapping("/libreta/{matriculaId}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE','APODERADO')")
   @Operation(summary = "consulta.libreta")
   public LibretaNotasResponseDto consultarLibretaNotas(@PathVariable @Positive Long matriculaId) {
     return consulta.libreta(matriculaId);
   }
 
   @GetMapping("/riesgo")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
   @Operation(summary = "consulta.riesgo")
   public EstudiantesEnRiesgoResponseDto consultarEstudiantesEnRiesgo(@RequestParam Short periodoId) {
     return consulta.riesgo(periodoId);

@@ -18,4 +18,5 @@ public record ObligacionResponseDto(
     BigDecimal montoDescuento,
     BigDecimal totalPagado,
     BigDecimal saldoPendiente,
-    EstadoObligacion estado) {}
+    EstadoObligacion estado,
+    String nombreEstudiante) {}

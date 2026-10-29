@@ -15,4 +15,5 @@ public record IncidenciaResponseDto(
     Long reportadoPorUsuarioId,
     Boolean requiereCitacion,
     EstadoIncidencia estado,
-    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {}
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion,
+    String nombreEstudiante) {}

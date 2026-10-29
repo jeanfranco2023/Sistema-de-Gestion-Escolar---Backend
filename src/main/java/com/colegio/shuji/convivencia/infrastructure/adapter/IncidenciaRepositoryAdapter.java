@@ -6,6 +6,7 @@ import com.colegio.shuji.convivencia.domain.model.IncidenciaConductual;
 import com.colegio.shuji.convivencia.infrastructure.repository.JpaIncidenciaRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -59,6 +60,11 @@ public class IncidenciaRepositoryAdapter implements IncidenciaRepositoryPort {
 
   public List<IncidenciaConductual> buscarPorMatriculaId(Long valor) {
     return repository.buscarPorMatriculaId(valor).stream().map(mapper::toDomain).toList();
+  }
+
+  public List<IncidenciaConductual> buscarPorMatriculaIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorMatriculaIds(ids).stream().map(mapper::toDomain).toList();
   }
 
   public List<IncidenciaConductual> buscarPorReportadoPorUsuarioId(Long valor) {

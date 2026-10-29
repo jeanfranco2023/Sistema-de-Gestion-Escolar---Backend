@@ -52,7 +52,7 @@ public class EstudianteRepositoryAdapter implements EstudianteRepositoryPort {
   }
 
   public List<Estudiante> listar() {
-    return repository.findAll(org.springframework.data.domain.Sort.by("id")).stream()
+    return repository.findAllByActivoTrue(org.springframework.data.domain.Sort.by("id")).stream()
         .map(mapper::toDomain)
         .toList();
   }

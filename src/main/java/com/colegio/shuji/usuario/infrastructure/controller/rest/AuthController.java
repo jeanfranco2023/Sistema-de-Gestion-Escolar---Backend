@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,6 +45,7 @@ public class AuthController {
       summary = "Iniciar sesión",
       description = "Valida credenciales y retorna Access Token y Refresh Token")
   @PostMapping("/login")
+  @PreAuthorize("permitAll()")
   public ResponseEntity<ApiResponse<AuthResponseDto>> login(
       @Valid @RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
 
@@ -58,6 +60,7 @@ public class AuthController {
       summary = "Registrar nuevo usuario",
       description = "Crea una nueva cuenta de usuario con roles institucionales")
   @PostMapping("/register")
+  @PreAuthorize("permitAll()")
   public ResponseEntity<ApiResponse<UserResponseDto>> register(
       @Valid @RequestBody RegisterUserRequestDto registerRequest) {
 
@@ -70,6 +73,7 @@ public class AuthController {
       summary = "Renovar token de acceso",
       description = "Genera un nuevo Access Token a partir de un Refresh Token válido")
   @PostMapping("/refresh")
+  @PreAuthorize("permitAll()")
   public ResponseEntity<ApiResponse<AuthResponseDto>> refresh(
       @Valid @RequestBody RefreshTokenRequestDto refreshRequest, HttpServletRequest request) {
 

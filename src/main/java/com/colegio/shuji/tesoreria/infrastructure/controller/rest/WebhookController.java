@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +30,7 @@ public class WebhookController {
   private final MercadoPagoWebhookSignatureValidator firmaMercadoPago;
 
   @PostMapping("/culqi")
+  @PreAuthorize("permitAll()")
   @Operation(summary = "pagos.procesarWebhook")
   public TransaccionResponseDto webhookCulqi(
       @Valid @RequestBody ProcesarPagoWebhookRequestDto r,
@@ -37,6 +39,7 @@ public class WebhookController {
   }
 
   @PostMapping("/niubiz")
+  @PreAuthorize("permitAll()")
   @Operation(summary = "pagos.procesarWebhook")
   public TransaccionResponseDto webhookNiubiz(
       @Valid @RequestBody ProcesarPagoWebhookRequestDto r,
@@ -45,6 +48,7 @@ public class WebhookController {
   }
 
   @PostMapping("/mercadopago")
+  @PreAuthorize("permitAll()")
   @Operation(summary = "Procesar IPN / Webhook de Mercado Pago")
   public ResponseEntity<Void> webhookMercadoPago(
       @RequestParam(value = "data.id", required = false) String dataIdParam,

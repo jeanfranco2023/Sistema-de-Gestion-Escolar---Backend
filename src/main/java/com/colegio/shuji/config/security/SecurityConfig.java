@@ -88,7 +88,7 @@ public class SecurityConfig {
                   .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-matricula/public")
                   .permitAll()
                   .requestMatchers("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/**")
-                  .hasAnyRole("DIRECCION", "ACTUATOR")
+                  .hasRole("DIRECCION")
                   .requestMatchers(PUBLIC_ENDPOINTS)
                   .permitAll();
               if (swaggerEnabled) {

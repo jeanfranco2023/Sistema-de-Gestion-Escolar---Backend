@@ -26,7 +26,7 @@ public class ApoderadoController {
   private final RegistrarFichaFamiliarUseCase familias;
 
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "familias.registrarApoderado")
   public ApoderadoResponseDto registrarApoderado(@Valid @RequestBody RegistrarApoderadoRequestDto r) {
     return familias.registrarApoderado(r);

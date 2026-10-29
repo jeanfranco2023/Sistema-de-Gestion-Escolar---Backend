@@ -20,32 +20,39 @@ public class PortalFamiliarController {
   private final com.colegio.shuji.academico.application.port.in.GestionarAnioLectivoUseCase calendario;
 
   @GetMapping("/periodos-seguimiento")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','TUTOR','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','TUTOR','AUXILIAR')")
   public List<PeriodoResponseDto> periodosSeguimiento(@org.springframework.web.bind.annotation.RequestParam Short anioId) {
-    return calendario.listarPeriodos(anioId);
+    return consulta.periodosSeguimiento(anioId);
   }
   @GetMapping("/hijos-propios")
   @PreAuthorize("hasRole('APODERADO')")
   public List<HijoPortalResponseDto> hijosPropios() { return consulta.hijosPropios(); }
 
   @GetMapping("/matriculas/{id}/calificaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
   public List<com.colegio.shuji.evaluacion.application.dto.out.CalificacionPortalResponseDto> calificaciones(@PathVariable Long id) {
     return consulta.calificaciones(id);
   }
   @GetMapping("/hijos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
   public List<HijoPortalResponseDto> hijos() { return consulta.hijos(); }
 
   @GetMapping("/alumnos-seguimiento")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','TUTOR','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','TUTOR','AUXILIAR')")
   public List<HijoPortalResponseDto> seguimiento() { return consulta.alumnosSeguimiento(); }
 
+  @GetMapping("/seguimiento/riesgo-calificaciones")
+  @PreAuthorize("hasRole('TUTOR')")
+  public List<com.colegio.shuji.evaluacion.application.dto.out.CalificacionRiesgoTutorResponseDto>
+      calificacionesRiesgoTutor() {
+    return consulta.calificacionesRiesgoTutor();
+  }
+
   @GetMapping("/matriculas/{id}/asistencia")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
   public List<AsistenciaAulaResponseDto> asistencia(@PathVariable Long id) { return consulta.asistencia(id); }
 
   @GetMapping("/matriculas/{id}/periodos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
   public List<PeriodoResponseDto> periodos(@PathVariable Long id) { return consulta.periodos(id); }
 }

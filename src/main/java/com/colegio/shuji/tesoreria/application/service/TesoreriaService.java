@@ -7,6 +7,7 @@ import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPor
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPublicaUseCase;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
@@ -55,6 +56,7 @@ public class TesoreriaService
   private final PagoRepositoryPort pagos;
   private final ConceptoCobroRepositoryPort conceptos;
   private final MatriculaRepositoryPort matriculas;
+  private final EstudianteRepositoryPort estudiantes;
   private final AnioLectivoRepositoryPort anios;
   private final VerificarPagoPort verificador;
   private final MercadoPagoPort mercadoPagoPort;
@@ -110,12 +112,12 @@ public class TesoreriaService
               i == 0 ? r.primerVencimiento() : r.primerVencimiento().plusMonths(i - 1));
       result.add(mapper.toResponse(obligaciones.guardar(o)));
     }
-    return result;
+    return conNombres(result);
   }
 
   @Transactional(readOnly = true)
   public List<ObligacionResponseDto> obligacionesMatricula(Long id) {
-    return obligaciones.buscarPorMatriculaId(id).stream().map(mapper::toResponse).toList();
+    return conNombres(obligaciones.buscarPorMatriculaId(id).stream().map(mapper::toResponse).toList());
   }
 
   @Transactional(readOnly = true)
@@ -129,9 +131,8 @@ public class TesoreriaService
         .distinct()
         .toList();
     if (matriculaIds.isEmpty()) return List.of();
-    return obligaciones.buscarPorMatriculaIds(matriculaIds).stream()
-        .map(mapper::toResponse)
-        .toList();
+    return conNombres(obligaciones.buscarPorMatriculaIds(matriculaIds).stream()
+        .map(mapper::toResponse).toList());
   }
 
   @Transactional(readOnly = true)
@@ -141,11 +142,31 @@ public class TesoreriaService
     var deudas = obligaciones.buscarPorMatriculaIds(matriculaIds);
     return new EstadoCuentaEstudianteResponseDto(
         estudianteId,
-        deudas.stream().map(mapper::toResponse).toList(),
+        conNombres(deudas.stream().map(mapper::toResponse).toList()),
         deudas.stream()
             .filter(o -> o.getEstado() != EstadoObligacion.CANCELADO_POR_TRASLADO)
             .map(ObligacionPago::saldo)
             .reduce(BigDecimal.ZERO, BigDecimal::add));
+  }
+
+  private List<ObligacionResponseDto> conNombres(List<ObligacionResponseDto> filas) {
+    if (filas.isEmpty()) return List.of();
+    var matriculasPorId = matriculas.buscarPorIds(filas.stream().map(ObligacionResponseDto::matriculaId).distinct().toList())
+        .stream().collect(java.util.stream.Collectors.toMap(
+            com.colegio.shuji.matricula.domain.model.Matricula::getId, java.util.function.Function.identity()));
+    var estudiantesPorId = estudiantes.buscarPorIds(matriculasPorId.values().stream()
+        .map(com.colegio.shuji.matricula.domain.model.Matricula::getEstudianteId).distinct().toList())
+        .stream().collect(java.util.stream.Collectors.toMap(
+            com.colegio.shuji.matricula.domain.model.Estudiante::getId,
+            com.colegio.shuji.matricula.domain.model.Estudiante::nombreCompleto));
+    return filas.stream().map(fila -> {
+      var matricula = matriculasPorId.get(fila.matriculaId());
+      String nombre = matricula == null ? null : estudiantesPorId.get(matricula.getEstudianteId());
+      return new ObligacionResponseDto(fila.id(), fila.matriculaId(), fila.conceptoId(), fila.tipoConcepto(),
+          fila.numeroCuota(), fila.descripcion(), fila.fechaVencimiento(), fila.montoBase(), fila.montoMora(),
+          fila.montoDescuento(), fila.totalPagado(), fila.saldoPendiente(), fila.estado(),
+          nombre == null ? "Estudiante sin datos" : nombre);
+    }).toList();
   }
 
   private TransaccionResponseDto registrar(PagoTransaccion p) {

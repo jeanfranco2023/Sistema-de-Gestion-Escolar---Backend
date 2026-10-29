@@ -3,6 +3,7 @@ package com.colegio.shuji.academico.infrastructure.controller.rest;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.colegio.shuji.academico.application.port.in.ConsultarVacantesUseCase;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.http.MediaType;
 import org.springframework.security.web.access.ExceptionTranslationFilter;
 import org.springframework.security.web.authentication.Http403ForbiddenEntryPoint;
 import org.springframework.test.context.ContextConfiguration;
@@ -53,6 +55,20 @@ class AcademicoControllerRolesTest {
   @WithMockUser(roles = "APODERADO")
   void apoderadoNoPuedeListarPeriodos() throws Exception {
     mvc.perform(get("/api/v1/academico/periodos").param("anioId", "2026"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "SECRETARIA")
+  void secretariaPuedeConsultarVacantesPeroNoModificarLaEstructura() throws Exception {
+    mvc.perform(get("/api/v1/academico/secciones/1/vacantes"))
+        .andExpect(status().isOk());
+
+    mvc.perform(post("/api/v1/academico/secciones")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"anioLectivoId":2026,"gradoId":1,"nivelId":1,"letra":"A","cupoMaximo":30,"aulaFisica":"Aula 1"}
+                """))
         .andExpect(status().isForbidden());
   }
 

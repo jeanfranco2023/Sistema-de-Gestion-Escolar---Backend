@@ -7,10 +7,11 @@ import java.time.LocalTime;
 public record AsistenciaAulaResponseDto(
     Long id,
     Long matriculaId,
+    String nombreEstudiante,
     LocalDate fechaSesion,
     LocalTime horaRegistro,
     EstadoAsistenciaAula estado,
     Long auxiliarUsuarioId,
     Boolean justificada,
     String motivoJustificacion,
-    String documentoSustentoUrl) {}
+    boolean tieneDocumentoSustento) {}

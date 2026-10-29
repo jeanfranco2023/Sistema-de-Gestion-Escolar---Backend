@@ -52,6 +52,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final int MATRICULA_DOCUMENTO_LIMIT = 10;
   private static final int WEBHOOK_PAGOS_LIMIT = 120;
   private static final int PAGOS_TESORERIA_LIMIT = 30;
+  private static final int BIOMETRICO_IMPORT_LIMIT = 5;
+  private static final int JUSTIFICACION_ADJUNTO_LIMIT = 10;
 
   public RateLimitingFilter() {
     this.behindTrustedProxy = false;
@@ -104,6 +106,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private Integer resolveLimit(String uri) {
     if (uri == null) return null;
     if (uri.equals("/api/v1/evaluacion/ia/sugerir-conclusion")) return 15;
+    if (uri.startsWith("/api/v1/asistencia/biometrico/importar")) return BIOMETRICO_IMPORT_LIMIT;
+    if (uri.equals("/api/v1/asistencia/aula/justificacion")) return JUSTIFICACION_ADJUNTO_LIMIT;
     if (uri.endsWith(LOGIN_PATH) || uri.equals(LOGIN_PATH)) {
       return LOGIN_LIMIT;
     } else if (uri.endsWith(REGISTER_PATH) || uri.equals(REGISTER_PATH)) {

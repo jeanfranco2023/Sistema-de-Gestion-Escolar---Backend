@@ -8,9 +8,11 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.repository.query.Param;
 
 public interface JpaEstudianteRepository extends JpaRepository<EstudianteEntity, Long> {
+  List<EstudianteEntity> findAllByActivoTrue(Sort sort);
   @Query("select e from EstudianteEntity e where e.id in :ids order by e.id")
   List<EstudianteEntity> buscarPorIds(@Param("ids") Collection<Long> ids);
   @Lock(LockModeType.PESSIMISTIC_WRITE)

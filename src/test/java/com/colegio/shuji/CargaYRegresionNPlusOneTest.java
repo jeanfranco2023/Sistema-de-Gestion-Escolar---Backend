@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.colegio.shuji.asistencia.application.dto.in.ImportarLoteBiometricoRequestDto;
 import com.colegio.shuji.asistencia.application.dto.in.MarcaBiometricaRequestDto;
 import com.colegio.shuji.asistencia.application.port.in.ProcesarBiometricoUseCase;
+import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
 import com.colegio.shuji.config.security.UserPrincipal;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.port.in.RegistrarFichaFamiliarUseCase;
@@ -17,8 +18,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres}",
+      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/shuji_audit}",
       "spring.datasource.username=${TEST_DB_USERNAME:postgres}",
       "spring.datasource.password=${TEST_DB_PASSWORD:}",
       "spring.flyway.schemas=${TEST_DB_SCHEMA:public}",
@@ -49,6 +52,7 @@ import org.springframework.transaction.support.TransactionTemplate;
       "spring.datasource.hikari.maximum-pool-size=10",
       "spring.datasource.hikari.minimum-idle=0"
     })
+@EnabledIfEnvironmentVariable(named = "RUN_MUTATING_POSTGRES_TESTS", matches = "true")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 class CargaYRegresionNPlusOneTest {
@@ -59,9 +63,11 @@ class CargaYRegresionNPlusOneTest {
   private final ProcesarBiometricoUseCase biometrico;
 
   Long usuarioId;
+  private final List<String> documentosPrueba = new ArrayList<>();
 
   @BeforeEach
   void preparar() {
+    documentosPrueba.clear();
     txTemplate.execute(status -> {
       var rolesAux = em.createQuery("select r from RolEntity r where r.codigo='AUXILIAR'", RolEntity.class).getResultList();
       var u = new UsuarioEntity();
@@ -77,6 +83,28 @@ class CargaYRegresionNPlusOneTest {
     autenticar("AUXILIAR");
   }
 
+  @AfterEach
+  void limpiarDatosDePrueba() {
+    txTemplate.execute(status -> {
+      if (!documentosPrueba.isEmpty()) {
+        em.createQuery("update MarcaBiometricoEntity m set m.estudianteId = null, m.estadoProcesamiento = :estado "
+                + "where m.estudianteId in (select e.id from EstudianteEntity e where e.numeroDocumento in :documentos)")
+            .setParameter("estado", EstadoMarca.DNI_NO_IDENTIFICADO)
+            .setParameter("documentos", List.copyOf(documentosPrueba))
+            .executeUpdate();
+        em.createQuery("update EstudianteEntity e set e.activo = false where e.numeroDocumento in :documentos")
+            .setParameter("documentos", List.copyOf(documentosPrueba))
+            .executeUpdate();
+      }
+      if (usuarioId != null) {
+        var usuario = em.find(UsuarioEntity.class, usuarioId);
+        if (usuario != null) usuario.setActivo(false);
+      }
+      return null;
+    });
+    SecurityContextHolder.clearContext();
+  }
+
   @Test
   @DisplayName("Carga biométrica por lote sin consultas N+1")
   void procesamientoMasivoDeMarcasBiometricasEjecutaEnTiempoSubsegundoSinNPlusOne() {
@@ -90,6 +118,7 @@ class CargaYRegresionNPlusOneTest {
     for (int i = 0; i < TOTAL_ALUMNOS; i++) {
       String dni = "4" + String.format("%07d", new Random().nextInt(9999999));
       dnis.add(dni);
+      documentosPrueba.add(dni);
       familias.registrarEstudiante(
           new RegistrarEstudianteRequestDto(
               TipoDocumento.DNI, dni,

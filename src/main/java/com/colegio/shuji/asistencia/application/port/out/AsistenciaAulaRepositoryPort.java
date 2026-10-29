@@ -5,6 +5,7 @@ import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface AsistenciaAulaRepositoryPort {
   AsistenciaAula guardar(AsistenciaAula valor);
@@ -18,6 +19,8 @@ public interface AsistenciaAulaRepositoryPort {
   List<AsistenciaAula> buscarPorMatriculaId(Long valor);
 
   List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor);
+
+  List<AsistenciaAula> buscarPorFechaSesionYMatriculaIds(LocalDate fecha, Collection<Long> matriculaIds);
 
   List<AsistenciaAula> buscarPorEstado(EstadoAsistenciaAula valor);
 

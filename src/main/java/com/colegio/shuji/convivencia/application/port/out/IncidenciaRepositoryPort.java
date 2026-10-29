@@ -2,6 +2,7 @@ package com.colegio.shuji.convivencia.application.port.out;
 
 import com.colegio.shuji.convivencia.domain.enums.EstadoIncidencia;
 import com.colegio.shuji.convivencia.domain.model.IncidenciaConductual;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,8 @@ public interface IncidenciaRepositoryPort {
   List<IncidenciaConductual> listar();
 
   List<IncidenciaConductual> buscarPorMatriculaId(Long valor);
+
+  List<IncidenciaConductual> buscarPorMatriculaIds(Collection<Long> ids);
 
   List<IncidenciaConductual> buscarPorReportadoPorUsuarioId(Long valor);
 

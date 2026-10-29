@@ -20,6 +20,7 @@ public class HorarioSeccion {
   private Long asignacionDocenteId;
   private Short diaSemana;
   private Short bloqueHorarioId;
+  private Boolean activo;
 
   public void reprogramar(Short nuevoDia, Short nuevoBloqueId) {
     this.diaSemana = nuevoDia;
@@ -29,5 +30,21 @@ public class HorarioSeccion {
   public void reprogramar(DiaSemana dia, Short nuevoBloqueId) {
     this.diaSemana = dia != null ? dia.getCodigo() : null;
     this.bloqueHorarioId = nuevoBloqueId;
+  }
+
+  public void reprogramar(AsignacionDocente asignacion, DiaSemana dia, Short nuevoBloqueId) {
+    this.anioLectivoId = asignacion.getAnioLectivoId();
+    this.seccionId = asignacion.getSeccionId();
+    this.docenteUsuarioId = asignacion.getDocenteUsuarioId();
+    this.asignacionDocenteId = asignacion.getId();
+    reprogramar(dia, nuevoBloqueId);
+  }
+
+  public void retirar() {
+    this.activo = false;
+  }
+
+  public boolean estaActivo() {
+    return Boolean.TRUE.equals(activo);
   }
 }

@@ -12,10 +12,10 @@ public class CatalogoHorariosAdapter implements ConsultarCatalogoHorariosUseCase
   private final EntityManager em;
   private final ActorActualPort actor;
   public List<AsignacionHorarioOpcionDto> catalogo() {
-    Long docente=actor.tieneRol("DIRECCION")||actor.tieneRol("SECRETARIA")?null:actor.usuarioId();
+    Long docente=actor.tieneRol("DIRECCION")?null:actor.usuarioId();
     return em.createQuery("""
         select new com.colegio.shuji.curriculo.application.dto.out.AsignacionHorarioOpcionDto(
-          a.id,an.id,an.anio,s.id,n.nombre,g.nombre,s.letra,ar.id,ar.nombre,u.id,u.username,au.codigo)
+          a.id,an.id,an.anio,s.id,n.id,g.id,n.nombre,g.nombre,s.letra,ar.id,ar.nombre,u.id,u.username,au.codigo)
         from AsignacionDocenteEntity a, AnioLectivoEntity an, SeccionEntity s, GradoEntity g,
           NivelEntity n, AreaCurricularEntity ar, UsuarioEntity u, AulaEntity au
         where a.anioLectivoId=an.id and a.seccionId=s.id and s.gradoId=g.id and g.nivelId=n.id

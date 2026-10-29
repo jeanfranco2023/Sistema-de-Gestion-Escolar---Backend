@@ -2,12 +2,14 @@ package com.colegio.shuji.tesoreria.infrastructure.controller.rest;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class RetornoPagoController {
   @GetMapping(value = "/api/v1/pagos/retorno", produces = MediaType.TEXT_HTML_VALUE)
+  @PreAuthorize("permitAll()")
   public ResponseEntity<String> retorno() {
     // Los parámetros del navegador nunca acreditan un pago.
     return ResponseEntity.ok().header("Cache-Control", "no-store")

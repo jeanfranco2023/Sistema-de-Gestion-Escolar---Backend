@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,7 +54,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/postgres}",
+      "spring.datasource.url=${TEST_DB_URL:jdbc:postgresql://${TEST_DB_HOST:127.0.0.1}:${TEST_DB_PORT:55439}/shuji_audit}",
       "spring.datasource.username=${TEST_DB_USERNAME:postgres}",
       "spring.datasource.password=${TEST_DB_PASSWORD:}",
       "spring.flyway.schemas=${TEST_DB_SCHEMA:public}",
@@ -68,6 +69,7 @@ import org.springframework.transaction.support.TransactionTemplate;
       "spring.datasource.hikari.maximum-pool-size=10",
       "spring.datasource.hikari.minimum-idle=0"
     })
+@EnabledIfEnvironmentVariable(named = "RUN_MUTATING_POSTGRES_TESTS", matches = "true")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 class ConcurrenciaPostgresTest {

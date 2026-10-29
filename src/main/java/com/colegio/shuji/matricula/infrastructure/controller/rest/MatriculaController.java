@@ -34,14 +34,14 @@ public class MatriculaController {
   private final LiberarReservasVencidasUseCase reservas;
 
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "matriculas.solicitar")
   public MatriculaResponseDto solicitarMatricula(@Valid @RequestBody SolicitarMatriculaRequestDto r) {
     return matriculas.solicitar(r);
   }
 
   @PostMapping("/confirmacion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "matriculas.confirmar")
   public MatriculaResponseDto confirmarMatricula(@Valid @RequestBody ConfirmarMatriculaRequestDto r) {
     return matriculas.confirmar(r);
@@ -65,7 +65,7 @@ public class MatriculaController {
   }
 
   @PostMapping("/reservas/liberar")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "reservas.liberarVencidas")
   public int liberarReservasVencidas() {
     return reservas.liberarVencidas();

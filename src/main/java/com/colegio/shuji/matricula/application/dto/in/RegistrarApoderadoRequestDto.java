@@ -14,7 +14,7 @@ public record RegistrarApoderadoRequestDto(
     @NotBlank @Size(max = 20) String apellidoPaterno,
     @NotBlank @Size(max = 20) String apellidoMaterno,
     @NotBlank @Pattern(regexp = "9[0-9]{8}") String celular,
-    @Email @Size(max = 50) String email,
+    @Email @Size(max = 100) String email,
     @NotBlank @Size(max = 150) String direccion,
     @NotBlank @Pattern(regexp = "[0-9]{6}") String ubigeoInei,
     Long usuarioId) {}

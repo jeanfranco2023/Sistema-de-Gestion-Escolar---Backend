@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,7 +35,7 @@ public class DashboardController {
 
   @GetMapping("/resumen")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
-  public Resumen resumen() {
+  public Resumen resumen(Authentication authentication) {
     var hoy = LocalDate.now(ZoneId.of("America/Lima"));
     int anioActual = hoy.getYear();
     Long totalEstudiantes = null;
@@ -53,12 +54,16 @@ public class DashboardController {
         } catch (Exception e) {
           log.warn("Error calculando matriculas activas: {}", e.getMessage());
         }
-        try {
-          alumnosRiesgo = calificaciones.buscarPorAnioLectivoId(anio.getId()).stream()
-              .filter(c -> c.getCalificacionCualitativa() == CalificacionCualitativa.C)
-              .map(c -> c.getMatriculaId()).distinct().count();
-        } catch (Exception e) {
-          log.warn("Error calculando alumnos en riesgo: {}", e.getMessage());
+        boolean direccion = authentication != null && authentication.getAuthorities().stream()
+            .anyMatch(authority -> "ROLE_DIRECCION".equals(authority.getAuthority()));
+        if (direccion) {
+          try {
+            alumnosRiesgo = calificaciones.buscarPorAnioLectivoId(anio.getId()).stream()
+                .filter(c -> c.getCalificacionCualitativa() == CalificacionCualitativa.C)
+                .map(c -> c.getMatriculaId()).distinct().count();
+          } catch (Exception e) {
+            log.warn("Error calculando alumnos en riesgo: {}", e.getMessage());
+          }
         }
       }
     } catch (Exception e) {

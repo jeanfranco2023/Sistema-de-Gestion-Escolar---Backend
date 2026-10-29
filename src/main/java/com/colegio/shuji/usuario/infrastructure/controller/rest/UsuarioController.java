@@ -60,6 +60,7 @@ public class UsuarioController {
       summary = "Obtener perfil propio",
       description = "Retorna la información del usuario actualmente autenticado")
   @GetMapping("/me")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<UserResponseDto>> obtenerMiPerfil(
       @AuthenticationPrincipal UserPrincipal principal) {
 
@@ -71,6 +72,7 @@ public class UsuarioController {
       summary = "Actualizar perfil propio",
       description = "Actualiza los datos básicos del usuario autenticado")
   @PutMapping("/me")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<UserResponseDto>> actualizarMiPerfil(
       @AuthenticationPrincipal UserPrincipal principal,
       @Valid @RequestBody UpdateUsuarioRequestDto requestDto) {
@@ -86,7 +88,7 @@ public class UsuarioController {
           "Lista todos los usuarios o filtra según el código de rol institucional (ej: DOCENTE,"
               + " SECRETARIA)")
   @GetMapping
-  @PreAuthorize("hasAnyRole('DIRECCION', 'SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   public ResponseEntity<ApiResponse<List<UserResponseDto>>> listarUsuarios(
       @Parameter(description = "Código del rol (opcional)", example = "DOCENTE")
           @RequestParam(name = "rol", required = false)
@@ -98,9 +100,9 @@ public class UsuarioController {
 
   @Operation(
       summary = "Cambiar estado activo/inactivo de un usuario",
-      description = "Permite a Dirección o Secretaría activar o suspender una cuenta")
+      description = "Permite a Dirección activar o suspender una cuenta")
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION', 'SECRETARIA')")
+  @PreAuthorize("hasRole('DIRECCION')")
   public ResponseEntity<ApiResponse<UserResponseDto>> cambiarEstado(
       @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
           Long id,
@@ -123,6 +125,7 @@ public class UsuarioController {
       summary = "Cambiar contraseña del usuario autenticado",
       description = "Permite al usuario actual modificar su contraseña validando la anterior")
   @PutMapping("/password")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<Void>> cambiarPassword(
       @AuthenticationPrincipal UserPrincipal principal,
       @Valid @RequestBody CambiarPasswordRequestDto requestDto) {

@@ -45,7 +45,7 @@ public class TesoreriaController {
   }
 
   @PostMapping("/obligaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "cronograma.generarCronograma")
   public List<ObligacionResponseDto> generarCronograma(
       @Valid @RequestBody GenerarObligacionesAnualesRequestDto r) {
@@ -73,21 +73,21 @@ public class TesoreriaController {
   }
 
   @PostMapping("/pagos/caja")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "pagos.registrarCaja")
   public TransaccionResponseDto registrarPagoCaja(@Valid @RequestBody RegistrarPagoCajaRequestDto r) {
     return pagos.registrarCaja(r);
   }
 
   @PostMapping("/pagos/reversion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "reversiones.revertir")
   public TransaccionResponseDto revertirPago(@Valid @RequestBody RevertirPagoRequestDto r) {
     return reversiones.revertir(r);
   }
 
   @PostMapping("/pagos/mercadopago/preferencia")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','APODERADO')")
   @Operation(summary = "Crear preferencia de pago en Mercado Pago")
   public PreferenciaMercadoPagoResponseDto crearPreferenciaMercadoPago(
       @Valid @RequestBody CrearPreferenciaMercadoPagoDto r) {
@@ -95,7 +95,7 @@ public class TesoreriaController {
   }
 
   @PostMapping("/obligaciones/{id}/confirmar-pago")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','APODERADO')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','APODERADO')")
   public org.springframework.http.ResponseEntity<TransaccionResponseDto> confirmarPago(@PathVariable @Positive Long id) {
     var pago = pagos.confirmarPagoMercadoPago(id);
     return pago == null ? org.springframework.http.ResponseEntity.noContent().build()

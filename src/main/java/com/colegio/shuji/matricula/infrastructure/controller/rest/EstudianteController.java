@@ -32,7 +32,7 @@ public class EstudianteController {
   private final RegistrarFichaFamiliarUseCase familias;
 
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "familias.registrarEstudiante")
   public EstudianteResponseDto registrarEstudiante(@Valid @RequestBody RegistrarEstudianteRequestDto r) {
     return familias.registrarEstudiante(r);
@@ -62,7 +62,7 @@ public class EstudianteController {
   }
 
   @PostMapping("/apoderados")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "familias.vincular")
   public EstudianteApoderadoResponseDto vincularApoderado(
       @Valid @RequestBody VincularApoderadoRequestDto r) {

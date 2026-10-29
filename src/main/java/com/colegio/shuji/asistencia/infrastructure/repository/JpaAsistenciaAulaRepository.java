@@ -5,6 +5,7 @@ import com.colegio.shuji.asistencia.infrastructure.entity.AsistenciaAulaEntity;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -21,6 +22,10 @@ public interface JpaAsistenciaAulaRepository extends JpaRepository<AsistenciaAul
 
   @Query("select e from AsistenciaAulaEntity e where e.fechaSesion = :valor order by e.id")
   List<AsistenciaAulaEntity> buscarPorFechaSesion(@Param("valor") LocalDate valor);
+
+  @Query("select e from AsistenciaAulaEntity e where e.fechaSesion = :fecha and e.matriculaId in :ids order by e.id")
+  List<AsistenciaAulaEntity> buscarPorFechaSesionYMatriculaIds(
+      @Param("fecha") LocalDate fecha, @Param("ids") Collection<Long> matriculaIds);
 
   @Query("select e from AsistenciaAulaEntity e where e.estado = :valor order by e.id")
   List<AsistenciaAulaEntity> buscarPorEstado(@Param("valor") EstadoAsistenciaAula valor);

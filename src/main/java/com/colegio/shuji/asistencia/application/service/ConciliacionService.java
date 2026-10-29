@@ -18,6 +18,7 @@ import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.ConciliacionAsistencia;
 import com.colegio.shuji.asistencia.domain.model.MarcaPorteria;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
+import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -39,6 +40,7 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
   private final MarcaPorteriaRepositoryPort marcas;
   private final AsistenciaAulaRepositoryPort asistencias;
   private final MatriculaRepositoryPort matriculas;
+  private final EstudianteRepositoryPort estudiantes;
   private final AnioLectivoRepositoryPort anios;
 
   public List<ConciliacionAsistenciaResponseDto> conciliar(
@@ -114,15 +116,19 @@ public class ConciliacionService implements EjecutarConciliacionDiariaUseCase {
 
   @Transactional(readOnly = true)
   public List<DiscrepanciaAlertaResponseDto> alertas(LocalDate fecha) {
-    return conciliaciones.buscarPorFecha(fecha).stream()
+    var incidencias = conciliaciones.buscarPorFecha(fecha).stream()
         .filter(
             c ->
                 c.getTipoDiscrepancia() == TipoDiscrepancia.DISCREPANCIA_FUGA
                     || c.getTipoDiscrepancia() == TipoDiscrepancia.DISCREPANCIA_OMISION_PORTERIA)
-        .map(
-            c ->
-                new DiscrepanciaAlertaResponseDto(
-                    c.getEstudianteId(), c.getFecha(), c.getTipoDiscrepancia()))
         .toList();
+    if (incidencias.isEmpty()) return List.of();
+    var nombres = estudiantes.buscarPorIds(incidencias.stream().map(ConciliacionAsistencia::getEstudianteId).distinct().toList())
+        .stream().collect(Collectors.toMap(
+            com.colegio.shuji.matricula.domain.model.Estudiante::getId,
+            com.colegio.shuji.matricula.domain.model.Estudiante::nombreCompleto));
+    return incidencias.stream().map(c -> new DiscrepanciaAlertaResponseDto(
+        c.getEstudianteId(), nombres.getOrDefault(c.getEstudianteId(), "Estudiante sin datos"),
+        c.getFecha(), c.getTipoDiscrepancia())).toList();
   }
 }
