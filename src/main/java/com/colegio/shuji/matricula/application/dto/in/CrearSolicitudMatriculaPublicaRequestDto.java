@@ -14,7 +14,7 @@ import java.time.ZoneId;
 
 public record CrearSolicitudMatriculaPublicaRequestDto(
     @NotNull @Positive Short anioLectivoId,
-    @NotNull @Positive Integer seccionId,
+    @NotNull @Positive Short gradoId,
     @NotBlank @Pattern(regexp = "[0-9]{8}") String numeroDocumentoEstudiante,
     @NotBlank @Size(max = 20) String nombresEstudiante,
     @NotBlank @Size(max = 20) String apellidoPaternoEstudiante,

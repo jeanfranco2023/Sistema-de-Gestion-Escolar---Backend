@@ -1,8 +1,8 @@
 # 🏫 Sistema de Gestión Escolar - Backend API
 ### Plataforma Web Integral para la I.E.P. Shuji Kitamura (Proyecto Integrador II)
 
-[![Java 21](https://img.shields.io/badge/Java-21%20LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Java 25](https://img.shields.io/badge/Java-25%20LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Spring Security](https://img.shields.io/badge/Spring%20Security-6-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Mercado Pago](https://img.shields.io/badge/Mercado%20Pago-Checkout%20Pro-009EE3?style=for-the-badge&logo=mercadopago&logoColor=white)](https://www.mercadopago.com.pe/developers)
@@ -113,7 +113,7 @@ El esquema de base de datos (`src/main/resources/db/migration/V1__schema_colegio
 
 | Componente | Tecnología | Versión | Propósito |
 | :--- | :--- | :--- | :--- |
-| **Lenguaje** | **Java** | 21 LTS | Lenguaje principal (Pattern Matching, Records, Virtual Threads ready). |
+| **Lenguaje** | **Java** | 25 LTS | Lenguaje principal, con runtime y compilación alineados a JDK 25. |
 | **Framework** | **Spring Boot** | 3.3.x | Framework central de microservicios y APIs REST. |
 | **Seguridad** | **Spring Security** | 6.x | Seguridad stateless con JWT (JJWT 0.12.6) y filtros por rol. |
 | **ORM / Acceso** | **Spring Data JPA / Hibernate** | 6.x | Mapeo objeto-relacional con consultas 100% JPQL. |
@@ -131,7 +131,7 @@ El esquema de base de datos (`src/main/resources/db/migration/V1__schema_colegio
 ## 🚀 Instalación y Despliegue Local
 
 ### Prerrequisitos
-* **JDK 21 LTS** instalado y configurado en el `PATH` (`java -version`).
+* **JDK 25 LTS** instalado y configurado en el `PATH` (`java -version`).
 * **PostgreSQL 15+** (o proyecto Supabase) con la base de datos creada.
 * Conexión a Internet para la descarga de dependencias de Maven.
 

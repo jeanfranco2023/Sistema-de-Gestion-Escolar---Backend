@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class GeminiConclusionDescriptivaAdapter implements GeneradorConclusionPort {
+  private static final Pattern DNI_PATTERN = Pattern.compile("\\b\\d{8,}\\b");
+  private static final Pattern EMAIL_PATTERN = Pattern.compile(
+      "[A-Za-z0-9.!#$%&'*+/=?^_\\x60{|}~-]++@[A-Za-z0-9-]++(?:\\.[A-Za-z0-9-]++)++");
   private final String apiKey;
   private final String model;
   private final ObjectMapper json;
@@ -78,7 +82,9 @@ public class GeminiConclusionDescriptivaAdapter implements GeneradorConclusionPo
   }
 
   private String anonimizar(String texto) {
-    return texto == null ? "" : texto.replaceAll("\\b\\d{8,}\\b|[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}", "[dato omitido]");
+    if (texto == null) return "";
+    String sinDocumento = DNI_PATTERN.matcher(texto).replaceAll("[dato omitido]");
+    return EMAIL_PATTERN.matcher(sinDocumento).replaceAll("[dato omitido]");
   }
 
   private ResponseStatusException noDisponible() {

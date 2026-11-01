@@ -14,4 +14,8 @@ public interface ProcesarMatriculaUseCase {
   FichaMatriculaResponseDto ficha(Long id);
 
   List<MatriculaResponseDto> listarPorSeccion(Integer seccionId, int page, int size);
+
+  List<MatriculaResponseDto> listarPorAnio(Short anioLectivoId);
+
+  List<Long> listarEstudianteIdsMatriculados(Short anioLectivoId);
 }

@@ -9,10 +9,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class ActorActualAdapter implements ActorActualPort {
   public Long usuarioId() {
+    return usuarioAutenticado().getId();
+  }
+
+  @Override
+  public String nombreUsuario() {
+    return usuarioAutenticado().getUsername();
+  }
+
+  private UserPrincipal usuarioAutenticado() {
     var auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal p))
       throw new AccessDeniedException("Se requiere autenticación");
-    return p.getId();
+    return p;
   }
 
   public boolean tieneRol(String rol) {

@@ -48,7 +48,7 @@ class EstudianteControllerTest {
     var request = solicitud("12345678", "María");
     when(familias.registrarEstudiante(any(RegistrarEstudianteRequestDto.class)))
         .thenReturn(new EstudianteResponseDto(
-            7L, TipoDocumento.DNI, "12345678", "María", "Pérez", "López",
+            7L, null, TipoDocumento.DNI, "12345678", "María", "Pérez", "López",
             LocalDate.of(2015, 5, 12), Genero.F, null, false, OrigenRegistro.MANUAL_CONTINGENCIA,
             null, null, true, OffsetDateTime.now()));
 
@@ -56,6 +56,7 @@ class EstudianteControllerTest {
             .content(objectMapper.writeValueAsBytes(request)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(7))
+        .andExpect(jsonPath("$.codigoInterno").value("ALU-000007"))
         .andExpect(jsonPath("$.tipoDocumento").value("DNI"));
   }
 
@@ -93,6 +94,6 @@ class EstudianteControllerTest {
 
   private RegistrarEstudianteRequestDto solicitud(String documento, String nombres) {
     return new RegistrarEstudianteRequestDto(TipoDocumento.DNI, documento, nombres, "Pérez", "López",
-        LocalDate.of(2015, 5, 12), Genero.F, null, null, null);
+        LocalDate.of(2015, 5, 12), Genero.F, null, null);
   }
 }

@@ -15,6 +15,7 @@ import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
 import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
 import com.colegio.shuji.tesoreria.domain.model.ObligacionPago;
 import com.colegio.shuji.tesoreria.domain.model.PagoTransaccion;
+import com.colegio.shuji.shared.domain.exception.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -33,7 +34,8 @@ public class CobroMatriculaService implements RegistrarCobroMatriculaUseCase {
   private final EmitirComprobanteUseCase comprobantes;
 
   public String registrar(Long matriculaId, BigDecimal montoEsperado, PagoVerificado confirmado) {
-    exigir(confirmado != null && confirmado.aprobado() && "PEN".equals(confirmado.moneda())
+    if (confirmado == null) throw new BusinessException("No se recibió la confirmación del pago de matrícula");
+    exigir(confirmado.aprobado() && "PEN".equals(confirmado.moneda())
         && confirmado.monto() != null && confirmado.monto().compareTo(montoEsperado) == 0,
         "El pago de matrícula no coincide con el importe esperado en soles");
     requerido(matriculas.bloquearPorId(matriculaId));

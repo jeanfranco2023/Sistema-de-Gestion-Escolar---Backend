@@ -22,11 +22,11 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: postgres
+          POSTGRES_DB: shuji_audit
         ports:
           - 55439:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d shuji_audit"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -38,10 +38,10 @@ jobs:
       - name: Dar permisos de ejecución al Maven Wrapper
         run: chmod +x ./mvnw
 
-      - name: Configurar Java 21 LTS (Temurin)
+      - name: Configurar Java 25 LTS (Temurin)
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
           cache: 'maven'
 
@@ -61,9 +61,13 @@ jobs:
         run: ./mvnw test -Dtest=PersistenciaPostgresTest -B
 
       - name: 5. Pruebas Reales de Alta Concurrencia (Bloqueo Pesimista en Series y Vacantes)
+        env:
+          RUN_MUTATING_POSTGRES_TESTS: 'true'
         run: ./mvnw test -Dtest=ConcurrenciaPostgresTest -B
 
       - name: 6. Pruebas de Carga y Regresiones N+1 (Ingesta Biométrica Masiva con Hibernate Statistics)
+        env:
+          RUN_MUTATING_POSTGRES_TESTS: 'true'
         run: ./mvnw test -Dtest=CargaYRegresionNPlusOneTest -B
 
       - name: 7. Suite Completa de Verificación y Cobertura JaCoCo

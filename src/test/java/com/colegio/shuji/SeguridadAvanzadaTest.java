@@ -314,6 +314,17 @@ class SeguridadAvanzadaTest {
   class SecretRotationTests {
 
     @Test
+    @DisplayName("JWT: el proveedor falla al iniciar si no hay secreto configurado")
+    void jwtSinSecretoConfiguradoFallaAlIniciar() {
+      var provider = new JwtTokenProvider();
+      ReflectionTestUtils.setField(provider, "jwtSecret", " ");
+
+      var error = assertThrows(IllegalStateException.class, provider::init);
+
+      assertTrue(error.getMessage().contains("JWT_SECRET"));
+    }
+
+    @Test
     @DisplayName("JWT: Token generado con clave previa es válido durante la ventana de rotación")
     void jwtTokenGeneradoConClavePreviaEsValido() {
       String secretViejo = "clave_secreta_antigua_de_rotacion_32bytes!!";

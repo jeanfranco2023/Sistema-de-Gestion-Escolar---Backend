@@ -1,5 +1,6 @@
 package com.colegio.shuji.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.colegio.shuji.academico.infrastructure.controller.rest.AcademicoController;
@@ -94,6 +95,21 @@ class EndpointAuthorizationTest {
 
     assertTrue(endpoints > 0, "No REST endpoints were discovered for the authorization audit");
     assertTrue(violations.isEmpty(), String.join(System.lineSeparator(), violations));
+  }
+
+  @Test
+  void gradeEditingAndImportEndpointsAreTeacherOnly() {
+    for (String methodName :
+        List.of("plantilla", "cargarPlanilla", "sugerirConclusionIa", "registrarCalificacionesMasivas")) {
+      String authorization =
+          Arrays.stream(EvaluacionController.class.getDeclaredMethods())
+              .filter(method -> method.getName().equals(methodName))
+              .map(method -> method.getDeclaredAnnotation(PreAuthorize.class))
+              .map(PreAuthorize::value)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Missing @PreAuthorize for " + methodName));
+      assertEquals("hasRole('DOCENTE')", authorization, methodName + " must be teacher-only");
+    }
   }
 
   private static boolean isRestEndpoint(Method method) {

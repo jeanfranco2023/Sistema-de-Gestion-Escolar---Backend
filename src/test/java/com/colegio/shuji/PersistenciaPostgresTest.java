@@ -148,7 +148,6 @@ class PersistenciaPostgresTest {
                 LocalDate.of(2018, 1, 1),
                 Genero.F,
                 null,
-                null,
                 null));
     estudianteId = estudiante.id();
     String dniApoderado = "8" + String.format("%07d", new Random().nextInt(9999999));
@@ -268,9 +267,12 @@ class PersistenciaPostgresTest {
         .nombreEstudiante().contains("Ana"));
     var opcion=catalogoHorarios.catalogo().stream().filter(a->a.asignacionId().equals(asignacion.id())).findFirst().orElseThrow();
     assertEquals("Matemática",opcion.areaNombre());assertEquals((short)2026,opcion.anio());assertNotNull(opcion.aulaCodigo());
-    autenticar("DIRECCION");
     var cabecera=List.of("DNI_ESTUDIANTE","COMPETENCIA_ID","NOTA_CNEB","CONCLUSION_DESCRIPTIVA");
     var malas=List.of(cabecera,List.of(dniEstudiante,competencia.id().toString(),"Z","Error de nota"));
+    autenticar("DIRECCION");
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,
+        ()->importacionCneb.importar(malas,periodo.id(),seccionId,asignacion.id(),true));
+    autenticar("DOCENTE");
     assertThrows(com.colegio.shuji.evaluacion.domain.exception.ImportacionCalificacionesException.class,
         ()->importacionCneb.importar(malas,periodo.id(),seccionId,asignacion.id(),true));
     assertTrue(evaluacion.listar(asignacion.id(),periodo.id()).isEmpty());
@@ -383,7 +385,7 @@ class PersistenciaPostgresTest {
     String dniNuevo = "5" + String.format("%07d", new Random().nextInt(9999999));
     String dniTutor = "6" + String.format("%07d", new Random().nextInt(9999999));
     var nueva = solicitudesPublicas.crear(new CrearSolicitudMatriculaPublicaRequestDto(
-        anioId, seccionId, dniNuevo, "Maria", "Perez", "Ruiz", nacimientoAdmisible(), Genero.F,
+        anioId, seccionesJpa.findById(seccionId).orElseThrow().getGradoId(), dniNuevo, "Maria", "Perez", "Ruiz", nacimientoAdmisible(), Genero.F,
         dniTutor, "Luis", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.PADRE, true));
     var s = em.find(com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity.class, nueva.id());
     s.setEstado(metodo == MetodoPago.PAGO_EFECTIVO ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
@@ -398,12 +400,8 @@ class PersistenciaPostgresTest {
           tipo == com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud.RECIBO_SERVICIO ? null : true,
           null,"privado","test/"+UUID.randomUUID()+".pdf","application/pdf",100,"a".repeat(64));
     }
-    if (metodo == MetodoPago.YAPE) {
-      assertEquals(1, seccionesJpa.reservarVacante(seccionId));
-      s.setVacanteReservada(true);
-      s.setFechaExpiracionPago(OffsetDateTime.now().plusMinutes(30));
-    }
     em.flush();
+    short vacantesAntesAsignacion = seccionesJpa.findById(seccionId).orElseThrow().getVacantesOcupadas();
     String transaccionId = "it-publico-" + UUID.randomUUID();
     var pago = new com.colegio.shuji.tesoreria.application.port.out.VerificarPagoPort.PagoVerificado(
         transaccionId, null, new BigDecimal("350.00"), "PEN", metodo, true,
@@ -411,7 +409,14 @@ class PersistenciaPostgresTest {
     var confirmada = solicitudesPublicas.finalizarPagoVerificado(nueva.id(), nueva.token(), pago);
     em.flush();
     em.clear();
-    assertEquals(EstadoSolicitudMatriculaPublica.MATRICULADA, confirmada.estado());
+    assertEquals(EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION, confirmada.estado());
+    var pendienteAsignacion = em.find(com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity.class,
+        confirmada.matriculaId());
+    assertEquals(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION,
+        pendienteAsignacion.getEstadoMatricula());
+    assertNull(pendienteAsignacion.getSeccionId());
+    assertEquals(vacantesAntesAsignacion,
+        seccionesJpa.findById(seccionId).orElseThrow().getVacantesOcupadas());
     var deuda = cronograma.obligacionesMatricula(confirmada.matriculaId()).getFirst();
     assertEquals(new BigDecimal("350.00"), deuda.totalPagado());
     assertEquals(EstadoObligacion.PAGADO_TOTAL, deuda.estado());
@@ -420,12 +425,23 @@ class PersistenciaPostgresTest {
     assertEquals(confirmada.matriculaId(), solicitudesPublicas.finalizarPagoVerificado(nueva.id(), nueva.token(), pago).matriculaId());
     assertEquals(1L, em.createQuery("select count(p) from PagoTransaccionEntity p where p.pasarelaTransaccionId=:id", Long.class)
         .setParameter("id", transaccionId).getSingleResult());
+    var asignada = solicitudesPublicas.asignarSeccion(nueva.id(), seccionId);
+    em.flush();
+    em.clear();
+    assertEquals(EstadoSolicitudMatriculaPublica.MATRICULADA, asignada.estado());
+    var matriculaAsignada = em.find(com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity.class,
+        confirmada.matriculaId());
+    assertEquals(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO,
+        matriculaAsignada.getEstadoMatricula());
+    assertEquals(seccionId, matriculaAsignada.getSeccionId());
+    assertEquals((short) (vacantesAntesAsignacion + 1),
+        seccionesJpa.findById(seccionId).orElseThrow().getVacantesOcupadas());
   }
 
   @Test
   void conservaHistorialParentalYBloqueaPagoMientrasFaltenOtrosPdf() {
     var nueva = solicitudesPublicas.crear(new CrearSolicitudMatriculaPublicaRequestDto(
-        anioId,seccionId,"7"+String.format("%07d",new Random().nextInt(9999999)),"Maria","Perez","Ruiz",
+        anioId,seccionesJpa.findById(seccionId).orElseThrow().getGradoId(),"7"+String.format("%07d",new Random().nextInt(9999999)),"Maria","Perez","Ruiz",
         nacimientoAdmisible(),Genero.F,"8"+String.format("%07d",new Random().nextInt(9999999)),
         "Rosa","Perez","Ruiz","999888777","familia@example.test","Lima","150101",Parentesco.MADRE,true));
     var tipo = TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
@@ -487,6 +503,7 @@ class PersistenciaPostgresTest {
                 (short) 9, LocalTime.of(13, 45), LocalTime.of(14, 30), false));
     horarios.programar(
         new ProgramarHorarioRequestDto(asignacion.id(), DiaSemana.LUNES, bloque.id()));
+    autenticar("DOCENTE");
     var notas =
         evaluacion.registrar(
             new RegistrarCalificacionesMasivasRequestDto(

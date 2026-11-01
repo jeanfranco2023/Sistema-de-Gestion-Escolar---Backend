@@ -74,7 +74,8 @@ public class SolicitudMatriculaPublicaService {
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS,
       EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS,
       EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE,
-      EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
+      EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE,
+      EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION);
 
   private final JpaSolicitudMatriculaPublicaRepository solicitudes;
   private final JpaSolicitudMatriculaDocumentoRepository documentos;
@@ -110,6 +111,7 @@ public class SolicitudMatriculaPublicaService {
           var edades = limitesEdad(s);
           return new SeccionMatriculaPublicaOpcionDto(
               s.getId(), s.getAnioLectivoId(),
+              s.getGradoId(),
               nivel == null ? "Nivel" : nivel.getNombre(),
               grado == null ? "Grado" : grado.getNombre(),
               s.getLetra(), s.getCupoMaximo() - s.getVacantesOcupadas(), edades.minima(), edades.maxima());
@@ -126,16 +128,19 @@ public class SolicitudMatriculaPublicaService {
     if (!Boolean.TRUE.equals(anio.getAbierto())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El año lectivo no admite matrículas");
     }
-    var seccion = secciones.bloquearPorId(r.seccionId())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sección inexistente"));
-    if (!seccion.getAnioLectivoId().equals(r.anioLectivoId())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La sección no corresponde al año lectivo");
+    var seccionesGrado = secciones.buscarPorAnioLectivoId(r.anioLectivoId());
+    var seccion = seccionesGrado.stream()
+        .filter(opcion -> opcion.getGradoId().equals(r.gradoId()))
+        .findFirst()
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El grado no corresponde al año lectivo"));
+    boolean hayVacantesEnGrado = seccionesGrado.stream()
+        .filter(opcion -> opcion.getGradoId().equals(r.gradoId()))
+        .anyMatch(opcion -> opcion.getCupoMaximo() > opcion.getVacantesOcupadas());
+    if (!hayVacantesEnGrado) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "No hay vacantes disponibles para el grado seleccionado");
     }
     var edades = limitesEdad(seccion);
     boolean requiereAutorizacionEdad = !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
-    if (seccion.getCupoMaximo() <= seccion.getVacantesOcupadas()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección seleccionada ya no tiene vacantes");
-    }
     if (!estudiantes.buscarPorNumeroDocumento(r.numeroDocumentoEstudiante()).isEmpty()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El DNI del estudiante ya está registrado");
     }
@@ -155,7 +160,8 @@ public class SolicitudMatriculaPublicaService {
         : EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES);
     s.setRequiereAutorizacionEdad(requiereAutorizacionEdad);
     s.setAnioLectivoId(r.anioLectivoId());
-    s.setSeccionId(r.seccionId());
+    s.setGradoId(r.gradoId());
+    s.setSeccionId(null);
     s.setNumeroDocumentoEstudiante(r.numeroDocumentoEstudiante().trim());
     s.setNombresEstudiante(r.nombresEstudiante().trim());
     s.setApellidoPaternoEstudiante(r.apellidoPaternoEstudiante().trim());
@@ -329,12 +335,16 @@ public class SolicitudMatriculaPublicaService {
     validarDocumentosEmitidos(s);
     var anio = anios.findById(s.getAnioLectivoId())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Año lectivo de la matrícula no disponible"));
-    var seccion = secciones.findById(s.getSeccionId())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Sección de la matrícula no disponible"));
-    var grado = seccion.getRelacion1();
+    var seccion = s.getSeccionId() == null ? null : secciones.findById(s.getSeccionId()).orElse(null);
+    var seccionGrado = seccion == null
+        ? secciones.buscarPorAnioLectivoId(s.getAnioLectivoId()).stream()
+            .filter(opcion -> opcion.getGradoId().equals(s.getGradoId())).findFirst().orElse(null)
+        : seccion;
+    var grado = seccionGrado == null ? null : seccionGrado.getRelacion1();
     var nivel = grado == null ? null : grado.getRelacion0();
     String seccionLabel = (nivel == null ? "Nivel" : nivel.getNombre()) + " · "
-        + (grado == null ? "Grado" : grado.getNombre()) + " " + seccion.getLetra();
+        + (grado == null ? "Grado" : grado.getNombre())
+        + (seccion == null ? " · sección y aula pendientes" : " · Sección " + seccion.getLetra());
     String fichaCodigo = "FIC-MAT-" + s.getMatriculaId();
     String filas = fila("Ficha", fichaCodigo)
         + fila("Matrícula", "#" + s.getMatriculaId())
@@ -350,7 +360,8 @@ public class SolicitudMatriculaPublicaService {
         + fila("Celular", s.getCelularApoderado())
         + fila("Correo", s.getEmailApoderado())
         + fila("Dirección", s.getDireccionApoderado())
-        + fila("Estado", "MATRÍCULA CONFIRMADA")
+        + fila("Estado", s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA
+            ? "PAGO CONFIRMADO · AULA ASIGNADA" : "PAGO CONFIRMADO · AULA PENDIENTE")
         + fila("Emitida", fechaDocumento(s.getFechaEmisionDocumentos()));
     return documentoHtml("Ficha de matrícula", fichaCodigo, filas,
         "Documento informativo generado al confirmar el pago y registrar la matrícula.");
@@ -359,7 +370,8 @@ public class SolicitudMatriculaPublicaService {
   @Transactional
   public PagoMatriculaPublicaResponseDto crearPago(UUID id, String token) {
     var s = solicitudConTokenBloqueada(id, token);
-    if (s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta solicitud ya fue matriculada");
     }
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
@@ -374,10 +386,8 @@ public class SolicitudMatriculaPublicaService {
         && s.getPagoEnlace() != null && !s.getPagoEnlace().isBlank()) {
       return pagoResponse(s);
     }
-    if (!s.isVacanteReservada() && secciones.reservarVacante(s.getSeccionId()) != 1) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "La vacante fue ocupada; selecciona otra sección");
-    }
-    s.setVacanteReservada(true);
+    // La sección se asigna después del pago por Secretaría; el checkout no consume vacantes.
+    if (s.isVacanteReservada()) liberarReserva(s);
     s.setFechaExpiracionPago(ahora.plusMinutes(Math.max(5, duracionReservaMinutos)));
     s.setPagoMonto(obtenerMontoMatriculaPublica());
     String referencia = REFERENCIA_PAGO_PREFIX + s.getId();
@@ -400,7 +410,8 @@ public class SolicitudMatriculaPublicaService {
         : solicitudConTokenBloqueada(id, token);
     validarReferenciaPago(s, pago);
     if (!pago.aprobado()) return respuesta(s, null);
-    if (s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
       if (!pago.transaccionId().equals(s.getPagoId())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta matrícula ya está asociada a otro pago");
       }
@@ -419,23 +430,17 @@ public class SolicitudMatriculaPublicaService {
           HttpStatus.CONFLICT,
           "El pago debe coincidir con S/ " + obtenerMontoMatriculaPublica().toPlainString() + " PEN");
     }
-    if (!s.isVacanteReservada()) {
-      if (secciones.reservarVacante(s.getSeccionId()) != 1) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Pago aprobado, pero la vacante requiere revisión administrativa");
-      }
-      s.setFechaExpiracionPago(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5));
-      s.setVacanteReservada(true);
-    }
+    if (s.isVacanteReservada()) liberarReserva(s);
 
     var anio = anios.bloquearPorId(s.getAnioLectivoId())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "El año lectivo ya no existe"));
     if (!Boolean.TRUE.equals(anio.getAbierto())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El año lectivo fue cerrado; requiere revisión administrativa");
     }
-    var seccion = secciones.bloquearPorId(s.getSeccionId())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "La sección ya no existe"));
-    if (!seccion.getAnioLectivoId().equals(s.getAnioLectivoId())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección ya no corresponde al año lectivo");
+    boolean gradoVigente = secciones.buscarPorAnioLectivoId(s.getAnioLectivoId()).stream()
+        .anyMatch(opcion -> opcion.getGradoId().equals(s.getGradoId()));
+    if (!gradoVigente) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "El grado ya no corresponde al año lectivo");
     }
 
     var existentes = estudiantes.buscarPorNumeroDocumento(s.getNumeroDocumentoEstudiante());
@@ -482,15 +487,12 @@ public class SolicitudMatriculaPublicaService {
     vinculo.setPermiteRecojo(true);
     vinculos.saveAndFlush(vinculo);
 
-    // La solicitud reservó el cupo al generar el checkout; se transfiere al trigger de matrícula.
-    secciones.liberarVacante(s.getSeccionId());
-    s.setVacanteReservada(false);
     var matricula = new MatriculaEntity();
     matricula.setAnioLectivoId(s.getAnioLectivoId());
     matricula.setEstudianteId(estudiante.getId());
-    matricula.setSeccionId(s.getSeccionId());
-    matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO);
-    matricula.setObservaciones("Matrícula pública confirmada por pago verificado de Mercado Pago");
+    matricula.setSeccionId(null);
+    matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION);
+    matricula.setObservaciones("Pago de matrícula confirmado; pendiente asignar grado y aula por Secretaría");
     matricula = matriculas.saveAndFlush(matricula);
 
     s.setPagoId(pago.transaccionId());
@@ -499,7 +501,7 @@ public class SolicitudMatriculaPublicaService {
     s.setMatriculaId(matricula.getId());
     s.setComprobantePagoCodigo(cobrosMatricula.registrar(matricula.getId(), s.getPagoMonto(), pago));
     s.setFechaEmisionDocumentos(OffsetDateTime.now(ZoneOffset.UTC));
-    s.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
+    s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION);
     s.setFechaExpiracionPago(null);
     return respuesta(solicitudes.saveAndFlush(s), null);
   }
@@ -512,9 +514,42 @@ public class SolicitudMatriculaPublicaService {
         new SolicitudMatriculaPublicaAdminResponseDto(
             s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
             nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(),
-            s.getAnioLectivoId(), s.getSeccionId(), documentos(s, archivos), s.getFechaCreacion(),
+            s.getAnioLectivoId(), s.getGradoId(), s.getSeccionId(), documentos(s, archivos), s.getFechaCreacion(),
             s.getEstudianteId(), s.getMatriculaId(), s.isRequiereAutorizacionEdad(),
             s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(), s.getFechaAutorizacionEdad())).toList();
+  }
+
+  @Transactional
+  public SolicitudMatriculaPublicaAdminResponseDto asignarSeccion(UUID id, Integer seccionId) {
+    var solicitud = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
+    if (solicitud.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || solicitud.getMatriculaId() == null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "Solo se puede asignar aula a una matrícula pagada pendiente de asignación");
+    }
+    var matricula = matriculas.bloquearPorId(solicitud.getMatriculaId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No se encontró la matrícula pagada"));
+    if (matricula.getEstadoMatricula() != com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION
+        || matricula.getSeccionId() != null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "La matrícula ya tiene una asignación o cambió de estado");
+    }
+    var seccion = secciones.bloquearPorId(seccionId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "La sección no existe"));
+    if (!seccion.getAnioLectivoId().equals(solicitud.getAnioLectivoId())
+        || !seccion.getGradoId().equals(solicitud.getGradoId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "La sección debe pertenecer al grado solicitado y al año lectivo correspondiente");
+    }
+    if (seccion.getVacantesOcupadas() >= seccion.getCupoMaximo()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección ya alcanzó su capacidad máxima");
+    }
+    matricula.setSeccionId(seccionId);
+    matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO);
+    matricula.setObservaciones("Aula asignada por Secretaría después de confirmar el pago de matrícula");
+    matriculas.saveAndFlush(matricula);
+    solicitud.setSeccionId(seccionId);
+    solicitud.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
+    return adminResponse(solicitudes.saveAndFlush(solicitud));
   }
 
   @Transactional
@@ -546,7 +581,8 @@ public class SolicitudMatriculaPublicaService {
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
       UUID id, ObservarSolicitudMatriculaPublicaRequestDto r) {
     var s = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
-    if (s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA
         || s.getEstado() == EstadoSolicitudMatriculaPublica.RECHAZADA) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud ya terminó");
     }
@@ -559,7 +595,8 @@ public class SolicitudMatriculaPublicaService {
   @Transactional
   public void rechazarAdmin(UUID id) {
     var s = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
-    if (s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede rechazar una matrícula ya confirmada");
     }
     liberarReserva(s);
@@ -590,6 +627,7 @@ public class SolicitudMatriculaPublicaService {
   @Transactional(readOnly = true)
   public void validarToken(UUID id, String token) { solicitudConToken(id, token); }
 
+  @Transactional
   public void procesarPagoWebhook(PagoVerificado pago) {
     if (pago.referenciaExterna() == null || !pago.referenciaExterna().startsWith(REFERENCIA_PAGO_PREFIX)) return;
     if (!pago.aprobado()) return;
@@ -703,7 +741,8 @@ public class SolicitudMatriculaPublicaService {
       java.util.Map<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity> archivos) {
     return java.util.Arrays.stream(TipoDocumentoSolicitud.values()).map(tipo -> {
       var v = archivos.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
-      boolean revalidar = s.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
+      boolean revalidar = s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+          && s.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
           && s.getEstado() != EstadoSolicitudMatriculaPublica.RECHAZADA
           && s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO && !evidenciaCompleta(tipo, v);
       return new DocumentoSolicitudResponseDto(tipo, revalidar ? EstadoValidacionDocumento.EN_VALIDACION : s.estadoDocumento(tipo),
@@ -752,7 +791,7 @@ public class SolicitudMatriculaPublicaService {
     return new SolicitudMatriculaPublicaAdminResponseDto(
         s.getId(), s.getEstado(), nombreEstudiante(s), s.getNumeroDocumentoEstudiante(),
         nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(), s.getAnioLectivoId(),
-        s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId(),
+        s.getGradoId(), s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId(),
         s.isRequiereAutorizacionEdad(), s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(),
         s.getFechaAutorizacionEdad());
   }
@@ -766,7 +805,8 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private void validarDocumentosEmitidos(SolicitudMatriculaPublicaEntity solicitud) {
-    if (solicitud.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
+    if ((solicitud.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+            && solicitud.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA)
         || solicitud.getMatriculaId() == null
         || solicitud.getPagoId() == null
         || solicitud.getComprobantePagoCodigo() == null

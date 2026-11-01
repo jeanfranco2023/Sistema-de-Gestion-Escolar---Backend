@@ -40,14 +40,13 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
 
   public MatriculaResponseDto solicitar(SolicitarMatriculaRequestDto r) {
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
-    var s = requerido(secciones.bloquearPorId(r.seccionId()));
-    exigir(s.getAnioLectivoId().equals(r.anioLectivoId()), "Sección de otro año");
     var e = requerido(estudiantes.bloquearPorId(r.estudianteId()));
     exigir(Boolean.TRUE.equals(e.getActivo()), "Estudiante inactivo");
-    if (matriculas.buscarPorEstudianteId(r.estudianteId()).stream()
-        .anyMatch(m -> m.getAnioLectivoId().equals(r.anioLectivoId())))
+    if (matriculas.existePorEstudianteIdYAnioLectivoId(r.estudianteId(), r.anioLectivoId()))
       throw new com.colegio.shuji.matricula.domain.exception.EstudianteYaMatriculadoException(
-          "Ya existe matrícula para este año");
+          "El estudiante ya tiene una matrícula registrada para el año lectivo seleccionado.");
+    var s = requerido(secciones.bloquearPorId(r.seccionId()));
+    exigir(s.getAnioLectivoId().equals(r.anioLectivoId()), "Sección de otro año");
     var m = mapper.toDomain(r);
     m.iniciarSolicitud();
     if (r.fechaExpiracionReserva() != null) {
@@ -59,6 +58,9 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
 
   public MatriculaResponseDto confirmar(ConfirmarMatriculaRequestDto r) {
     var snapshot = requerido(matriculas.buscarPorId(r.matriculaId()));
+    exigir(snapshot.getEstadoMatricula() != EstadoMatricula.PENDIENTE_ASIGNACION
+        && snapshot.getSeccionId() != null,
+        "Secretaría debe asignar el grado y aula antes de confirmar la matrícula.");
     requerido(anios.bloquearPorId(snapshot.getAnioLectivoId())).verificarAbierto();
     var s = requerido(secciones.bloquearPorId(snapshot.getSeccionId()));
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
@@ -142,5 +144,17 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     int start = Math.min(Math.max(0, page) * Math.max(1, size), todas.size());
     int end = Math.min(start + Math.max(1, size), todas.size());
     return todas.subList(start, end).stream().map(mapper::toResponse).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public java.util.List<MatriculaResponseDto> listarPorAnio(Short anioLectivoId) {
+    return matriculas.buscarPorAnioLectivoId(anioLectivoId).stream()
+        .map(mapper::toResponse)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public java.util.List<Long> listarEstudianteIdsMatriculados(Short anioLectivoId) {
+    return matriculas.buscarEstudianteIdsPorAnioLectivoId(anioLectivoId);
   }
 }

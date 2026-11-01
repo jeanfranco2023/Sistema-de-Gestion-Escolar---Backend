@@ -42,7 +42,7 @@ spring:
 # Configuración institucional de la aplicación
 app:
   jwt:
-    secret: ${JWT_SECRET:c2h1amlfa2l0YW11cmFfcHJveWVjdG9faW50ZWdyYWRvcl91dHBfMjAyNg==}
+    secret: ${JWT_SECRET:}
     expiration-ms: ${JWT_EXPIRATION_MS:900000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
   cors:

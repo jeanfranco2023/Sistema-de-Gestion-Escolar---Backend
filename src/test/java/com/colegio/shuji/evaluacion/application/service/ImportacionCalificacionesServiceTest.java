@@ -30,6 +30,7 @@ class ImportacionCalificacionesServiceTest {
   @Mock MatriculaRepositoryPort matriculas; @Mock EstudianteRepositoryPort estudiantes; @Mock ActorActualPort actor;
   @Mock RegistrarEvaluacionCnebUseCase registro; @InjectMocks ImportacionCalificacionesService servicio;
   private void contexto() {
+    when(actor.tieneRol("DOCENTE")).thenReturn(true);
     when(asignaciones.buscarPorId(9L)).thenReturn(Optional.of(AsignacionDocente.builder().id(9L).docenteUsuarioId(5L).seccionId(2).anioLectivoId((short)1).areaCurricularId((short)3).build()));
   }
   private void datos() {
@@ -55,5 +56,10 @@ class ImportacionCalificacionesServiceTest {
   @Test void docenteAjenoNoPuedeInspeccionarAlumnosNiImportar() {
     contexto(); doThrow(new org.springframework.security.access.AccessDeniedException("Ajeno")).when(actor).verificarDocente(5L);
     assertThrows(org.springframework.security.access.AccessDeniedException.class,()->servicio.importar(filas("C"),(short)1,2,9L,true)); verifyNoInteractions(estudiantes,matriculas,registro,competencias,periodos);
+  }
+  @Test void direccionNoPuedeImportarCalificaciones() {
+    when(actor.tieneRol("DOCENTE")).thenReturn(false);
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,()->servicio.importar(filas("C"),(short)1,2,9L,true));
+    verifyNoInteractions(asignaciones,estudiantes,matriculas,registro,competencias,periodos);
   }
 }

@@ -38,7 +38,18 @@ public class ReniecPkiHttpSource {
   private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
       .followRedirects(HttpClient.Redirect.NEVER).build();
   private final Map<String, Cache> cache = new ConcurrentHashMap<>();
-  private record Cache(byte[] bytes, Instant expira) {}
+  private static final class Cache {
+    private final byte[] bytes;
+    private final Instant expira;
+
+    private Cache(byte[] bytes, Instant expira) {
+      this.bytes = bytes;
+      this.expira = expira;
+    }
+
+    private byte[] bytes() { return bytes; }
+    private Instant expira() { return expira; }
+  }
 
   public ReniecPkiHttpSource(@Value("${app.matricula-publica.firmas.consulta-publica-habilitada:true}") boolean habilitado) {
     this.habilitado = habilitado;

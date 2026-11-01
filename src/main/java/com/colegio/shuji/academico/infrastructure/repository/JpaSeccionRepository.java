@@ -30,7 +30,6 @@ public interface JpaSeccionRepository extends JpaRepository<SeccionEntity, Integ
   int liberarVacante(@Param("id") Integer id);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = "aula")
   @Query("select e from SeccionEntity e where e.id = :id")
   Optional<SeccionEntity> bloquearPorId(@Param("id") Integer id);
 

@@ -49,3 +49,4 @@ CONSOLIDADO_*
 DBDIAGRAM_*
 JUSTIFICACION_*
 
+.env.local-docker

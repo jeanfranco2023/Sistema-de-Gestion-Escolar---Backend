@@ -64,6 +64,20 @@ public class MatriculaController {
     return matriculas.listarPorSeccion(seccionId, page, size);
   }
 
+  @GetMapping("/anio/{anioLectivoId}/registros")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "matriculas.listarPorAnio")
+  public List<MatriculaResponseDto> listarPorAnio(@PathVariable @Positive Short anioLectivoId) {
+    return matriculas.listarPorAnio(anioLectivoId);
+  }
+
+  @GetMapping("/anio/{anioLectivoId}/estudiantes-matriculados")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "matriculas.listarEstudianteIdsMatriculados")
+  public List<Long> listarEstudianteIdsMatriculados(@PathVariable @Positive Short anioLectivoId) {
+    return matriculas.listarEstudianteIdsMatriculados(anioLectivoId);
+  }
+
   @PostMapping("/reservas/liberar")
   @PreAuthorize("hasRole('SECRETARIA')")
   @Operation(summary = "reservas.liberarVencidas")

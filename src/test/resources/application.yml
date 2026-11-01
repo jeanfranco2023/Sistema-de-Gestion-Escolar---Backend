@@ -1,0 +1,8 @@
+# Credencial exclusiva de pruebas. Nunca se utiliza en empaquetados de producción.
+app:
+  jwt:
+    secret: test-only-jwt-secret-not-for-production-0123456789abcdef
+
+spring:
+  jpa:
+    open-in-view: false

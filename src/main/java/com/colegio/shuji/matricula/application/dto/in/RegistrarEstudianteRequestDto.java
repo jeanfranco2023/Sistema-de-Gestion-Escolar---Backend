@@ -17,6 +17,5 @@ public record RegistrarEstudianteRequestDto(
     @NotBlank @Size(max = 20) String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,
     @NotNull Genero genero,
-    @Size(max = 14) String codigoEstudianteSiagie,
     @Size(max = 5) String grupoSanguineo,
     @Size(max = 4000) String alergiasCondiciones) {}

@@ -60,16 +60,17 @@ public class AsistenciaController {
   @PreAuthorize("hasAnyRole('SECRETARIA','AUXILIAR')")
   @Operation(summary = "biometrico.importarCsv")
   public LoteBiometricoResponseDto importarArchivoBiometrico(@org.springframework.web.bind.annotation.RequestPart("archivo") MultipartFile archivo) {
+    String nombreOriginal = archivo == null ? null : archivo.getOriginalFilename();
     if (archivo == null || archivo.isEmpty() || archivo.getSize() > 5L * 1024 * 1024
-        || archivo.getOriginalFilename() == null
-        || !(archivo.getOriginalFilename().toLowerCase(Locale.ROOT).endsWith(".csv")
-            || archivo.getOriginalFilename().toLowerCase(Locale.ROOT).endsWith(".xlsx"))) {
+        || nombreOriginal == null
+        || !(nombreOriginal.toLowerCase(Locale.ROOT).endsWith(".csv")
+            || nombreOriginal.toLowerCase(Locale.ROOT).endsWith(".xlsx"))) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adjunta un CSV o XLSX biométrico de hasta 5 MB");
     }
     try {
       var marcas = com.colegio.shuji.asistencia.infrastructure.adapter.LectorArchivoBiometrico.leer(
-          archivo.getBytes(), archivo.getOriginalFilename());
-      var nombre = archivo.getOriginalFilename().replaceAll("[\\r\\n\\\\/]+", "_");
+          archivo.getBytes(), nombreOriginal);
+      var nombre = nombreOriginal.replaceAll("[\\r\\n\\\\/]+", "_");
       return biometrico.importar(new ImportarLoteBiometricoRequestDto(nombre, marcas));
     } catch (IOException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo leer el CSV biométrico");

@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 
 public record EstudianteResponseDto(
     Long id,
+    String codigoInterno,
     TipoDocumento tipoDocumento,
     String numeroDocumento,
     String nombres,
@@ -22,4 +23,13 @@ public record EstudianteResponseDto(
     String grupoSanguineo,
     String alergiasCondiciones,
     Boolean activo,
-    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {}
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {
+
+  public EstudianteResponseDto {
+    codigoInterno = generarCodigoInterno(id);
+  }
+
+  public static String generarCodigoInterno(Long estudianteId) {
+    return estudianteId == null ? null : "ALU-" + String.format("%06d", estudianteId);
+  }
+}

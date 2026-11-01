@@ -88,6 +88,10 @@ public class EvaluacionService
   }
 
   public List<CalificacionResponseDto> registrar(RegistrarCalificacionesMasivasRequestDto r) {
+    if (!actor.tieneRol("DOCENTE")) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Solo un docente puede registrar calificaciones");
+    }
     var snapshot = requerido(periodos.buscarPorId(r.periodoAcademicoId()));
     requerido(anios.bloquearPorId(snapshot.getAnioLectivoId())).verificarAbierto();
     var periodo = requerido(periodos.bloquearPorId(r.periodoAcademicoId()));

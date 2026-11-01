@@ -162,6 +162,8 @@ public class GeminiDocumentoMatriculaAdapter implements GeminiDocumentoMatricula
         .body(new ParameterizedTypeReference<>() {});
   }
 
+  // validar() rechaza apiKeys vacía antes de llamar aquí.
+  @SuppressWarnings("java:S2259")
   private Map<String, Object> generarConReintento(Map<String, Object> body, String modelo) {
     RestClientException ultimoError = null;
     int cambiosDeClave = 0;

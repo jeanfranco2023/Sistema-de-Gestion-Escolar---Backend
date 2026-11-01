@@ -85,7 +85,7 @@ public class ReporteLibretaPdfAdapter implements GenerarLibretaPdfUseCase {
           }
           ajustadas.add(linea.toString());
           for (String contenido : ajustadas) {
-            if (y < 55) {
+            if (stream == null || y < 55) {
               if (stream != null) stream.close();
               var pagina = new PDPage(PDRectangle.A4); doc.addPage(pagina);
               stream = new PDPageContentStream(doc, pagina); y = 785; numero++;

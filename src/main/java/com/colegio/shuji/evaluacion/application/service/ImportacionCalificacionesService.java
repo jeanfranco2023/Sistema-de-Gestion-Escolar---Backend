@@ -42,6 +42,10 @@ public class ImportacionCalificacionesService implements ImportarCalificacionesU
 
   public ImportacionCalificacionesResponseDto importar(List<List<String>> filas, Short periodoId, Integer seccionId,
       Long asignacionId, boolean confirmar) {
+    if (!actor.tieneRol("DOCENTE")) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Solo un docente puede importar calificaciones");
+    }
     var asignacion = requerido(asignaciones.buscarPorId(asignacionId));
     actor.verificarDocente(asignacion.getDocenteUsuarioId());
     var periodo = requerido(periodos.buscarPorId(periodoId));

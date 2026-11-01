@@ -87,7 +87,11 @@ public final class LectorPlanillaCalificaciones {
         if (evento == XMLStreamConstants.START_ELEMENT && xml.getLocalName().equals("si")) texto = new StringBuilder();
         if (evento == XMLStreamConstants.START_ELEMENT && xml.getLocalName().equals("t") && texto != null) texto.append(xml.getElementText());
         if (texto != null && texto.length() > 4000) throw invalido();
-        if (evento == XMLStreamConstants.END_ELEMENT && xml.getLocalName().equals("si")) { textos.add(texto.toString()); texto = null; if (textos.size() > 10000) throw invalido(); }
+        if (evento == XMLStreamConstants.END_ELEMENT && xml.getLocalName().equals("si") && texto != null) {
+          textos.add(texto.toString());
+          texto = null;
+          if (textos.size() > 10000) throw invalido();
+        }
       }
       xml.close();
     }

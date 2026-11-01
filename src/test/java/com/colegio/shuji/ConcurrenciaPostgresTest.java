@@ -148,7 +148,7 @@ class ConcurrenciaPostgresTest {
           new RegistrarEstudianteRequestDto(
               TipoDocumento.DNI, "7" + String.format("%07d", new Random().nextInt(9999999)),
               "Alumno" + idx, "Test", "Concurrente",
-              LocalDate.of(2018, 1, 1), Genero.M, null, null, null));
+              LocalDate.of(2018, 1, 1), Genero.M, null, null));
       var apod = familias.registrarApoderado(
           new RegistrarApoderadoRequestDto(
               TipoDocumento.DNI, "8" + String.format("%07d", new Random().nextInt(9999999)),
@@ -224,7 +224,7 @@ class ConcurrenciaPostgresTest {
           new RegistrarEstudianteRequestDto(
               TipoDocumento.DNI, "9" + String.format("%07d", new Random().nextInt(9999999)),
               "Postulante" + i, "Vacante", "Test",
-              LocalDate.of(2018, 5, 5), Genero.F, null, null, null));
+              LocalDate.of(2018, 5, 5), Genero.F, null, null));
       estudiantes.add(est.id());
     }
 
@@ -271,7 +271,7 @@ class ConcurrenciaPostgresTest {
     });
     String dni = "4" + String.format("%07d", new Random().nextInt(9999999));
     var request = new com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto(
-        anioId, seccion.id(), dni, "Ana", "Perez", "Ruiz", nacimiento, Genero.F,
+        anioId, seccion.gradoId(), dni, "Ana", "Perez", "Ruiz", nacimiento, Genero.F,
         "87654321", "Rosa", "Perez", "Ruiz", "999888777", "familia@example.test", "Lima", "150101", Parentesco.MADRE, true);
     var inicio = new CountDownLatch(1);
     var executor = Executors.newFixedThreadPool(4);
@@ -312,7 +312,7 @@ class ConcurrenciaPostgresTest {
   void aprobacionesSimultaneasNoAutorizanDosSuplentesEnElMismoPeriodo() throws Exception {
     autenticar("DIRECCION");
     var estudiante=familias.registrarEstudiante(new RegistrarEstudianteRequestDto(TipoDocumento.DNI,
-        "6"+String.format("%07d",new Random().nextInt(9999999)),"Ana","Perez","Ruiz",LocalDate.of(2018,1,1),Genero.F,null,null,null));
+        "6"+String.format("%07d",new Random().nextInt(9999999)),"Ana","Perez","Ruiz",LocalDate.of(2018,1,1),Genero.F,null,null));
     var apoderado=familias.registrarApoderado(new com.colegio.shuji.matricula.application.dto.in.RegistrarApoderadoRequestDto(TipoDocumento.DNI,
         "7"+String.format("%07d",new Random().nextInt(9999999)),"Rosa","Perez","Ruiz","912345678","familia@example.test","Lima","150101",usuarioId));
     familias.vincular(new com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto(estudiante.id(),apoderado.id(),com.colegio.shuji.matricula.domain.enums.Parentesco.MADRE,true,true,true));

@@ -38,7 +38,7 @@ public class MatriculaEntity {
   @Column(name = "estudiante_id", nullable = false)
   private Long estudianteId;
 
-  @Column(name = "seccion_id", nullable = false)
+  @Column(name = "seccion_id")
   private Integer seccionId;
 
   @Column(name = "fecha_matricula", nullable = false)

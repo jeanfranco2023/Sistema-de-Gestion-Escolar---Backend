@@ -27,7 +27,9 @@ public class SupabaseJustificacionStorageAdapter implements AlmacenJustificacion
       @Value("${supabase.storage.service-role-key:}") String serviceRoleKey,
       @Value("${supabase.storage.justifications-bucket:asistencia-justificaciones}") String bucket,
       @Value("${supabase.storage.signed-url-seconds:60}") int signedUrlSeconds) {
-    this.url = url == null ? "" : url.trim().replaceAll("/+$", "");
+    String baseUrl = url == null ? "" : url.trim();
+    while (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+    this.url = baseUrl;
     this.serviceRoleKey = serviceRoleKey == null ? "" : serviceRoleKey.trim();
     this.bucket = bucket == null ? "" : bucket.trim();
     this.signedUrlSeconds = Math.max(30, Math.min(600, signedUrlSeconds));

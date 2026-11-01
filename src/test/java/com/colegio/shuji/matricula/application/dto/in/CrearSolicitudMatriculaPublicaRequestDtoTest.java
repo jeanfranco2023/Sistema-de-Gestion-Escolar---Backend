@@ -45,7 +45,7 @@ class CrearSolicitudMatriculaPublicaRequestDtoTest {
   private CrearSolicitudMatriculaPublicaRequestDto request(LocalDate nacimiento, Parentesco parentesco) {
     return new CrearSolicitudMatriculaPublicaRequestDto(
         (short) 2026,
-        1,
+        (short) 1,
         "12345678",
         "Ana María",
         "Pérez",

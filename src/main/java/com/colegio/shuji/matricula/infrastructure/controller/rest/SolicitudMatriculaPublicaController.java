@@ -211,6 +211,13 @@ public class SolicitudMatriculaPublicaController {
     return solicitudes.listarAdmin();
   }
 
+  @PutMapping("/admin/{id}/asignar-seccion")
+  @PreAuthorize("hasRole('SECRETARIA')")
+  public SolicitudMatriculaPublicaAdminResponseDto asignarSeccion(
+      @PathVariable UUID id, @Valid @RequestBody AsignarSeccionRequest request) {
+    return solicitudes.asignarSeccion(id, request.seccionId());
+  }
+
   @PutMapping("/admin/{id}/observar")
   @PreAuthorize("hasRole('SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
@@ -242,6 +249,9 @@ public class SolicitudMatriculaPublicaController {
   public record AutorizarExcepcionEdadRequest(
       @jakarta.validation.constraints.NotBlank
       @jakarta.validation.constraints.Size(min = 10, max = 500) String motivo) {}
+
+  public record AsignarSeccionRequest(@jakarta.validation.constraints.NotNull
+      @jakarta.validation.constraints.Positive Integer seccionId) {}
 
   @GetMapping("/admin/{id}/documentos/{tipo}/url")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")

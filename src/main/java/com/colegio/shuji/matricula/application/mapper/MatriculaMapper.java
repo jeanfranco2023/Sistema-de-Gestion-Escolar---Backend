@@ -13,6 +13,7 @@ import com.colegio.shuji.matricula.domain.model.Estudiante;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
@@ -25,6 +26,7 @@ public interface MatriculaMapper {
 
   Matricula toDomain(SolicitarMatriculaRequestDto request);
 
+  @Mapping(target = "codigoInterno", ignore = true)
   EstudianteResponseDto toResponse(Estudiante model);
 
   ApoderadoResponseDto toResponse(Apoderado model);

@@ -36,4 +36,28 @@ class GeminiConclusionDescriptivaTest {
     servidor.expect(anything()).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
     assertEquals(503, assertThrows(ResponseStatusException.class, () -> configurado.generar(request)).getStatusCode().value());
   }
+
+  @Test void anonimizaDocumentoYCorreoAntesDeEnviarEvidencia() throws Exception {
+    var builder = RestClient.builder();
+    var servidor = MockRestServiceServer.bindTo(builder).build();
+    var adapter = new GeminiConclusionDescriptivaAdapter("clave-sintetica", "modelo", json, builder.build());
+    var solicitud = new SugerirConclusionDescriptivaRequestDto(
+        "Estudiante", "Matemática", "Resuelve problemas", "B",
+        "Contactar a demo@example.invalid con DNI 12345678.");
+    String resultado = json.writeValueAsString(java.util.Map.of(
+        "conclusionDescriptiva", "Avanza con apoyo.",
+        "aspectoMejora", "Verificar resultados",
+        "recomendacionApoderado", "Practicar en casa"));
+    String body = json.writeValueAsString(java.util.Map.of("candidates", java.util.List.of(
+        java.util.Map.of("content", java.util.Map.of("parts", java.util.List.of(
+            java.util.Map.of("text", resultado)))))));
+    servidor.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/modelo:generateContent"))
+        .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("demo@example.invalid"))))
+        .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("12345678"))))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("[dato omitido]")))
+        .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+    assertTrue(adapter.generar(solicitud).generadoPorIa());
+    servidor.verify();
+  }
 }

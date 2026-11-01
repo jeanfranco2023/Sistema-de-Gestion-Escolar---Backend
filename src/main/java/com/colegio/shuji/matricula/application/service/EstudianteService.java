@@ -45,10 +45,6 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
             .noneMatch(e -> e.getTipoDocumento() == r.tipoDocumento()),
         "Documento ya registrado");
     var e = mapper.toDomain(r);
-    e.actualizarCodigoSiagie(
-        r.codigoEstudianteSiagie() == null || r.codigoEstudianteSiagie().isBlank()
-            ? null
-            : r.codigoEstudianteSiagie().trim());
     e.iniciarRegistroManual();
     e.activar();
     return mapper.toResponse(estudiantes.guardar(e));

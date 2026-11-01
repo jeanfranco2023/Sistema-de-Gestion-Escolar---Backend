@@ -28,22 +28,29 @@ public class IncidenciaConductual {
   private OffsetDateTime fechaCreacion;
 
   public void cambiarEstado(EstadoIncidencia nuevoEstado) {
-    if (estado == EstadoIncidencia.CERRADA) {
-      throw new BusinessException("No se puede cambiar el estado de una incidencia cerrada");
+    if (estado == EstadoIncidencia.ABIERTA && nuevoEstado == EstadoIncidencia.ATENDIDA) {
+      atender();
+      return;
     }
-    if (estado == EstadoIncidencia.ABIERTA && nuevoEstado == EstadoIncidencia.CERRADA) {
-      throw new BusinessException(
-          "Una incidencia abierta debe pasar por atención antes de cerrarse");
+    if (estado == EstadoIncidencia.ATENDIDA && nuevoEstado == EstadoIncidencia.CERRADA) {
+      cerrar();
+      return;
     }
-    this.estado = nuevoEstado;
+    throw new BusinessException("La incidencia solo puede avanzar de ABIERTA a ATENDIDA y de ATENDIDA a CERRADA");
   }
 
   public void atender() {
-    cambiarEstado(EstadoIncidencia.ATENDIDA);
+    if (estado != EstadoIncidencia.ABIERTA) {
+      throw new BusinessException("Solo una incidencia abierta puede pasar a atención");
+    }
+    this.estado = EstadoIncidencia.ATENDIDA;
   }
 
   public void cerrar() {
-    cambiarEstado(EstadoIncidencia.CERRADA);
+    if (estado != EstadoIncidencia.ATENDIDA) {
+      throw new BusinessException("Solo una incidencia atendida puede cerrarse");
+    }
+    this.estado = EstadoIncidencia.CERRADA;
   }
 
   public void actualizarDetalles(String nuevaDescripcion, Boolean requiereCitacion) {

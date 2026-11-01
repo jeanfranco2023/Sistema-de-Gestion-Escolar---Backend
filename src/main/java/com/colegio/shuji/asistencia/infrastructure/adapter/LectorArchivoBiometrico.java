@@ -124,6 +124,7 @@ public final class LectorArchivoBiometrico {
           default -> {}
         }
       } else if (evento == XMLStreamConstants.END_ELEMENT && xml.getLocalName().equals("row")) {
+        if (fila == null) throw invalido();
         agregar(filas, fila);
         fila = null;
         asignada = null;
@@ -147,6 +148,7 @@ public final class LectorArchivoBiometrico {
         if (texto.length() > 128) throw invalido();
       }
       if (evento == XMLStreamConstants.END_ELEMENT && xml.getLocalName().equals("si")) {
+        if (texto == null) throw invalido();
         textos.add(texto.toString());
         texto = null;
         if (textos.size() > MAX_FILAS * 3 + 3) throw invalido();

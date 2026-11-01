@@ -14,6 +14,7 @@ public record SolicitudMatriculaPublicaAdminResponseDto(
     String celularApoderado,
     String emailApoderado,
     Short anioLectivoId,
+    Short gradoId,
     Integer seccionId,
     List<DocumentoSolicitudResponseDto> documentos,
     OffsetDateTime creadaAt,

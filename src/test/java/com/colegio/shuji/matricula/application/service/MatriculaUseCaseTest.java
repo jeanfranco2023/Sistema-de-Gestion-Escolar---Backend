@@ -23,8 +23,10 @@ import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
+import com.colegio.shuji.matricula.domain.model.Estudiante;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
+import com.colegio.shuji.matricula.domain.exception.EstudianteYaMatriculadoException;
 import com.colegio.shuji.tesoreria.application.port.out.ObligacionRepositoryPort;
 import com.colegio.shuji.tesoreria.domain.enums.EstadoObligacion;
 import com.colegio.shuji.tesoreria.domain.enums.TipoConcepto;
@@ -85,6 +87,20 @@ class MatriculaUseCaseTest {
 
     assertEquals(EstadoMatricula.MATRICULADO, result.estadoMatricula());
     verify(matriculas).guardar(solicitud);
+  }
+
+  @Test
+  void impideCrearUnaSegundaMatriculaDelEstudianteEnElMismoAnio() {
+    var request = new com.colegio.shuji.matricula.application.dto.in.SolicitarMatriculaRequestDto(
+        (short) 2, 20L, 30, null, null);
+    when(anios.bloquearPorId((short) 2)).thenReturn(Optional.of(
+        AnioLectivo.builder().id((short) 2).abierto(true).build()));
+    when(estudiantes.bloquearPorId(20L)).thenReturn(Optional.of(
+        Estudiante.builder().id(20L).activo(true).build()));
+    when(matriculas.existePorEstudianteIdYAnioLectivoId(20L, (short) 2)).thenReturn(true);
+
+    assertThrows(EstudianteYaMatriculadoException.class, () -> useCase.solicitar(request));
+    verify(matriculas, never()).guardar(any(Matricula.class));
   }
 
   @Test

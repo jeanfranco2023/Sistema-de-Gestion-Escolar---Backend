@@ -37,7 +37,7 @@ public class EvaluacionController {
   private final com.colegio.shuji.evaluacion.application.port.in.DescargarPlantillaCnebUseCase plantilla;
 
   @GetMapping("/cneb/plantilla")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasRole('DOCENTE')")
   public org.springframework.http.ResponseEntity<byte[]> plantilla(@RequestParam Long asignacionDocenteId,
       @RequestParam Short periodoId, @RequestParam Short competenciaId) {
     return org.springframework.http.ResponseEntity.ok()
@@ -55,7 +55,7 @@ public class EvaluacionController {
   }
 
   @PostMapping(value = "/cneb/carga-masiva", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasRole('DOCENTE')")
   public com.colegio.shuji.evaluacion.application.dto.out.ImportacionCalificacionesResponseDto cargarPlanilla(
       @RequestParam("archivo") org.springframework.web.multipart.MultipartFile archivo,
       @RequestParam Short periodoId, @RequestParam Integer seccionId, @RequestParam Long asignacionDocenteId,
@@ -68,7 +68,7 @@ public class EvaluacionController {
   }
 
   @PostMapping("/ia/sugerir-conclusion")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasRole('DOCENTE')")
   @Operation(summary = "evaluacion.sugerirIa")
   public com.colegio.shuji.evaluacion.application.dto.out.SugerenciaConclusionDescriptivaResponseDto sugerirConclusionIa(
       @Valid @RequestBody com.colegio.shuji.evaluacion.application.dto.in.SugerirConclusionDescriptivaRequestDto request) {
@@ -76,7 +76,7 @@ public class EvaluacionController {
   }
 
   @PostMapping("/cneb")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasRole('DOCENTE')")
   @Operation(summary = "registro.registrar")
   public List<CalificacionResponseDto> registrarCalificacionesMasivas(
       @Valid @RequestBody RegistrarCalificacionesMasivasRequestDto r) {

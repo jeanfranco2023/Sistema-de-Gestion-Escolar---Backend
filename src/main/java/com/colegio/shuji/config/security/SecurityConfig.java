@@ -1,5 +1,6 @@
 package com.colegio.shuji.config.security;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,8 +59,10 @@ public class SecurityConfig {
   };
 
   @Bean
+  @SuppressWarnings("java:S4502")
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.cors(cors -> cors.configurationSource(corsConfigurationSource))
+        // API stateless con JWT en Authorization; no usa cookies de autenticación expuestas a CSRF.
         .csrf(AbstractHttpConfigurer::disable)
         .headers(headers -> headers
             .contentTypeOptions(Customizer.withDefaults())
@@ -78,7 +81,9 @@ public class SecurityConfig {
                     .accessDeniedHandler(accessDeniedHandler()))
         .authorizeHttpRequests(
             auth -> {
-              auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+              auth.dispatcherTypeMatchers(DispatcherType.ERROR)
+                  .permitAll()
+                  .requestMatchers(HttpMethod.OPTIONS, "/**")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/api/v1/pagos/webhook/**")
                   .permitAll()

@@ -24,10 +24,27 @@ class LectorPlanillaCalificacionesTest {
     assertThrows(ResponseStatusException.class, () -> LectorPlanillaCalificaciones.leer(zip(hoja.replace("<v>2</v>", "<f>1+1</f><v>2</v>")), "p.xlsx"));
     assertThrows(ResponseStatusException.class, () -> LectorPlanillaCalificaciones.leer(zip("<!DOCTYPE x [<!ENTITY secreto SYSTEM 'file:///archivo'>]>" + hoja), "p.xlsx"));
   }
+  @Test void xlsxLeeCadenasCompartidas() throws Exception {
+    String hoja = "<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>";
+    String cadenas = "<sst><si><t>00123456</t></si></sst>";
+    assertEquals("00123456", LectorPlanillaCalificaciones.leer(zip(hoja, cadenas), "planilla.xlsx").getFirst().getFirst());
+  }
   private java.util.List<java.util.List<String>> leer(String texto) { return LectorPlanillaCalificaciones.leer(texto.getBytes(StandardCharsets.UTF_8), "p.csv"); }
   private byte[] zip(String hoja) throws Exception {
+    return zip(hoja, null);
+  }
+  private byte[] zip(String hoja, String cadenas) throws Exception {
     var bytes = new ByteArrayOutputStream();
-    try (var zip = new ZipOutputStream(bytes)) { zip.putNextEntry(new ZipEntry("xl/worksheets/sheet1.xml")); zip.write(hoja.getBytes(StandardCharsets.UTF_8)); zip.closeEntry(); }
+    try (var zip = new ZipOutputStream(bytes)) {
+      if (cadenas != null) {
+        zip.putNextEntry(new ZipEntry("xl/sharedStrings.xml"));
+        zip.write(cadenas.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+      }
+      zip.putNextEntry(new ZipEntry("xl/worksheets/sheet1.xml"));
+      zip.write(hoja.getBytes(StandardCharsets.UTF_8));
+      zip.closeEntry();
+    }
     return bytes.toByteArray();
   }
 }

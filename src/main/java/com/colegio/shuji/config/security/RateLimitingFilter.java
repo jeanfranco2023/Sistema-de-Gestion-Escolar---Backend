@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -55,6 +56,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final int BIOMETRICO_IMPORT_LIMIT = 5;
   private static final int JUSTIFICACION_ADJUNTO_LIMIT = 10;
 
+  @Autowired
   public RateLimitingFilter() {
     this.behindTrustedProxy = false;
   }

@@ -33,13 +33,16 @@ public class SolicitudMatriculaPublicaEntity {
   private String tokenHash;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 30)
+  @Column(nullable = false, length = 50)
   private EstadoSolicitudMatriculaPublica estado;
 
   @Column(name = "anio_lectivo_id", nullable = false)
   private Short anioLectivoId;
 
-  @Column(name = "seccion_id", nullable = false)
+  @Column(name = "grado_id", nullable = false)
+  private Short gradoId;
+
+  @Column(name = "seccion_id")
   private Integer seccionId;
 
   @Column(name = "numero_documento_estudiante", nullable = false, length = 8)

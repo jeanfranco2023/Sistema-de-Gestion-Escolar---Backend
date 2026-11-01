@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtTokenProvider implements com.colegio.shuji.usuario.application.port.out.TokenPort {
 
-  @Value("${app.jwt.secret:c2h1amlfa2l0YW11cmFfcHJveWVjdG9faW50ZWdyYWRvcl91dHBfMjAyNg==}")
+  @Value("${app.jwt.secret:}")
   private String jwtSecret;
 
   @Value("${app.jwt.previous-secret:}")
@@ -54,6 +54,9 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
 
   @PostConstruct
   public void init() {
+    if (jwtSecret == null || jwtSecret.isBlank()) {
+      throw new IllegalStateException("JWT_SECRET debe estar configurado; no se permite una clave predeterminada");
+    }
     this.key = deriveKey(jwtSecret);
     this.verificationKeys = new java.util.ArrayList<>();
     this.verificationKeys.add(this.key);

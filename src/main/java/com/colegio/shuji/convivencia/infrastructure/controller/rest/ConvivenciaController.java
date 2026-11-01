@@ -3,6 +3,7 @@ package com.colegio.shuji.convivencia.infrastructure.controller.rest;
 import com.colegio.shuji.convivencia.application.dto.in.ActualizarEstadoIncidenciaRequestDto;
 import com.colegio.shuji.convivencia.application.dto.in.RegistrarIncidenciaRequestDto;
 import com.colegio.shuji.convivencia.application.dto.out.HistorialConductualEstudianteResponseDto;
+import com.colegio.shuji.convivencia.application.dto.out.HistorialEstadoIncidenciaResponseDto;
 import com.colegio.shuji.convivencia.application.dto.out.IncidenciaResponseDto;
 import com.colegio.shuji.convivencia.application.port.in.GestionarIncidenciasUseCase;
 import com.colegio.shuji.convivencia.application.port.in.RegistrarIncidenciaUseCase;
@@ -35,7 +36,7 @@ public class ConvivenciaController {
   private final GestionarIncidenciasUseCase gestion;
 
   @GetMapping("/incidencias")
-  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   public List<IncidenciaResponseDto> listarIncidencias() {
     return gestion.listar();
   }
@@ -48,22 +49,29 @@ public class ConvivenciaController {
   }
 
   @PutMapping("/incidencias/{id}/estado")
-  @PreAuthorize("hasRole('TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR')")
   @Operation(summary = "gestion.actualizar")
   public IncidenciaResponseDto actualizarEstadoIncidencia(
       @PathVariable @Positive Long id, @Valid @RequestBody ActualizarEstadoIncidenciaRequestDto r) {
     return gestion.actualizar(id, r);
   }
 
+  @GetMapping("/incidencias/{id}/historial")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  public List<HistorialEstadoIncidenciaResponseDto> consultarHistorialEstados(
+      @PathVariable @Positive Long id) {
+    return gestion.historialEstados(id);
+  }
+
   @GetMapping("/matricula/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.historial")
   public HistorialConductualEstudianteResponseDto consultarHistorialConductual(@PathVariable @Positive Long id) {
     return gestion.historial(id);
   }
 
   @GetMapping("/incidencias/citaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.citaciones")
   public List<IncidenciaResponseDto> listarCitaciones(
       @RequestParam(name = "page", defaultValue = "0") @PositiveOrZero int page,
