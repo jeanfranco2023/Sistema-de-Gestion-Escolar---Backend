@@ -4,6 +4,7 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,6 +38,7 @@ public class SecurityConfig {
 
   private final RateLimitingFilter rateLimitingFilter;
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final AuditoriaAccesoFilter auditoriaAccesoFilter;
   private final CorsConfigurationSource corsConfigurationSource;
 
   @Value("${springdoc.swagger-ui.enabled:true}")
@@ -46,6 +48,7 @@ public class SecurityConfig {
     "/auth/**",
     "/api/v1/auth/**",
     "/api/v1/solicitudes-matricula/public/**",
+    "/api/v1/personas/reniec/**",
     "/actuator/health",
     "/actuator/health/**",
     "/actuator/info"
@@ -89,6 +92,8 @@ public class SecurityConfig {
                   .permitAll()
                   .requestMatchers(HttpMethod.GET, "/api/v1/pagos/retorno")
                   .permitAll()
+                  .requestMatchers(HttpMethod.GET, "/api/v1/storage/local/download")
+                  .permitAll()
                   // The root POST creates the anonymous enrollment before any upload/token exists.
                   .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-matricula/public")
                   .permitAll()
@@ -104,7 +109,8 @@ public class SecurityConfig {
               auth.anyRequest().authenticated();
             })
         .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(auditoriaAccesoFilter, JwtAuthenticationFilter.class);
 
     return http.build();
   }
@@ -112,6 +118,14 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder(10);
+  }
+
+  @Bean
+  public FilterRegistrationBean<AuditoriaAccesoFilter> auditoriaAccesoFilterRegistration(
+      AuditoriaAccesoFilter filter) {
+    var registration = new FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
   }
 
   @Bean

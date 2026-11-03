@@ -74,6 +74,9 @@ public class EstudianteEntity {
   @Column(name = "activo", nullable = false)
   private Boolean activo;
 
+  @Column(name = "estado", nullable = false, length = 20)
+  private String estado;
+
   @Column(name = "fecha_creacion", nullable = false)
   private OffsetDateTime fechaCreacion;
 
@@ -83,6 +86,7 @@ public class EstudianteEntity {
     if (validadoReniec == null) validadoReniec = false;
     if (origenRegistro == null) origenRegistro = OrigenRegistro.RENIEC_API;
     if (activo == null) activo = true;
+    if (estado == null) estado = "ACTIVO";
     if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

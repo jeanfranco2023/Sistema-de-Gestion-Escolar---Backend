@@ -27,6 +27,7 @@
         <dotenv.version>4.0.0</dotenv.version>
         <pdfbox.version>3.0.8</pdfbox.version>
         <bouncycastle.version>1.86</bouncycastle.version>
+        <argLine/>
     </properties>
 
     <dependencies>
@@ -209,6 +210,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <argLine>@{argLine} -javaagent:"${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar"</argLine>
                     <systemPropertyVariables>
                         <shuji.integration>true</shuji.integration>
                     </systemPropertyVariables>

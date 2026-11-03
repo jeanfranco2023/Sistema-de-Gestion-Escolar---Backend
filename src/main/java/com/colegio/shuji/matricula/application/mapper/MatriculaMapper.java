@@ -33,5 +33,6 @@ public interface MatriculaMapper {
 
   EstudianteApoderadoResponseDto toResponse(EstudianteApoderado model);
 
+  @Mapping(target = "estadoPagoMatricula", ignore = true)
   MatriculaResponseDto toResponse(Matricula model);
 }

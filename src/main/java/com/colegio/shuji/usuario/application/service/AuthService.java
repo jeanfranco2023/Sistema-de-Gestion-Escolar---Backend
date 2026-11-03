@@ -3,12 +3,14 @@ package com.colegio.shuji.usuario.application.service;
 import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import com.colegio.shuji.shared.domain.exception.ResourceNotFoundException;
 import com.colegio.shuji.shared.domain.exception.UnauthorizedException;
+import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordInicialRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.LoginRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RefreshTokenRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.AuthResponseDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 import com.colegio.shuji.usuario.application.mapper.UserMapper;
+import com.colegio.shuji.usuario.application.port.in.CambiarPasswordInicialUseCase;
 import com.colegio.shuji.usuario.application.port.in.LoginUseCase;
 import com.colegio.shuji.usuario.application.port.in.RefreshTokenUseCase;
 import com.colegio.shuji.usuario.application.port.in.RegisterUserUseCase;
@@ -18,6 +20,7 @@ import com.colegio.shuji.usuario.application.port.out.SessionRepositoryPort;
 import com.colegio.shuji.usuario.application.port.out.TokenPort;
 import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
 import com.colegio.shuji.usuario.domain.exception.InvalidCredentialsException;
+import com.colegio.shuji.usuario.domain.exception.ReglaNegocioException;
 import com.colegio.shuji.usuario.domain.exception.UserAlreadyExistsException;
 import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.Sesion;
@@ -29,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTokenUseCase {
+public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTokenUseCase, CambiarPasswordInicialUseCase {
 
   private final UserRepositoryPort userRepositoryPort;
   private final RoleRepositoryPort roleRepositoryPort;
@@ -108,6 +112,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
         .refreshToken(refreshToken)
         .tokenType("Bearer")
         .expiresIn(jwtTokenProvider.getJwtExpirationMs())
+        .debeCambiarPassword(Boolean.TRUE.equals(usuario.getDebeCambiarPassword()))
         .user(userMapper.toResponseDto(usuario))
         .build();
   }
@@ -115,6 +120,14 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
   @Override
   public UserResponseDto register(RegisterUserRequestDto registerRequest) {
     log.info("Registrando nuevo usuario (auto-registro público): {}", registerRequest.getUsername());
+
+    if (registerRequest.getRoles() == null
+        || registerRequest.getRoles().isEmpty()
+        || registerRequest.getRoles().stream().anyMatch(r -> r != null
+            && ("APODERADO".equalsIgnoreCase(r.trim()) || "ROL_APODERADO".equalsIgnoreCase(r.trim())))) {
+      throw new ReglaNegocioException(
+          "Los usuarios con rol APODERADO solo se originan automáticamente mediante el flujo de matrícula confirmada");
+    }
 
     if (userRepositoryPort.existsByUsername(registerRequest.getUsername())) {
       throw new UserAlreadyExistsException("nombre de usuario", registerRequest.getUsername());
@@ -124,11 +137,11 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
       throw new UserAlreadyExistsException("correo electrónico", registerRequest.getEmail());
     }
 
-    // Seguridad crítica: el auto-registro público asigna forzosamente y de forma exclusiva el rol APODERADO
+    // El cliente no puede elegir el rol asignado por el auto-registro público.
     List<Rol> roles = roleRepositoryPort.findByCodigoIn(List.of("APODERADO"));
     if (roles.isEmpty()) {
       throw new ResourceNotFoundException(
-          "El rol obligatorio APODERADO no fue encontrado en el catálogo institucional.");
+          "Ninguno de los roles solicitados fue encontrado en el catálogo institucional.");
     }
 
     Usuario usuario = userMapper.toDomain(registerRequest);
@@ -138,7 +151,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
         LocalDateTime.now());
 
     Usuario usuarioGuardado = userRepositoryPort.save(usuario);
-    log.info("Usuario auto-registrado exitosamente con ID: {} y rol APODERADO", usuarioGuardado.getId());
+    log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
 
     return userMapper.toResponseDto(usuarioGuardado);
   }
@@ -146,6 +159,11 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
   @Override
   public UserResponseDto registrarPorDireccion(RegisterUserRequestDto request) {
     log.info("Registrando nuevo usuario administrativo por Dirección: {}", request.getUsername());
+
+    validarNoRolApoderado(request.getRoles());
+    if (request.getRoles() == null || request.getRoles().isEmpty()) {
+      throw new ReglaNegocioException("Debe especificar al menos un rol institucional para la creación del usuario");
+    }
 
     if (userRepositoryPort.existsByUsername(request.getUsername())) {
       throw new UserAlreadyExistsException("nombre de usuario", request.getUsername());
@@ -155,28 +173,29 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
       throw new UserAlreadyExistsException("correo electrónico", request.getEmail());
     }
 
-    Collection<String> codigosRoles =
-        (request.getRoles() == null || request.getRoles().isEmpty())
-            ? List.of("APODERADO")
-            : request.getRoles();
-
-    List<Rol> roles = roleRepositoryPort.findByCodigoIn(codigosRoles);
+    List<Rol> roles = roleRepositoryPort.findByCodigoIn(request.getRoles());
     if (roles.isEmpty()) {
       throw new ResourceNotFoundException(
           "Ninguno de los roles solicitados fue encontrado en el catálogo institucional.");
     }
 
+    String plainPassword = request.getPassword();
+    if (plainPassword == null || plainPassword.isBlank()) {
+      plainPassword = generarPasswordTemporal();
+    }
+
     Usuario usuario = userMapper.toDomain(request);
     usuario.registrar(
-        passwordEncoder.encode(request.getPassword()),
+        passwordEncoder.encode(plainPassword),
         new HashSet<>(roles),
         LocalDateTime.now());
+    usuario.marcarCambioPasswordInicialPendiente();
 
     Usuario usuarioGuardado = userRepositoryPort.save(usuario);
     log.info(
         "Usuario institucional creado por Dirección con ID: {} y roles: {}",
         usuarioGuardado.getId(),
-        codigosRoles);
+        request.getRoles());
 
     return userMapper.toResponseDto(usuarioGuardado);
   }
@@ -186,7 +205,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
       RefreshTokenRequestDto refreshTokenRequest, String ipAddress, String userAgent) {
     String refreshToken = refreshTokenRequest.getRefreshToken();
 
-    if (!jwtTokenProvider.validateToken(refreshToken)) {
+    if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
       throw new UnauthorizedException("El token de refresco no es válido o ha expirado.");
     }
 
@@ -238,8 +257,46 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
         .refreshToken(newRefreshToken)
         .tokenType("Bearer")
         .expiresIn(jwtTokenProvider.getJwtExpirationMs())
+        .debeCambiarPassword(Boolean.TRUE.equals(usuario.getDebeCambiarPassword()))
         .user(userMapper.toResponseDto(usuario))
         .build();
+  }
+
+  @Override
+  public void cambiarPasswordInicial(Long usuarioId, CambiarPasswordInicialRequestDto request) {
+    log.info("Cambiando contraseña inicial obligatoria para usuario ID: {}", usuarioId);
+
+    Usuario usuario =
+        userRepositoryPort
+            .findById(usuarioId)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con ID: " + usuarioId));
+
+    if (!passwordEncoder.matches(request.passwordActual(), usuario.getUsuarioPassword())) {
+      throw new ReglaNegocioException("La contraseña actual no es correcta");
+    }
+
+    if (passwordEncoder.matches(request.nuevoPassword(), usuario.getUsuarioPassword())) {
+      throw new ReglaNegocioException("La nueva contraseña no puede ser igual a la actual");
+    }
+
+    auditoria.setCurrentUserId(usuario.getId());
+
+    usuario.cambiarPassword(passwordEncoder.encode(request.nuevoPassword()));
+    usuario.completarCambioPasswordInicial();
+
+    userRepositoryPort.save(usuario);
+    log.info("Contraseña inicial actualizada exitosamente para usuario ID: {}", usuarioId);
+  }
+
+  private void validarNoRolApoderado(Collection<String> roles) {
+    if (roles != null && roles.stream().anyMatch(r -> r != null && ("APODERADO".equalsIgnoreCase(r.trim()) || "ROL_APODERADO".equalsIgnoreCase(r.trim())))) {
+      throw new ReglaNegocioException(
+          "Los usuarios con rol APODERADO solo se originan automáticamente mediante el flujo de matrícula confirmada");
+    }
+  }
+
+  private String generarPasswordTemporal() {
+    return "Shuji2026!" + UUID.randomUUID().toString().replace("-", "").substring(0, 6);
   }
 
   private String hashToken(String token) {

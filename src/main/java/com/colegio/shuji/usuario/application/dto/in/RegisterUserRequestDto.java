@@ -28,7 +28,7 @@ public class RegisterUserRequestDto {
   @Size(max = 100, message = "El correo electrónico no puede superar los 100 caracteres")
   private String email;
 
-  @NotBlank(message = "La contraseña es obligatoria")
+  // Contraseña opcional para creación administrativa (se genera temporal si se omite)
   @Size(min = 6, max = 100, message = "La contraseña debe tener entre 6 y 100 caracteres")
   private String password;
 

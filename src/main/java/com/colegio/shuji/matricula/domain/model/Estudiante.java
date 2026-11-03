@@ -32,6 +32,7 @@ public class Estudiante {
   private String grupoSanguineo;
   private String alergiasCondiciones;
   private Boolean activo;
+  private String estado;
   private OffsetDateTime fechaCreacion;
 
   public String nombreCompleto() {
@@ -58,6 +59,20 @@ public class Estudiante {
 
   public void actualizarCodigoSiagie(String codigoSiagie) {
     this.codigoEstudianteSiagie = codigoSiagie;
+  }
+
+  public void corregirNumeroDocumento(String numeroDocumento) {
+    this.numeroDocumento = numeroDocumento;
+  }
+
+  public void cambiarEstado(String estado) {
+    String estadoNormalizado = estado == null ? null : estado.trim().toUpperCase(java.util.Locale.ROOT);
+    Reglas.exigir(
+        java.util.Set.of("ACTIVO", "SUSPENDIDO", "RETIRADO", "TRASLADADO", "EGRESADO", "INACTIVO")
+            .contains(estadoNormalizado),
+        "Estado de estudiante inválido");
+    this.estado = estadoNormalizado;
+    this.activo = "ACTIVO".equals(estadoNormalizado);
   }
 
   public void marcarValidadoReniec() {

@@ -51,6 +51,38 @@ public class UsuarioEntity {
   @Builder.Default
   private Boolean activo = true;
 
+  @Column(name = "debe_cambiar_password", nullable = false)
+  @Builder.Default
+  private Boolean debeCambiarPassword = false;
+
+  @Column(name = "dni", length = 8)
+  private String dni;
+
+  @Column(name = "telefono", length = 15)
+  private String telefono;
+
+  @Column(name = "direccion", length = 150)
+  private String direccion;
+
+  @Column(name = "especialidad", length = 100)
+  private String especialidad;
+
+  @Column(name = "codigo_modular", length = 20)
+  private String codigoModular;
+
+  @Column(name = "numero_colegiatura", length = 20)
+  private String numeroColegiatura;
+
+  @Column(name = "fecha_ingreso")
+  private java.time.LocalDate fechaIngreso;
+
+  @Column(name = "tipo_contrato", length = 30)
+  private String tipoContrato;
+
+  @Column(name = "estado_laboral", nullable = false, length = 20)
+  @Builder.Default
+  private String estadoLaboral = "ACTIVO";
+
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "usuario_roles",

@@ -4,6 +4,7 @@ import com.colegio.shuji.tesoreria.application.port.out.SerieComprobanteReposito
 import com.colegio.shuji.tesoreria.domain.model.SerieComprobante;
 import com.colegio.shuji.tesoreria.infrastructure.entity.SerieComprobanteEntity;
 import com.colegio.shuji.tesoreria.infrastructure.repository.JpaSerieComprobanteRepository;
+import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SerieComprobanteRepositoryAdapter implements SerieComprobanteRepositoryPort {
   private final JpaSerieComprobanteRepository repository;
+  private final AuditContextPort auditoria;
 
   @Override
   public Optional<SerieComprobante> bloquearPorSerie(String serie) {
@@ -29,6 +31,7 @@ public class SerieComprobanteRepositoryAdapter implements SerieComprobanteReposi
                         "Serie de comprobante no configurada: " + serie.getSerie()));
     entity.setUltimoCorrelativo(serie.getUltimoCorrelativo());
     entity.setFechaActualizacion(serie.getFechaActualizacion());
+    auditoria.syncCurrentUserFromSecurityContext();
     return toDomain(repository.saveAndFlush(entity));
   }
 

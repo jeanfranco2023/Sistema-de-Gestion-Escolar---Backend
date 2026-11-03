@@ -1,6 +1,7 @@
 package com.colegio.shuji.evaluacion.application.port.out;
 
 import com.colegio.shuji.evaluacion.domain.model.CalificacionCneb;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,8 @@ public interface CalificacionRepositoryPort {
   List<CalificacionCneb> listar();
 
   List<CalificacionCneb> buscarPorMatriculaId(Long valor);
+
+  List<CalificacionCneb> buscarPorMatriculaIds(Collection<Long> matriculaIds);
 
   List<CalificacionCneb> buscarPorAnioLectivoId(Short valor);
 

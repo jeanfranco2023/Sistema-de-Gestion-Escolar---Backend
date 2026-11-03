@@ -89,6 +89,25 @@ class SolicitudMatriculaPublicaDocumentosTest {
     org.mockito.Mockito.verifyNoInteractions(mercadoPago);
   }
 
+  @Test
+  void creacionConUbigeoNuloUOmisibleGuardaCorrectamente() {
+    prepararAdmision();
+    org.mockito.ArgumentCaptor<SolicitudMatriculaPublicaEntity> captor =
+        org.mockito.ArgumentCaptor.forClass(SolicitudMatriculaPublicaEntity.class);
+    when(solicitudes.saveAndFlush(captor.capture()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var request = new com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto(
+        (short) 2026, (short) 1, "12345678", "Ana", "Perez", "Ruiz",
+        java.time.LocalDate.of(2020, 3, 31), Genero.F,
+        "87654321", "Rosa", "Perez", "Ruiz", "999888777", "familia@example.test",
+        "Lima", null, Parentesco.MADRE, true);
+
+    service.crear(request);
+    assertNull(captor.getValue().getUbigeoApoderado());
+    assertEquals("Ana", captor.getValue().getNombresEstudiante());
+  }
+
   private void prepararAdmision() {
     var anio = new AnioLectivoEntity();
     anio.setAnio((short) 2026); anio.setAbierto(true);
@@ -227,6 +246,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setMatriculaId(42L);
     var matricula = new com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity();
     matricula.setId(42L);
+    matricula.setEstudianteId(101L);
     matricula.setAnioLectivoId((short) 2026);
     matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION);
     var seccion = new SeccionEntity();
@@ -252,11 +272,49 @@ class SolicitudMatriculaPublicaDocumentosTest {
   }
 
   @Test
+  void noAsignaSeccionSiMatriculaVinculadaPerteneceAOtroEstudiante() throws Exception {
+    assertVinculoMatriculaInconsistenteRechazado(999L, (short) 2026);
+  }
+
+  @Test
+  void noAsignaSeccionSiMatriculaVinculadaPerteneceAOtroAnio() throws Exception {
+    assertVinculoMatriculaInconsistenteRechazado(101L, (short) 2025);
+  }
+
+  private void assertVinculoMatriculaInconsistenteRechazado(Long estudianteId, short anioLectivoId)
+      throws Exception {
+    var solicitud = solicitudConfirmada();
+    solicitud.setEstudianteId(101L);
+    solicitud.setMatriculaId(42L);
+    var matricula = new com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity();
+    matricula.setId(42L);
+    matricula.setEstudianteId(estudianteId);
+    matricula.setAnioLectivoId(anioLectivoId);
+    matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION);
+    when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(matriculas.bloquearPorId(42L)).thenReturn(Optional.of(matricula));
+
+    var error = assertThrows(
+        ResponseStatusException.class, () -> service.asignarSeccion(SOLICITUD_ID, 9));
+
+    assertEquals(409, error.getStatusCode().value());
+    assertEquals(EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION, solicitud.getEstado());
+    assertEquals(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION,
+        matricula.getEstadoMatricula());
+    assertNull(matricula.getSeccionId());
+    org.mockito.Mockito.verify(secciones, org.mockito.Mockito.never()).bloquearPorId(9);
+    org.mockito.Mockito.verify(matriculas, org.mockito.Mockito.never()).saveAndFlush(matricula);
+    org.mockito.Mockito.verify(solicitudes, org.mockito.Mockito.never()).saveAndFlush(solicitud);
+  }
+
+  @Test
   void noAsignaUnaSeccionQueYaAlcanzoElCupo() throws Exception {
     var solicitud = solicitudConfirmada();
     solicitud.setMatriculaId(42L);
     var matricula = new com.colegio.shuji.matricula.infrastructure.entity.MatriculaEntity();
     matricula.setId(42L);
+    matricula.setEstudianteId(101L);
+    matricula.setAnioLectivoId((short) 2026);
     matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION);
     var seccion = new SeccionEntity();
     seccion.setId(9);
@@ -304,6 +362,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
     solicitud.setComprobantePagoCodigo("REC-MAT-42");
     solicitud.setFechaEmisionDocumentos(OffsetDateTime.parse("2026-09-23T18:30:00Z"));
     solicitud.setPagoMonto(new BigDecimal("1.00"));
+    solicitud.setEstudianteId(101L);
     solicitud.setNombresEstudiante("Ana");
     solicitud.setApellidoPaternoEstudiante("Lopez");
     solicitud.setApellidoMaternoEstudiante("Diaz");

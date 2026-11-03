@@ -40,17 +40,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private static final String LOGIN_PATH = "/api/v1/auth/login";
   private static final String REGISTER_PATH = "/api/v1/auth/register";
   private static final String REFRESH_PATH = "/api/v1/auth/refresh";
-  private static final String MATRICULA_DNI_PATH = "/api/v1/solicitudes-matricula/public/dni/";
   private static final String MATRICULA_PUBLICA_PATH = "/api/v1/solicitudes-matricula/public";
+  private static final String PERSONAS_RENIEC_PATH = "/api/v1/personas/reniec";
+  private static final Pattern RENIEC_DNI_PATH = Pattern.compile("^/api/v1/personas/reniec/[0-9]{8}/?$");
   private static final Pattern DOCUMENTO_PUBLICO_PATH = Pattern.compile(
       "^/api/v1/solicitudes-matricula/public/[^/]+/documentos/[^/]+/?$");
 
   private static final int LOGIN_LIMIT = 15;
   private static final int REGISTER_LIMIT = 10;
   private static final int REFRESH_LIMIT = 20;
-  private static final int MATRICULA_DNI_LIMIT = 8;
   private static final int MATRICULA_CREAR_LIMIT = 5;
   private static final int MATRICULA_DOCUMENTO_LIMIT = 10;
+  private static final int RENIEC_LIMIT = 15;
   private static final int WEBHOOK_PAGOS_LIMIT = 120;
   private static final int PAGOS_TESORERIA_LIMIT = 30;
   private static final int BIOMETRICO_IMPORT_LIMIT = 5;
@@ -107,7 +108,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   private Integer resolveLimit(String uri) {
     if (uri == null) return null;
+
     if (uri.equals("/api/v1/evaluacion/ia/sugerir-conclusion")) return 15;
+    if (uri.equals(PERSONAS_RENIEC_PATH)) return RENIEC_LIMIT;
     if (uri.startsWith("/api/v1/asistencia/biometrico/importar")) return BIOMETRICO_IMPORT_LIMIT;
     if (uri.equals("/api/v1/asistencia/aula/justificacion")) return JUSTIFICACION_ADJUNTO_LIMIT;
     if (uri.endsWith(LOGIN_PATH) || uri.equals(LOGIN_PATH)) {
@@ -116,8 +119,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return REGISTER_LIMIT;
     } else if (uri.endsWith(REFRESH_PATH) || uri.equals(REFRESH_PATH)) {
       return REFRESH_LIMIT;
-    } else if (uri.startsWith(MATRICULA_DNI_PATH)) {
-      return MATRICULA_DNI_LIMIT;
     } else if (uri.equals(MATRICULA_PUBLICA_PATH)) {
       return MATRICULA_CREAR_LIMIT;
     } else if (uri.equals(MATRICULA_PUBLICA_PATH + "/documentos")) {
@@ -133,7 +134,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private String resolveBucket(HttpServletRequest request) {
     String uri = request.getRequestURI();
     if (uri == null) return null;
-    if (uri.startsWith(MATRICULA_DNI_PATH)) return MATRICULA_DNI_PATH;
+
+    if (RENIEC_DNI_PATH.matcher(uri).matches() || uri.equals(PERSONAS_RENIEC_PATH) || uri.equals(PERSONAS_RENIEC_PATH + "/")) {
+      return PERSONAS_RENIEC_PATH;
+    }
     if ("POST".equalsIgnoreCase(request.getMethod())) {
       if (uri.equals(MATRICULA_PUBLICA_PATH) || uri.equals(MATRICULA_PUBLICA_PATH + "/")) {
         return MATRICULA_PUBLICA_PATH;

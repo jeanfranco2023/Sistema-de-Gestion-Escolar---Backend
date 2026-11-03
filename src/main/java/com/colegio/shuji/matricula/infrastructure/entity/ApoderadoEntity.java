@@ -61,7 +61,7 @@ public class ApoderadoEntity {
   @Column(name = "direccion", nullable = false, length = 150)
   private String direccion;
 
-  @Column(name = "ubigeo_inei", nullable = false, length = 6)
+  @Column(name = "ubigeo_inei", nullable = true, length = 6)
   private String ubigeoInei;
 
   @Column(name = "validado_reniec", nullable = false)
@@ -70,6 +70,12 @@ public class ApoderadoEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "origen_registro", nullable = false, length = 20)
   private OrigenRegistro origenRegistro;
+
+  @Column(name = "activo", nullable = false)
+  private Boolean activo;
+
+  @Column(name = "estado", nullable = false, length = 20)
+  private String estado;
 
   @Column(name = "fecha_creacion", nullable = false)
   private OffsetDateTime fechaCreacion;
@@ -89,6 +95,8 @@ public class ApoderadoEntity {
     if (tipoDocumento == null) tipoDocumento = TipoDocumento.DNI;
     if (validadoReniec == null) validadoReniec = false;
     if (origenRegistro == null) origenRegistro = OrigenRegistro.RENIEC_API;
+    if (activo == null) activo = true;
+    if (estado == null) estado = "ACTIVO";
     if (fechaCreacion == null) fechaCreacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 }

@@ -76,6 +76,11 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
   }
 
   @Override
+  public boolean existsByDni(String dni) {
+    return jpaUsuarioRepository.existsByDni(dni);
+  }
+
+  @Override
   public Usuario save(Usuario usuario) {
     auditoria.syncCurrentUserFromSecurityContext();
     UsuarioEntity entity = userMapper.toEntity(usuario);

@@ -1,6 +1,9 @@
 package com.colegio.shuji.matricula.infrastructure.controller.rest;
 
 import com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto;
+import com.colegio.shuji.matricula.application.dto.in.ReenviarTokenSolicitudRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ReenviarTokenSolicitudResponseDto;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.colegio.shuji.matricula.application.dto.in.ObservarSolicitudMatriculaPublicaRequestDto;
 import com.colegio.shuji.matricula.application.dto.out.CatalogoMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.PagoMatriculaPublicaResponseDto;
@@ -10,7 +13,6 @@ import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPub
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
 import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
 import com.colegio.shuji.matricula.application.dto.out.VersionDocumentoMatriculaResponseDto;
-import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.application.port.out.AlmacenDocumentosMatriculaPort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
 import com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService;
@@ -57,7 +59,6 @@ public class SolicitudMatriculaPublicaController {
   private final GeminiDocumentoMatriculaPort gemini;
   private final FirmaDigitalDocumentoPort firmas;
   private final com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService identidades;
-  private final ReniecServicePort consultaDni;
   private final AlmacenDocumentosMatriculaPort almacenDocumentos;
   private final ActorActualPort actor;
 
@@ -67,14 +68,6 @@ public class SolicitudMatriculaPublicaController {
     return solicitudes.catalogo();
   }
 
-  @GetMapping("/public/dni/{dni}")
-  @PreAuthorize("permitAll()")
-  public ReniecServicePort.Identidad consultarDni(@PathVariable @jakarta.validation.constraints.Pattern(regexp = "[0-9]{8}") String dni) {
-    return consultaDni.consultar(dni)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-            "No se encontraron nombres para el DNI o el proveedor no está disponible"));
-  }
-
   @PostMapping("/public")
   @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto crear(
@@ -82,11 +75,35 @@ public class SolicitudMatriculaPublicaController {
     return solicitudes.crear(request);
   }
 
+  @GetMapping("/public/por-token/{token}")
+  @PreAuthorize("permitAll()")
+  public SolicitudMatriculaPublicaResponseDto consultarPorToken(@PathVariable String token) {
+    return solicitudes.consultarPorToken(token);
+  }
+
+  @PostMapping("/public/reenviar-token")
+  @PreAuthorize("permitAll()")
+  public ReenviarTokenSolicitudResponseDto reenviarToken(
+      @Valid @RequestBody ReenviarTokenSolicitudRequestDto request) {
+    return solicitudes.reenviarToken(request);
+  }
+
+  public SolicitudMatriculaPublicaResponseDto consultar(UUID id, String token) {
+    return consultar(id, token, null);
+  }
+
+  public SolicitudMatriculaPublicaResponseDto validarDocumento(
+      UUID id, TipoDocumentoSolicitud tipo, String token, MultipartFile archivo) {
+    return validarDocumento(id, tipo, token, null, archivo);
+  }
+
   @GetMapping("/public/{id}")
   @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto consultar(
       @PathVariable UUID id,
-      @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+      @RequestHeader(value = TOKEN_HEADER, required = false) String tokenHeader,
+      @RequestParam(value = "token", required = false) String tokenParam) {
+    String token = (tokenParam != null && !tokenParam.isBlank()) ? tokenParam : tokenHeader;
     return solicitudes.consultar(id, token);
   }
 
@@ -95,8 +112,10 @@ public class SolicitudMatriculaPublicaController {
   public SolicitudMatriculaPublicaResponseDto validarDocumento(
       @PathVariable UUID id,
       @PathVariable TipoDocumentoSolicitud tipo,
-      @RequestHeader(value = TOKEN_HEADER, required = false) String token,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String tokenHeader,
+      @RequestParam(value = "token", required = false) String tokenParam,
       @RequestPart("archivo") MultipartFile archivo) {
+    String token = (tokenParam != null && !tokenParam.isBlank()) ? tokenParam : tokenHeader;
     if (archivo == null || archivo.isEmpty() || archivo.getSize() > MAX_FILE_BYTES) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El documento debe pesar hasta 5 MB");
     }
@@ -163,6 +182,20 @@ public class SolicitudMatriculaPublicaController {
     } finally {
       java.util.Arrays.fill(bytes, (byte) 0);
     }
+  }
+
+  @PostMapping(value = "/public/{id}/subsanar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("permitAll()")
+  public SolicitudMatriculaPublicaResponseDto subsanarDocumento(
+      @PathVariable UUID id,
+      @RequestParam("tipo") TipoDocumentoSolicitud tipo,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String tokenHeader,
+      @RequestHeader(value = "X-Matricula-Token", required = false) String tokenAltHeader,
+      @RequestParam(value = "token", required = false) String tokenParam,
+      @RequestPart("archivo") MultipartFile archivo) {
+    String token = (tokenParam != null && !tokenParam.isBlank()) ? tokenParam
+        : (tokenHeader != null && !tokenHeader.isBlank()) ? tokenHeader : tokenAltHeader;
+    return validarDocumento(id, tipo, token, null, archivo);
   }
 
   @PostMapping("/public/{id}/pago")

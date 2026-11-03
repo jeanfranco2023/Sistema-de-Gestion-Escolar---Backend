@@ -4,6 +4,7 @@ import com.colegio.shuji.academico.application.port.out.AulaRepositoryPort;
 import com.colegio.shuji.academico.domain.model.Aula;
 import com.colegio.shuji.academico.infrastructure.entity.AulaEntity;
 import com.colegio.shuji.academico.infrastructure.repository.JpaAulaRepository;
+import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AulaRepositoryAdapter implements AulaRepositoryPort {
   private final JpaAulaRepository repository;
+  private final AuditContextPort auditoria;
 
   public Aula guardar(Aula aula) {
     var entity = new AulaEntity();
@@ -22,6 +24,7 @@ public class AulaRepositoryAdapter implements AulaRepositoryPort {
     entity.setUbicacion(aula.getUbicacion());
     entity.setCapacidad(aula.getCapacidad());
     entity.setActiva(aula.getActiva());
+    auditoria.syncCurrentUserFromSecurityContext();
     return toDomain(repository.saveAndFlush(entity));
   }
 

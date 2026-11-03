@@ -31,6 +31,7 @@ import java.time.*;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -57,6 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
       "spring.datasource.hikari.minimum-idle=0"
     })
 @Transactional
+@EnabledIfEnvironmentVariable(named = "RUN_MUTATING_POSTGRES_TESTS", matches = "true")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
 class PersistenciaPostgresTest {
@@ -570,6 +572,10 @@ class PersistenciaPostgresTest {
   @Test
   void incidenciasDevuelvenElNombreDelEstudianteDeLaMatricula() {
     autenticar("DIRECCION");
+    var area = curriculo.crearArea(new CrearAreaRequestDto(nivelId, "INCTEST", "Tutoría"));
+    carga.asignarDocente(
+        new AsignarDocenteRequestDto(usuarioId, seccionId, anioId, nivelId, area.id()));
+    autenticar("TUTOR");
     var incidencia = registrarIncidencia.registrar(
         new com.colegio.shuji.convivencia.application.dto.in.RegistrarIncidenciaRequestDto(
             matriculaId, LocalDate.of(2026, 9, 18),

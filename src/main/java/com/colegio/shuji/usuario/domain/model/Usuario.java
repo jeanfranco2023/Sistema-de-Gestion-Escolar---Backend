@@ -29,6 +29,16 @@ public class Usuario {
   private String email;
   private String usuarioPassword;
   private Boolean activo;
+  @Builder.Default private Boolean debeCambiarPassword = false;
+  private String dni;
+  private String telefono;
+  private String direccion;
+  private String especialidad;
+  private String codigoModular;
+  private String numeroColegiatura;
+  private java.time.LocalDate fechaIngreso;
+  private String tipoContrato;
+  @Builder.Default private String estadoLaboral = "ACTIVO";
 
   @Builder.Default private Set<Rol> roles = new HashSet<>();
 
@@ -61,6 +71,14 @@ public class Usuario {
     this.fechaActualizacion = LocalDateTime.now();
   }
 
+  public void marcarCambioPasswordInicialPendiente() {
+    this.debeCambiarPassword = true;
+  }
+
+  public void completarCambioPasswordInicial() {
+    this.debeCambiarPassword = false;
+  }
+
   public void actualizarPerfil(String email) {
     if (email != null && !email.isBlank()) {
       this.email = email;
@@ -81,6 +99,16 @@ public class Usuario {
     if (this.roles != null && rol != null) {
       this.roles.remove(rol);
     }
+  }
+
+  public void revocarRol(Rol rol, LocalDateTime ahora) {
+    removerRol(rol);
+    this.fechaActualizacion = ahora;
+  }
+
+  public void corregirDni(String nuevoDni, LocalDateTime ahora) {
+    this.dni = nuevoDni;
+    this.fechaActualizacion = ahora;
   }
 
   public void registrar(String usuarioPassword, Set<Rol> roles, LocalDateTime ahora) {

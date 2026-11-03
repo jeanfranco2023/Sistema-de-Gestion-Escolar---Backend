@@ -82,6 +82,7 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
         .subject(username)
         .claim("userId", userId)
         .claim("roles", roles)
+        .claim("type", "ACCESS")
         .issuedAt(now)
         .expiration(expiryDate)
         .signWith(key)
@@ -149,15 +150,32 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
    * @return true si es válido, false en caso contrario.
    */
   public boolean validateToken(String token) {
+    return claimsIfValid(token) != null;
+  }
+
+  @Override
+  public boolean validateAccessToken(String token) {
+    Claims claims = claimsIfValid(token);
+    if (claims == null) return false;
+    Object type = claims.get("type");
+    return type == null || "ACCESS".equals(type);
+  }
+
+  @Override
+  public boolean validateRefreshToken(String token) {
+    Claims claims = claimsIfValid(token);
+    return claims != null && "REFRESH".equals(claims.get("type"));
+  }
+
+  private Claims claimsIfValid(String token) {
     try {
-      extractAllClaims(token);
-      return true;
+      return extractAllClaims(token);
     } catch (ExpiredJwtException e) {
       log.warn("El token JWT ha expirado: {}", e.getMessage());
     } catch (JwtException | IllegalArgumentException e) {
       log.error("Firma JWT inválida o token malformado: {}", e.getMessage());
     }
-    return false;
+    return null;
   }
 
   /** Extrae todas las claims verificando la firma con la clave simétrica (soporta rotación de claves). */

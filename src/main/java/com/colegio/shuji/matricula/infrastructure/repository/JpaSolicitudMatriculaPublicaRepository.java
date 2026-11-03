@@ -17,6 +17,8 @@ public interface JpaSolicitudMatriculaPublicaRepository
     extends JpaRepository<SolicitudMatriculaPublicaEntity, UUID> {
   Optional<SolicitudMatriculaPublicaEntity> findByIdAndTokenHash(UUID id, String tokenHash);
 
+  Optional<SolicitudMatriculaPublicaEntity> findByTokenHash(String tokenHash);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select s from SolicitudMatriculaPublicaEntity s where s.id = :id")
   Optional<SolicitudMatriculaPublicaEntity> bloquearPorId(@Param("id") UUID id);
@@ -25,6 +27,10 @@ public interface JpaSolicitudMatriculaPublicaRepository
 
   boolean existsByNumeroDocumentoEstudianteAndEstadoIn(
       String numeroDocumentoEstudiante, List<EstadoSolicitudMatriculaPublica> estados);
+
+  @Query("select s from SolicitudMatriculaPublicaEntity s where s.numeroDocumentoEstudiante = :dni and s.anioLectivoId = :anio and s.estado in :estados order by s.fechaCreacion desc")
+  List<SolicitudMatriculaPublicaEntity> buscarActivasPorDniYAnio(
+      @Param("dni") String dni, @Param("anio") Short anio, @Param("estados") List<EstadoSolicitudMatriculaPublica> estados);
 
   @Query("select s from SolicitudMatriculaPublicaEntity s where s.vacanteReservada = true and s.fechaExpiracionPago <= :ahora")
   List<SolicitudMatriculaPublicaEntity> buscarReservasExpiradas(@Param("ahora") OffsetDateTime ahora);

@@ -50,3 +50,12 @@ DBDIAGRAM_*
 JUSTIFICACION_*
 
 .env.local-docker
+/.runtime/private-files/
+
+# Código de auditoría y migraciones de auditoría versionables
+!src/main/resources/db/migration/V38__auditoria_accesos_api.sql
+!src/main/resources/db/migration/V39__auditoria_integral_de_cambios.sql
+!src/main/java/**/AuditoriaAcceso*.java
+!src/main/java/**/AuditoriaCambios*.java
+!src/main/java/**/CambioAuditoria*.java
+!src/main/java/**/ConsultarAuditoriaCambios*.java

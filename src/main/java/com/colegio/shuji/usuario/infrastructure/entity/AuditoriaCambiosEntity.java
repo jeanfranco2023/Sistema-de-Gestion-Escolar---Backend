@@ -10,7 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,8 +41,11 @@ public class AuditoriaCambiosEntity {
   @Column(name = "tabla_afectada", nullable = false, length = 50)
   private String tablaAfectada;
 
-  @Column(name = "registro_id", nullable = false)
+  @Column(name = "registro_id")
   private Long registroId;
+
+  @Column(name = "registro_clave", nullable = false, length = 500)
+  private String registroClave;
 
   @Column(nullable = false, length = 10)
   private String accion;
@@ -59,13 +62,19 @@ public class AuditoriaCambiosEntity {
   @JoinColumn(name = "usuario_id")
   private UsuarioEntity usuario;
 
+  @Column(name = "usuario_nombre_snapshot", length = 100)
+  private String usuarioNombreSnapshot;
+
+  @Column(name = "roles_usuario_snapshot", length = 300)
+  private String rolesUsuarioSnapshot;
+
   @Column(name = "fecha_creacion", nullable = false, updatable = false)
-  private LocalDateTime fechaCreacion;
+  private Instant fechaCreacion;
 
   @PrePersist
   public void prePersist() {
     if (this.fechaCreacion == null) {
-      this.fechaCreacion = LocalDateTime.now();
+      this.fechaCreacion = Instant.now();
     }
   }
 }

@@ -60,6 +60,7 @@ class ArquitecturaTest {
       var nombre = path.toString().replace('\\', '/');
       if (!nombre.contains("/domain/model/") || nombre.endsWith("/Reglas.java")) continue;
       var codigo = Files.readString(path);
+      if (codigo.matches("(?s).*\\brecord\\s+\\w+\\s*\\(.*")) continue;
       for (var anotacion : List.of("@Builder", "@NoArgsConstructor", "@AllArgsConstructor"))
         assertTrue(codigo.contains(anotacion), path + " requiere " + anotacion);
     }

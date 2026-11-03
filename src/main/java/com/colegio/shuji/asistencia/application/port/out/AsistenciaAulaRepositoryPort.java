@@ -18,6 +18,8 @@ public interface AsistenciaAulaRepositoryPort {
 
   List<AsistenciaAula> buscarPorMatriculaId(Long valor);
 
+  List<AsistenciaAula> buscarPorMatriculaIds(Collection<Long> matriculaIds);
+
   List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor);
 
   List<AsistenciaAula> buscarPorFechaSesionYMatriculaIds(LocalDate fecha, Collection<Long> matriculaIds);

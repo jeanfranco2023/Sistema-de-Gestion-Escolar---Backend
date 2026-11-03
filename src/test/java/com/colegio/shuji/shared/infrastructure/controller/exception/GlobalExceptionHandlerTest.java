@@ -25,7 +25,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void conservaElEstadoHttpDeResponseStatusException() {
-    var request = request("GET", "/api/v1/solicitudes-matricula/public/dni/12345678");
+    var request = request("GET", "/api/v1/solicitudes-matricula/public/00000000-0000-0000-0000-000000000001");
     var response = handler.handleResponseStatusException(
         new ResponseStatusException(HttpStatus.NOT_FOUND, "Proveedor sin resultado"), request);
 

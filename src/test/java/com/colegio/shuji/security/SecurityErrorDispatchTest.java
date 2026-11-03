@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.colegio.shuji.config.security.JwtAuthenticationFilter;
 import com.colegio.shuji.config.security.RateLimitingFilter;
 import com.colegio.shuji.config.security.SecurityConfig;
+import com.colegio.shuji.shared.infrastructure.audit.AuditoriaAccesoService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ class SecurityErrorDispatchTest {
   @Autowired private MockMvc mvc;
   @MockitoBean private JwtAuthenticationFilter jwtFilter;
   @MockitoBean private RateLimitingFilter rateFilter;
+  @MockitoBean private AuditoriaAccesoService auditoriaAcceso;
   @MockitoBean(name = "corsConfigurationSource") private CorsConfigurationSource cors;
 
   @BeforeEach

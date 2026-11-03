@@ -1,6 +1,7 @@
 package com.colegio.shuji.usuario.application.port.in;
 
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
+import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.UpdateUsuarioRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
@@ -22,4 +23,8 @@ public interface GestionUsuarioUseCase {
   void cambiarPassword(Long usuarioId, CambiarPasswordRequestDto cambiarPasswordDto);
 
   UserResponseDto registrarPorDireccion(RegisterUserRequestDto request);
+
+  UserResponseDto corregirDni(Long usuarioId, CorregirDniRequestDto request);
+
+  UserResponseDto revocarRol(Long usuarioId, Short rolId);
 }

@@ -5,6 +5,8 @@ import com.colegio.shuji.academico.infrastructure.repository.JpaAnioLectivoRepos
 import com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepository;
 import com.colegio.shuji.matricula.application.dto.in.CrearSolicitudMatriculaPublicaRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.ObservarSolicitudMatriculaPublicaRequestDto;
+import com.colegio.shuji.matricula.application.dto.in.ReenviarTokenSolicitudRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ReenviarTokenSolicitudResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.CatalogoMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.DocumentoSolicitudResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.PagoMatriculaPublicaResponseDto;
@@ -13,6 +15,7 @@ import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublica
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
 import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
+import com.colegio.shuji.matricula.application.port.out.SeguimientoSolicitudCorreoPort;
 import com.colegio.shuji.matricula.application.dto.out.VersionDocumentoMatriculaResponseDto;
 import com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital;
 import com.colegio.shuji.matricula.infrastructure.entity.DocumentoMatriculaVersionEntity;
@@ -55,6 +58,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -66,6 +70,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class SolicitudMatriculaPublicaService {
   public static final String REFERENCIA_PAGO_PREFIX = "MATRICULA_PUBLICA:";
+  private static final String MENSAJE_REENVIO_SEGURO =
+      "Si existe una solicitud activa con esos datos, enviaremos un enlace al correo registrado.";
 
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final List<EstadoSolicitudMatriculaPublica> SOLICITUDES_ACTIVAS = List.of(
@@ -89,6 +95,9 @@ public class SolicitudMatriculaPublicaService {
   private final GeminiDocumentoMatriculaPort gemini;
   private final MercadoPagoPort mercadoPago;
   private final com.colegio.shuji.tesoreria.application.port.in.RegistrarCobroMatriculaUseCase cobrosMatricula;
+
+  @Autowired(required = false)
+  private SeguimientoSolicitudCorreoPort correoSeguimiento;
 
   @Value("${app.matricula-publica.monto-matricula:350.00}")
   private BigDecimal montoMatriculaPublica = new BigDecimal("350.00");
@@ -141,12 +150,16 @@ public class SolicitudMatriculaPublicaService {
     }
     var edades = limitesEdad(seccion);
     boolean requiereAutorizacionEdad = !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
-    if (!estudiantes.buscarPorNumeroDocumento(r.numeroDocumentoEstudiante()).isEmpty()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "El DNI del estudiante ya está registrado");
+    var estudianteExistente = estudiantes.buscarPorNumeroDocumento(r.numeroDocumentoEstudiante().trim());
+    if (!estudianteExistente.isEmpty()) {
+      Long estudianteId = estudianteExistente.getFirst().getId();
+      if (matriculas.existsByEstudianteIdAndAnioLectivoId(estudianteId, r.anioLectivoId())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "El estudiante ya cuenta con vacante confirmada para este año lectivo.");
+      }
     }
     if (solicitudes.existsByNumeroDocumentoEstudianteAndEstadoIn(
-        r.numeroDocumentoEstudiante(), SOLICITUDES_ACTIVAS)) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una solicitud pendiente para ese DNI");
+        r.numeroDocumentoEstudiante().trim(), SOLICITUDES_ACTIVAS)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una solicitud en trámite para este DNI. Puedes solicitar el reenvío de tu enlace de seguimiento.");
     }
 
     byte[] secreto = new byte[32];
@@ -175,7 +188,10 @@ public class SolicitudMatriculaPublicaService {
     s.setCelularApoderado(r.celularApoderado().trim());
     s.setEmailApoderado(r.emailApoderado() == null ? null : r.emailApoderado().trim());
     s.setDireccionApoderado(r.direccionApoderado().trim());
-    s.setUbigeoApoderado(r.ubigeoApoderado().trim());
+    s.setUbigeoApoderado(
+        r.ubigeoApoderado() != null && !r.ubigeoApoderado().isBlank()
+            ? r.ubigeoApoderado().trim()
+            : null);
     s.setParentesco(r.parentesco());
     s.setConsentimientoGemini(r.consentimientoGemini());
     s.setPagoMonto(obtenerMontoMatriculaPublica());
@@ -300,6 +316,62 @@ public class SolicitudMatriculaPublicaService {
   @Transactional(readOnly = true)
   public SolicitudMatriculaPublicaResponseDto consultar(UUID id, String token) {
     return respuesta(solicitudConToken(id, token), null);
+  }
+
+  @Transactional(readOnly = true)
+  public SolicitudMatriculaPublicaResponseDto consultarPorToken(String token) {
+    if (token == null || token.isBlank()) throw noEncontrada();
+    String hashBuscado = hashToken(token.trim());
+    var s = solicitudes.findByTokenHash(hashBuscado).orElseThrow(this::noEncontrada);
+    if (!MessageDigest.isEqual(
+        hashBuscado.getBytes(StandardCharsets.US_ASCII),
+        s.getTokenHash().getBytes(StandardCharsets.US_ASCII))) {
+      throw noEncontrada();
+    }
+    return respuesta(s, token.trim());
+  }
+
+  @Transactional
+  public ReenviarTokenSolicitudResponseDto reenviarToken(ReenviarTokenSolicitudRequestDto r) {
+    if (correoSeguimiento == null) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+          "El reenvío por correo no está disponible temporalmente");
+    }
+    var lista = solicitudes.buscarActivasPorDniYAnio(r.numeroDocumentoEstudiante().trim(), r.anioLectivoId(), SOLICITUDES_ACTIVAS);
+    if (lista.isEmpty()) return new ReenviarTokenSolicitudResponseDto(MENSAJE_REENVIO_SEGURO);
+    var s = lista.getFirst();
+    String email = s.getEmailApoderado();
+    if (email == null || email.isBlank()) {
+      return new ReenviarTokenSolicitudResponseDto(MENSAJE_REENVIO_SEGURO);
+    }
+    byte[] secreto = new byte[32];
+    RANDOM.nextBytes(secreto);
+    String nuevoToken = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
+    try {
+      correoSeguimiento.enviarEnlaceSeguimiento(email, s.getId(), nuevoToken);
+    } catch (RuntimeException ex) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+          "No fue posible enviar el enlace temporalmente", ex);
+    }
+    s.setTokenHash(hashToken(nuevoToken));
+    solicitudes.saveAndFlush(s);
+    return new ReenviarTokenSolicitudResponseDto(MENSAJE_REENVIO_SEGURO);
+  }
+
+  public static String enmascararEmail(String email) {
+    if (email == null || email.isBlank()) return "***@***.***";
+    String trimmed = email.trim();
+    int atIndex = trimmed.indexOf('@');
+    if (atIndex <= 0) return "***@***.***";
+    String local = trimmed.substring(0, atIndex);
+    String domain = trimmed.substring(atIndex);
+    if (local.length() == 1) {
+      return local + "***" + domain;
+    } else if (local.length() == 2) {
+      return local.charAt(0) + "***" + local.charAt(1) + domain;
+    } else {
+      return local.charAt(0) + "***" + local.charAt(local.length() - 1) + domain;
+    }
   }
 
   @Transactional(readOnly = true)
@@ -472,7 +544,10 @@ public class SolicitudMatriculaPublicaService {
       apoderado.setCelular(s.getCelularApoderado());
       apoderado.setEmail(s.getEmailApoderado());
       apoderado.setDireccion(s.getDireccionApoderado());
-      apoderado.setUbigeoInei(s.getUbigeoApoderado());
+      apoderado.setUbigeoInei(
+          s.getUbigeoApoderado() != null && !s.getUbigeoApoderado().isBlank()
+              ? s.getUbigeoApoderado()
+              : "150101");
       apoderado.setValidadoReniec(false);
       apoderado.setOrigenRegistro(OrigenRegistro.MANUAL_CONTINGENCIA);
       apoderado = apoderados.saveAndFlush(apoderado);
@@ -529,6 +604,13 @@ public class SolicitudMatriculaPublicaService {
     }
     var matricula = matriculas.bloquearPorId(solicitud.getMatriculaId())
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No se encontró la matrícula pagada"));
+    if (matricula.getEstudianteId() == null
+        || solicitud.getEstudianteId() == null
+        || !java.util.Objects.equals(matricula.getEstudianteId(), solicitud.getEstudianteId())
+        || !java.util.Objects.equals(matricula.getAnioLectivoId(), solicitud.getAnioLectivoId())) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "La matrícula vinculada no corresponde al estudiante y año de la solicitud");
+    }
     if (matricula.getEstadoMatricula() != com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION
         || matricula.getSeccionId() != null) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La matrícula ya tiene una asignación o cambió de estado");

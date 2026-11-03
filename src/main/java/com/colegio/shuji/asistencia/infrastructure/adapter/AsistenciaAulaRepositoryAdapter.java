@@ -63,6 +63,11 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
     return repository.buscarPorMatriculaId(valor).stream().map(mapper::toDomain).toList();
   }
 
+  public List<AsistenciaAula> buscarPorMatriculaIds(Collection<Long> matriculaIds) {
+    if (matriculaIds == null || matriculaIds.isEmpty()) return List.of();
+    return repository.buscarPorMatriculaIds(matriculaIds).stream().map(mapper::toDomain).toList();
+  }
+
   public List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor) {
     return repository.buscarPorFechaSesion(valor).stream().map(mapper::toDomain).toList();
   }

@@ -3,29 +3,11 @@ package com.colegio.shuji.security;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.colegio.shuji.academico.infrastructure.controller.rest.AcademicoController;
-import com.colegio.shuji.asistencia.infrastructure.controller.rest.AsistenciaController;
-import com.colegio.shuji.comunicado.infrastructure.controller.rest.ComunicadoController;
-import com.colegio.shuji.convivencia.infrastructure.controller.rest.ConvivenciaController;
-import com.colegio.shuji.curriculo.infrastructure.controller.rest.CurriculoController;
-import com.colegio.shuji.curriculo.infrastructure.controller.rest.HorarioController;
 import com.colegio.shuji.evaluacion.infrastructure.controller.rest.EvaluacionController;
-import com.colegio.shuji.evaluacion.infrastructure.controller.rest.RefuerzoController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.ApoderadoController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.EstudianteController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.MatriculaController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.PortalFamiliarController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.SolicitudMatriculaPublicaController;
-import com.colegio.shuji.matricula.infrastructure.controller.rest.SuplenciaController;
-import com.colegio.shuji.shared.infrastructure.controller.DashboardController;
-import com.colegio.shuji.tesoreria.infrastructure.controller.rest.ComprobanteController;
-import com.colegio.shuji.tesoreria.infrastructure.controller.rest.RetornoPagoController;
-import com.colegio.shuji.tesoreria.infrastructure.controller.rest.TesoreriaController;
-import com.colegio.shuji.tesoreria.infrastructure.controller.rest.WebhookController;
 import com.colegio.shuji.usuario.domain.enums.RolNombre;
-import com.colegio.shuji.usuario.infrastructure.controller.rest.AuthController;
-import com.colegio.shuji.usuario.infrastructure.controller.rest.UsuarioController;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.RestController;
 
 class EndpointAuthorizationTest {
 
@@ -40,36 +23,21 @@ class EndpointAuthorizationTest {
       Arrays.stream(RolNombre.values()).map(Enum::name).collect(java.util.stream.Collectors.toSet());
   private static final Pattern ROLE_EXPRESSION = Pattern.compile("has(?:Any)?Role\\(([^)]*)\\)");
   private static final Pattern ROLE_NAME = Pattern.compile("'([^']+)'|\"([^\"]+)\"");
-  private static final List<Class<?>> CONTROLLERS =
-      List.of(
-          AcademicoController.class,
-          AsistenciaController.class,
-          ComunicadoController.class,
-          ConvivenciaController.class,
-          CurriculoController.class,
-          HorarioController.class,
-          EvaluacionController.class,
-          RefuerzoController.class,
-          ApoderadoController.class,
-          EstudianteController.class,
-          MatriculaController.class,
-          PortalFamiliarController.class,
-          SolicitudMatriculaPublicaController.class,
-          SuplenciaController.class,
-          DashboardController.class,
-          ComprobanteController.class,
-          RetornoPagoController.class,
-          TesoreriaController.class,
-          WebhookController.class,
-          AuthController.class,
-          UsuarioController.class);
-
   @Test
-  void everyRestEndpointDeclaresItsOwnAuthorizationAndOnlyKnownRoles() {
+  void everyRestEndpointDeclaresItsOwnAuthorizationAndOnlyKnownRoles() throws Exception {
     var violations = new java.util.ArrayList<String>();
     int endpoints = 0;
 
-    for (Class<?> controller : CONTROLLERS) {
+    var sourceRoot = Path.of("src/main/java");
+    List<Path> sources;
+    try (var files = Files.walk(sourceRoot)) {
+      sources = files.filter(path -> path.toString().endsWith(".java")).toList();
+    }
+    for (Path source : sources) {
+      String className = sourceRoot.relativize(source).toString()
+          .replace('\\', '.').replace('/', '.').replaceFirst("\\.java$", "");
+      Class<?> controller = Class.forName(className, false, getClass().getClassLoader());
+      if (!controller.isAnnotationPresent(RestController.class)) continue;
       for (Method method : controller.getDeclaredMethods()) {
         if (!isRestEndpoint(method)) continue;
         endpoints++;

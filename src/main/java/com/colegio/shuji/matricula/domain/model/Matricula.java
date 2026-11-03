@@ -58,16 +58,19 @@ public class Matricula {
 
   public void cancelar(String motivo) {
     this.estadoMatricula = EstadoMatricula.CANCELADA;
+    this.fechaExpiracionReserva = null;
     this.observaciones = motivo;
   }
 
   public void trasladar(String motivo) {
     this.estadoMatricula = EstadoMatricula.TRASLADADO;
+    this.fechaExpiracionReserva = null;
     this.observaciones = motivo;
   }
 
   public void retirar(String motivo) {
     this.estadoMatricula = EstadoMatricula.RETIRADO;
+    this.fechaExpiracionReserva = null;
     this.observaciones = motivo;
   }
 

@@ -1,5 +1,5 @@
 -- Datos base y administrador inicial para la instancia de práctica.
--- Solo se almacena BCrypt; los inserts son idempotentes y no reemplazan cuentas existentes.
+-- La cuenta inicial requiere un hash BCrypt externo en app.seed_password_hash.
 INSERT INTO roles (codigo, nombre, descripcion) VALUES
     ('DIRECCION', 'Dirección General', 'Acceso estratégico, reportería y configuración institucional'),
     ('SECRETARIA', 'Secretaría Académica', 'Gestión de matrículas, vacantes, expedientes y caja'),
@@ -22,7 +22,7 @@ INSERT INTO conceptos_cobro (codigo, nombre, tipo_concepto, monto_sugerido) VALU
 ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO usuarios (username, email, password_hash, activo)
-VALUES ('fq94289@gmail.com', 'fq94289@gmail.com', '$2a$10$Hs2U7laA.BYbPJmb2FBpQ.LC7o/MRNo5X0OR/gNfaT.efdtEVFNCe', TRUE)
+SELECT 'fq94289@gmail.com', 'fq94289@gmail.com', current_setting('app.seed_password_hash', true), TRUE WHERE current_setting('app.seed_password_hash', true) ~ '^\[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$'
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO usuario_roles (usuario_id, rol_id)

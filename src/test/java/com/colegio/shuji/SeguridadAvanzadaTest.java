@@ -536,7 +536,7 @@ class SeguridadAvanzadaTest {
 
       when(request.getServletPath()).thenReturn("/api/v1/usuarios");
       when(request.getHeader("Authorization")).thenReturn("Bearer token_jwt_valido");
-      when(tokenProvider.validateToken("token_jwt_valido")).thenReturn(true);
+      when(tokenProvider.validateAccessToken("token_jwt_valido")).thenReturn(true);
       when(tokenProvider.getUserIdFromToken("token_jwt_valido")).thenReturn(88L);
       when(tokenProvider.getUsernameFromToken("token_jwt_valido")).thenReturn("usuario_bloqueado");
       when(tokenProvider.getRolesFromToken("token_jwt_valido")).thenReturn(List.of("APODERADO"));
@@ -575,7 +575,7 @@ class SeguridadAvanzadaTest {
 
       when(request.getServletPath()).thenReturn("/api/v1/usuarios");
       when(request.getHeader("Authorization")).thenReturn("Bearer token_jwt_valido");
-      when(tokenProvider.validateToken("token_jwt_valido")).thenReturn(true);
+      when(tokenProvider.validateAccessToken("token_jwt_valido")).thenReturn(true);
       when(tokenProvider.getUserIdFromToken("token_jwt_valido")).thenReturn(999L);
       when(tokenProvider.getUsernameFromToken("token_jwt_valido")).thenReturn("usuario_borrado");
       when(tokenProvider.getRolesFromToken("token_jwt_valido")).thenReturn(List.of("APODERADO"));
@@ -647,7 +647,7 @@ class SeguridadAvanzadaTest {
 
       when(request.getServletPath()).thenReturn("/api/v1/usuarios");
       when(request.getHeader("Authorization")).thenReturn("Bearer token_con_rol_antiguo");
-      when(tokenProvider.validateToken("token_con_rol_antiguo")).thenReturn(true);
+      when(tokenProvider.validateAccessToken("token_con_rol_antiguo")).thenReturn(true);
       when(tokenProvider.getUserIdFromToken("token_con_rol_antiguo")).thenReturn(77L);
       when(tokenProvider.getUsernameFromToken("token_con_rol_antiguo")).thenReturn("docente_degradado");
       // El token aún declara DIRECCION en los claims desactualizados

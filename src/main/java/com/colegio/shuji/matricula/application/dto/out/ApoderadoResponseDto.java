@@ -19,4 +19,32 @@ public record ApoderadoResponseDto(
     String ubigeoInei,
     Boolean validadoReniec,
     OrigenRegistro origenRegistro,
-    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {}
+    Boolean activo,
+    String estado,
+    @JsonProperty("createdAt") OffsetDateTime fechaCreacion) {
+
+  public ApoderadoResponseDto {
+    if (activo == null) activo = true;
+    if (estado == null) estado = Boolean.TRUE.equals(activo) ? "ACTIVO" : "INACTIVO";
+  }
+
+  public ApoderadoResponseDto(
+      Long id,
+      Long usuarioId,
+      TipoDocumento tipoDocumento,
+      String numeroDocumento,
+      String nombres,
+      String apellidoPaterno,
+      String apellidoMaterno,
+      String celular,
+      String email,
+      String direccion,
+      String ubigeoInei,
+      Boolean validadoReniec,
+      OrigenRegistro origenRegistro,
+      OffsetDateTime fechaCreacion) {
+    this(id, usuarioId, tipoDocumento, numeroDocumento, nombres, apellidoPaterno, apellidoMaterno,
+         celular, email, direccion, ubigeoInei, validadoReniec, origenRegistro,
+         true, "ACTIVO", fechaCreacion);
+  }
+}

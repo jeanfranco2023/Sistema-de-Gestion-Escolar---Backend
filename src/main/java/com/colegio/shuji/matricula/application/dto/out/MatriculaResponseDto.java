@@ -12,4 +12,5 @@ public record MatriculaResponseDto(
     OffsetDateTime fechaMatricula,
     EstadoMatricula estadoMatricula,
     @JsonProperty("reservaExpiraAt") OffsetDateTime fechaExpiracionReserva,
-    String observaciones) {}
+    String observaciones,
+    EstadoPagoMatriculaFicha estadoPagoMatricula) {}

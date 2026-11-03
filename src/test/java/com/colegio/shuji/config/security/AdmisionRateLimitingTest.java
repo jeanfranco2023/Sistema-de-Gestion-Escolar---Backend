@@ -33,14 +33,6 @@ class AdmisionRateLimitingTest {
     assertEquals(200, enviar("POST", PUBLICO, "10.0.0.1").getStatus());
   }
 
-  @Test
-  void consultasDniCompartenContadorParaEvitarRotacionDelNumero() throws Exception {
-    for (int i = 0; i < 8; i++) {
-      assertEquals(200, enviar("GET", PUBLICO + "/dni/1234567" + i, "10.0.0.1").getStatus());
-    }
-    assertEquals(429, enviar("GET", PUBLICO + "/dni/99999999", "10.0.0.1").getStatus());
-  }
-
   private MockHttpServletResponse enviar(String metodo, String uri, String ip) throws Exception {
     var request = new MockHttpServletRequest(metodo, uri);
     request.setRemoteAddr(ip);
@@ -54,5 +46,18 @@ class AdmisionRateLimitingTest {
     String ruta="/api/v1/evaluacion/ia/sugerir-conclusion";
     for(int i=0;i<15;i++) assertEquals(200,enviar("POST",ruta,"10.0.0.1").getStatus());
     assertEquals(429,enviar("POST",ruta,"10.0.0.1").getStatus());
+  }
+
+  @Test
+  void reniecComparteLimitePorIpEntreMultiplesDnis() throws Exception {
+    for (int i = 0; i < 15; i++) {
+      String dni = String.format("%08d", 10000000 + i);
+      assertEquals(200, enviar("GET", "/api/v1/personas/reniec/" + dni, "10.0.0.5").getStatus());
+    }
+    var rechazo = enviar("GET", "/api/v1/personas/reniec/99999999", "10.0.0.5");
+    assertEquals(429, rechazo.getStatus());
+    assertEquals("60", rechazo.getHeader("Retry-After"));
+    // Otra IP no es afectada
+    assertEquals(200, enviar("GET", "/api/v1/personas/reniec/99999999", "10.0.0.6").getStatus());
   }
 }

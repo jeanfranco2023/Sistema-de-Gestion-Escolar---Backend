@@ -9,6 +9,10 @@ public interface TokenPort {
 
   boolean validateToken(String token);
 
+  boolean validateAccessToken(String token);
+
+  boolean validateRefreshToken(String token);
+
   long getJwtExpirationMs();
 
   long getJwtRefreshExpirationMs();

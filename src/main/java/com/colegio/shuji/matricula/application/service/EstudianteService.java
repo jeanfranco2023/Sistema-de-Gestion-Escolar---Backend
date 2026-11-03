@@ -3,6 +3,8 @@ package com.colegio.shuji.matricula.application.service;
 import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
+import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoApoderadoRequestDto;
+import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarApoderadoRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto;
@@ -16,21 +18,52 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
+import com.colegio.shuji.shared.application.port.out.AuditContextPort;
+import com.colegio.shuji.shared.domain.exception.BusinessException;
+import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
+import com.colegio.shuji.usuario.domain.exception.ReglaNegocioException;
 import java.util.List;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional
-@RequiredArgsConstructor
 public class EstudianteService implements RegistrarFichaFamiliarUseCase {
   private final MatriculaMapper mapper;
   private final EstudianteRepositoryPort estudiantes;
   private final ApoderadoRepositoryPort apoderados;
   private final EstudianteApoderadoRepositoryPort vinculos;
   private final ReniecServicePort reniec;
+  private final AuditContextPort auditoria;
+
+  @Autowired
+  public EstudianteService(
+      MatriculaMapper mapper,
+      EstudianteRepositoryPort estudiantes,
+      ApoderadoRepositoryPort apoderados,
+      EstudianteApoderadoRepositoryPort vinculos,
+      ReniecServicePort reniec,
+      @Autowired(required = false) AuditContextPort auditoria) {
+    this.mapper = mapper;
+    this.estudiantes = estudiantes;
+    this.apoderados = apoderados;
+    this.vinculos = vinculos;
+    this.reniec = reniec;
+    this.auditoria = auditoria;
+  }
+
+  public EstudianteService(
+      MatriculaMapper mapper,
+      EstudianteRepositoryPort estudiantes,
+      ApoderadoRepositoryPort apoderados,
+      EstudianteApoderadoRepositoryPort vinculos,
+      ReniecServicePort reniec) {
+    this(mapper, estudiantes, apoderados, vinculos, reniec, null);
+  }
 
   private void validarDocumento(TipoDocumento tipo, String numero) {
     if (tipo != TipoDocumento.DNI || numero == null || !numero.matches("[0-9]{8}"))
@@ -68,6 +101,11 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
     return mapper.toResponse(apoderados.guardar(a));
   }
 
+  @Transactional(readOnly = true)
+  public List<ApoderadoResponseDto> listarApoderados() {
+    return apoderados.listar().stream().map(mapper::toResponse).toList();
+  }
+
   public EstudianteApoderadoResponseDto vincular(VincularApoderadoRequestDto r) {
     requerido(estudiantes.bloquearPorId(r.estudianteId()));
     requerido(apoderados.buscarPorId(r.apoderadoId()));
@@ -102,5 +140,71 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
   public Optional<ReniecServicePort.Identidad> consultarDni(String dni) {
     validarDocumento(TipoDocumento.DNI, dni);
     return reniec.consultar(dni);
+  }
+
+  @Override
+  public EstudianteResponseDto corregirDniEstudiante(Long id, CorregirDniRequestDto request) {
+    log.info("Acción transaccional: Corrigiendo DNI para estudiante ID: {} con motivo: {}", id, request.motivo());
+    if (auditoria != null) {
+      auditoria.syncCurrentUserFromSecurityContext();
+    }
+    var e = requerido(estudiantes.buscarPorId(id));
+    if (request.nuevoDni().equals(e.getNumeroDocumento())) {
+      throw new BusinessException("El nuevo DNI es idéntico al DNI actualmente registrado", "DNI_IDENTICO");
+    }
+    if (estudiantes.buscarPorNumeroDocumento(request.nuevoDni()).stream()
+        .anyMatch(otro -> !otro.getId().equals(id))) {
+      throw new ReglaNegocioException("El DNI ingresado ya se encuentra asignado a otro estudiante", "DNI_DUPLICADO");
+    }
+    e.corregirNumeroDocumento(request.nuevoDni());
+    var guardado = estudiantes.guardar(e);
+    log.info("DNI del estudiante ID: {} corregido exitosamente a {}", id, request.nuevoDni());
+    return mapper.toResponse(guardado);
+  }
+
+  @Override
+  public EstudianteResponseDto cambiarEstadoEstudiante(Long id, CambiarEstadoEstudianteRequestDto request) {
+    log.info("Cambiando estado de estudiante ID: {} a: {} con motivo: {}", id, request.estado(), request.motivo());
+    if (auditoria != null) {
+      auditoria.syncCurrentUserFromSecurityContext();
+    }
+    var e = requerido(estudiantes.buscarPorId(id));
+    e.cambiarEstado(request.estado());
+    var guardado = estudiantes.guardar(e);
+    log.info("Estado de estudiante ID: {} actualizado a: {}", id, request.estado());
+    return mapper.toResponse(guardado);
+  }
+
+  @Override
+  public ApoderadoResponseDto corregirDniApoderado(Long id, CorregirDniRequestDto request) {
+    log.info("Acción transaccional: Corrigiendo DNI para apoderado ID: {} con motivo: {}", id, request.motivo());
+    if (auditoria != null) {
+      auditoria.syncCurrentUserFromSecurityContext();
+    }
+    var a = requerido(apoderados.buscarPorId(id));
+    if (request.nuevoDni().equals(a.getNumeroDocumento())) {
+      throw new BusinessException("El nuevo DNI es idéntico al DNI actualmente registrado", "DNI_IDENTICO");
+    }
+    if (apoderados.buscarPorNumeroDocumento(request.nuevoDni()).stream()
+        .anyMatch(otro -> !otro.getId().equals(id))) {
+      throw new ReglaNegocioException("El DNI ingresado ya se encuentra asignado a otro apoderado", "DNI_DUPLICADO");
+    }
+    a.corregirNumeroDocumento(request.nuevoDni());
+    var guardado = apoderados.guardar(a);
+    log.info("DNI del apoderado ID: {} corregido exitosamente a {}", id, request.nuevoDni());
+    return mapper.toResponse(guardado);
+  }
+
+  @Override
+  public ApoderadoResponseDto cambiarEstadoApoderado(Long id, CambiarEstadoApoderadoRequestDto request) {
+    log.info("Cambiando estado de apoderado ID: {} a: {} con motivo: {}", id, request.estado(), request.motivo());
+    if (auditoria != null) {
+      auditoria.syncCurrentUserFromSecurityContext();
+    }
+    var a = requerido(apoderados.buscarPorId(id));
+    a.cambiarEstado(request.estado());
+    var guardado = apoderados.guardar(a);
+    log.info("Estado de apoderado ID: {} actualizado a: {}", id, request.estado());
+    return mapper.toResponse(guardado);
   }
 }

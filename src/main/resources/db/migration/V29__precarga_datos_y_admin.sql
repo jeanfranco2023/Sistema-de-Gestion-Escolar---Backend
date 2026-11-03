@@ -2,11 +2,11 @@
 -- Todas las operaciones son idempotentes para permitir múltiples ejecuciones sin duplicar registros.
 
 -- 1. USUARIOS INSTITUCIONALES Y ROLES
--- Contraseña unificada para cuentas de prueba y administración: Admin2026!
--- Hash BCrypt estándar: $2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2
+-- Las credenciales semilla se inyectan solo desde el entorno local.
+-- Configure app.seed_password_hash con BCrypt antes de activar cuentas de prueba.
 
 INSERT INTO public.usuarios (nombre_usuario, correo_electronico, usuario_password, activo)
-SELECT u.username, u.email, '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2', TRUE
+SELECT u.username, u.email,current_setting('app.seed_password_hash', true), TRUE
 FROM (VALUES
     ('admin', 'admin@shuji.edu.pe'),
     ('docente', 'docente@shuji.edu.pe'),
@@ -14,16 +14,16 @@ FROM (VALUES
     ('auxiliar', 'auxiliar@shuji.edu.pe'),
     ('apoderado', 'apoderado@shuji.edu.pe')
 ) AS u(username, email)
-WHERE NOT EXISTS (
+WHERE current_setting('app.seed_password_hash', true) ~ '^\[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$' AND NOT EXISTS (
     SELECT 1 FROM public.usuarios exist
     WHERE exist.nombre_usuario = u.username OR exist.correo_electronico = u.email
 );
 
 -- Asegurar credenciales y activación de cuentas base
 UPDATE public.usuarios
-SET usuario_password = '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2',
+SET usuario_password = current_setting('app.seed_password_hash', true),
     activo = TRUE
-WHERE correo_electronico IN (
+WHERE current_setting('app.seed_password_hash', true) ~ '^\[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$' AND correo_electronico IN (
     'admin@shuji.edu.pe', 'docente@shuji.edu.pe', 'tutor@shuji.edu.pe',
     'auxiliar@shuji.edu.pe', 'apoderado@shuji.edu.pe', 'fq94289@gmail.com'
 );

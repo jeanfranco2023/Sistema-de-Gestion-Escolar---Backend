@@ -20,6 +20,9 @@ public interface JpaAsistenciaAulaRepository extends JpaRepository<AsistenciaAul
   @Query("select e from AsistenciaAulaEntity e where e.matriculaId = :valor order by e.id")
   List<AsistenciaAulaEntity> buscarPorMatriculaId(@Param("valor") Long valor);
 
+  @Query("select e from AsistenciaAulaEntity e where e.matriculaId in :ids order by e.matriculaId, e.id")
+  List<AsistenciaAulaEntity> buscarPorMatriculaIds(@Param("ids") Collection<Long> matriculaIds);
+
   @Query("select e from AsistenciaAulaEntity e where e.fechaSesion = :valor order by e.id")
   List<AsistenciaAulaEntity> buscarPorFechaSesion(@Param("valor") LocalDate valor);
 

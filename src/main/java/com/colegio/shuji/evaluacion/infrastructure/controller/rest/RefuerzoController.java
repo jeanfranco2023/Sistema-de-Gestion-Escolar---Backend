@@ -57,7 +57,7 @@ public class RefuerzoController {
   }
 
   @PostMapping("/asistencia")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasRole('DOCENTE')")
   @Operation(summary = "refuerzo.registrarAsistencia")
   public InscripcionRefuerzoResponseDto registrarAsistenciaRefuerzo(
       @Valid @RequestBody RegistrarAsistenciaRefuerzoRequestDto r) {

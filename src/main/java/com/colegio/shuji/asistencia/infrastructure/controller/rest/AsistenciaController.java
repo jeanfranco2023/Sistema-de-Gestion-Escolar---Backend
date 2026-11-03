@@ -153,7 +153,7 @@ public class AsistenciaController {
   }
 
   @PostMapping("/conciliacion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','AUXILIAR')")
   @Operation(summary = "conciliacion.conciliar")
   public List<ConciliacionAsistenciaResponseDto> conciliarAsistencia(
       @RequestParam Short anioId,

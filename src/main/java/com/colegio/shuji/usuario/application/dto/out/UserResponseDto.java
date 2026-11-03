@@ -22,6 +22,16 @@ public class UserResponseDto {
   private String username;
   private String email;
   private Boolean activo;
+  private Boolean debeCambiarPassword;
+  private String dni;
+  private String telefono;
+  private String direccion;
+  private String especialidad;
+  private String codigoModular;
+  private String numeroColegiatura;
+  private java.time.LocalDate fechaIngreso;
+  private String tipoContrato;
+  private String estadoLaboral;
   private Set<RolResponseDto> roles;
 
   @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")

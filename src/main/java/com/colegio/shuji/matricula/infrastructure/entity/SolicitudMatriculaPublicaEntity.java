@@ -85,7 +85,7 @@ public class SolicitudMatriculaPublicaEntity {
   @Column(name = "direccion_apoderado", nullable = false, length = 150)
   private String direccionApoderado;
 
-  @Column(name = "ubigeo_apoderado", nullable = false, length = 6)
+  @Column(name = "ubigeo_apoderado", length = 6)
   private String ubigeoApoderado;
 
   @Enumerated(EnumType.STRING)

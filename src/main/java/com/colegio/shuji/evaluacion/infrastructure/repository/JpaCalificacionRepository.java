@@ -2,6 +2,7 @@ package com.colegio.shuji.evaluacion.infrastructure.repository;
 
 import com.colegio.shuji.evaluacion.infrastructure.entity.CalificacionCnebEntity;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,9 @@ public interface JpaCalificacionRepository extends JpaRepository<CalificacionCne
 
   @Query("select e from CalificacionCnebEntity e where e.matriculaId = :valor order by e.id")
   List<CalificacionCnebEntity> buscarPorMatriculaId(@Param("valor") Long valor);
+
+  @Query("select e from CalificacionCnebEntity e where e.matriculaId in :ids order by e.matriculaId, e.id")
+  List<CalificacionCnebEntity> buscarPorMatriculaIds(@Param("ids") Collection<Long> matriculaIds);
 
   @Query("select e from CalificacionCnebEntity e where e.anioLectivoId = :valor order by e.id")
   List<CalificacionCnebEntity> buscarPorAnioLectivoId(@Param("valor") Short valor);

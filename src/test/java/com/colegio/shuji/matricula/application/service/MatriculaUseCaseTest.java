@@ -1,6 +1,7 @@
 package com.colegio.shuji.matricula.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -24,6 +25,7 @@ import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
 import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.domain.model.Estudiante;
+import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.matricula.domain.exception.EstudianteYaMatriculadoException;
@@ -77,7 +79,8 @@ class MatriculaUseCaseTest {
       Matricula saved = call.getArgument(0);
       return new com.colegio.shuji.matricula.application.dto.out.MatriculaResponseDto(
           saved.getId(), saved.getAnioLectivoId(), saved.getEstudianteId(), saved.getSeccionId(),
-          saved.getFechaMatricula(), saved.getEstadoMatricula(), saved.getFechaExpiracionReserva(), saved.getObservaciones());
+          saved.getFechaMatricula(), saved.getEstadoMatricula(), saved.getFechaExpiracionReserva(),
+          saved.getObservaciones(), null);
     });
   }
 
@@ -101,6 +104,21 @@ class MatriculaUseCaseTest {
 
     assertThrows(EstudianteYaMatriculadoException.class, () -> useCase.solicitar(request));
     verify(matriculas, never()).guardar(any(Matricula.class));
+  }
+
+  @Test
+  void ocultaObservacionLegadaAunqueTengaAcentosYSignosFinales() {
+    solicitud = Matricula.builder().id(10L).anioLectivoId((short) 2).estudianteId(20L)
+        .seccionId(30).estadoMatricula(EstadoMatricula.SOLICITADA)
+        .observaciones(" Pendiente de pago de matrícula...; ").build();
+    var apoderado = org.mockito.Mockito.mock(Apoderado.class);
+    when(apoderado.getId()).thenReturn(40L);
+    when(apoderados.buscarPorIds(List.of(40L))).thenReturn(List.of(apoderado));
+    when(estudiantes.buscarPorId(20L)).thenReturn(Optional.of(org.mockito.Mockito.mock(Estudiante.class)));
+
+    var ficha = useCase.ficha(10L);
+
+    assertNull(ficha.matricula().observaciones());
   }
 
   @Test

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.mapper.MatriculaMapper;
 import com.colegio.shuji.matricula.application.port.out.ApoderadoRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepositoryPort;
@@ -18,12 +19,33 @@ import com.colegio.shuji.matricula.domain.enums.Genero;
 import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.matricula.domain.model.Estudiante;
+import com.colegio.shuji.matricula.domain.model.Apoderado;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class EstudianteServiceTest {
+  @Test
+  void listarApoderadosConservaSeparadosIdYUsuarioId() {
+    var mapper = mock(MatriculaMapper.class);
+    var apoderados = mock(ApoderadoRepositoryPort.class);
+    var apoderado = mock(Apoderado.class);
+    var respuesta = new ApoderadoResponseDto(41L, 900L, TipoDocumento.DNI, "12345678",
+        "Ana", "Pérez", "López", "987654321", null, "Calle 1", "150101",
+        false, OrigenRegistro.MANUAL_CONTINGENCIA, null);
+    when(apoderados.listar()).thenReturn(List.of(apoderado));
+    when(mapper.toResponse(apoderado)).thenReturn(respuesta);
+    var service = new EstudianteService(mapper, mock(EstudianteRepositoryPort.class), apoderados,
+        mock(EstudianteApoderadoRepositoryPort.class), mock(ReniecServicePort.class));
+
+    var resultado = service.listarApoderados();
+
+    assertEquals(1, resultado.size());
+    assertEquals(41L, resultado.getFirst().id());
+    assertEquals(900L, resultado.getFirst().usuarioId());
+  }
+
   @Test
   void registroConservaNombresRevisadosSinMarcarReniec() {
     var mapper = mock(MatriculaMapper.class);

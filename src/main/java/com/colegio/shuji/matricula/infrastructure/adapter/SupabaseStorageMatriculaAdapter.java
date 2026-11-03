@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Component
+@Profile("!local-docker | prod")
 public class SupabaseStorageMatriculaAdapter implements AlmacenDocumentosMatriculaPort {
   private final String url;
   private final String serviceRoleKey;

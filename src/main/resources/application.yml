@@ -4,6 +4,9 @@ server:
     context-path: /
 
 spring:
+  flyway:
+    init-sqls:
+      - "SELECT set_config('app.seed_password_hash', '${SHUJI_SEED_PASSWORD_HASH:}', false)"
   application:
     name: shuji-backend
   servlet:

@@ -29,12 +29,12 @@ public class PortalFamiliarController {
   public List<HijoPortalResponseDto> hijosPropios() { return consulta.hijosPropios(); }
 
   @GetMapping("/matriculas/{id}/calificaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
+  @PreAuthorize("hasRole('APODERADO')")
   public List<com.colegio.shuji.evaluacion.application.dto.out.CalificacionPortalResponseDto> calificaciones(@PathVariable Long id) {
     return consulta.calificaciones(id);
   }
   @GetMapping("/hijos")
-  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
+  @PreAuthorize("hasRole('APODERADO')")
   public List<HijoPortalResponseDto> hijos() { return consulta.hijos(); }
 
   @GetMapping("/alumnos-seguimiento")
@@ -49,10 +49,10 @@ public class PortalFamiliarController {
   }
 
   @GetMapping("/matriculas/{id}/asistencia")
-  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
+  @PreAuthorize("hasRole('APODERADO')")
   public List<AsistenciaAulaResponseDto> asistencia(@PathVariable Long id) { return consulta.asistencia(id); }
 
   @GetMapping("/matriculas/{id}/periodos")
-  @PreAuthorize("hasAnyRole('DIRECCION','APODERADO')")
+  @PreAuthorize("hasRole('APODERADO')")
   public List<PeriodoResponseDto> periodos(@PathVariable Long id) { return consulta.periodos(id); }
 }

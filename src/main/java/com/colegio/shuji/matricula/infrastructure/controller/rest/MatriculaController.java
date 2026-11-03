@@ -1,6 +1,7 @@
 package com.colegio.shuji.matricula.infrastructure.controller.rest;
 
 import com.colegio.shuji.matricula.application.dto.in.ConfirmarMatriculaRequestDto;
+import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoMatriculaRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.SolicitarMatriculaRequestDto;
 import com.colegio.shuji.matricula.application.dto.out.FichaMatriculaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.MatriculaResponseDto;
@@ -18,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,10 +43,19 @@ public class MatriculaController {
   }
 
   @PostMapping("/confirmacion")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   @Operation(summary = "matriculas.confirmar")
   public MatriculaResponseDto confirmarMatricula(@Valid @RequestBody ConfirmarMatriculaRequestDto r) {
     return matriculas.confirmar(r);
+  }
+
+  @PatchMapping("/{id}/estado")
+  @PreAuthorize("hasRole('SECRETARIA')")
+  @Operation(summary = "matriculas.cambiarEstado")
+  public MatriculaResponseDto cambiarEstado(
+      @PathVariable @Positive Long id,
+      @Valid @RequestBody CambiarEstadoMatriculaRequestDto r) {
+    return matriculas.cambiarEstado(id, r);
   }
 
   @GetMapping("/{id}")

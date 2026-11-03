@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     try {
       String jwt = getJwtFromRequest(request);
 
-      if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+      if (StringUtils.hasText(jwt) && tokenProvider.validateAccessToken(jwt)) {
         String username = tokenProvider.getUsernameFromToken(jwt);
         Long userId = tokenProvider.getUserIdFromToken(jwt);
 
@@ -61,6 +61,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           }
 
           Usuario usuario = usuarioOpt.get();
+
+          if (Boolean.TRUE.equals(usuario.getDebeCambiarPassword())) {
+            String uri = request.getRequestURI();
+            boolean uriPermitida = "/api/v1/auth/cambiar-password-inicial".equals(uri)
+                || "/api/v1/auth/refresh".equals(uri)
+                || "/api/v1/auth/logout".equals(uri);
+            if (!uriPermitida) {
+              response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+              response.setContentType("application/json");
+              response.setCharacterEncoding("UTF-8");
+              response.getWriter().write("{\"success\":false,\"status\":403,\"errorCode\":\"PASSWORD_CHANGE_REQUIRED\",\"message\":\"Debe cambiar su contraseña inicial antes de acceder a los recursos del sistema.\"}");
+              return;
+            }
+          }
 
           List<SimpleGrantedAuthority> authorities =
               (usuario.getRoles() == null ? Collections.<Rol>emptySet() : usuario.getRoles())

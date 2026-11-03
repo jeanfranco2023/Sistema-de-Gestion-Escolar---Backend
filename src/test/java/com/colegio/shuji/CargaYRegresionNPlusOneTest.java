@@ -109,7 +109,9 @@ class CargaYRegresionNPlusOneTest {
   @DisplayName("Carga biométrica por lote sin consultas N+1")
   void procesamientoMasivoDeMarcasBiometricasMantieneConsultasEnBatch() {
     // A small real-database sample keeps the remote Supabase session within its connection window.
-    final boolean baseRemota = System.getenv("TEST_DB_URL") != null;
+    String testUrl = System.getenv("TEST_DB_URL");
+    final boolean baseRemota = testUrl != null
+        && !testUrl.contains("127.0.0.1") && !testUrl.contains("localhost");
     final int TOTAL_ALUMNOS = baseRemota ? 5 : 50;
     final int MARCAS_POR_ALUMNO = 6;
     final int TOTAL_MARCAS = TOTAL_ALUMNOS * MARCAS_POR_ALUMNO;

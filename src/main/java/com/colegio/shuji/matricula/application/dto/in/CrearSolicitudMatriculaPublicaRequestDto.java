@@ -28,7 +28,7 @@ public record CrearSolicitudMatriculaPublicaRequestDto(
     @NotBlank @Pattern(regexp = "9[0-9]{8}") String celularApoderado,
     @Email @Size(max = 100) String emailApoderado,
     @NotBlank @Size(max = 150) String direccionApoderado,
-    @NotBlank @Pattern(regexp = "[0-9]{6}") String ubigeoApoderado,
+    @Pattern(regexp = "^([0-9]{6})?$", message = "El ubigeo debe tener 6 dígitos numéricos si se especifica") String ubigeoApoderado,
     @NotNull Parentesco parentesco,
     @AssertTrue boolean consentimientoGemini) {
 

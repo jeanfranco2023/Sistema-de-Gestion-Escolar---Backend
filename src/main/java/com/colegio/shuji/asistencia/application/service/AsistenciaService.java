@@ -161,6 +161,14 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
     if (actor.tieneRol("DOCENTE") || actor.tieneRol("TUTOR")) exigirAccesoDocente(m);
     exigir(m.getEstadoMatricula() == EstadoMatricula.MATRICULADO, "Matrícula no activa");
+    var anio = requerido(anios.buscarPorId(m.getAnioLectivoId()));
+    exigir(
+        r.fechaSesion() != null
+            && anio.getFechaInicio() != null
+            && anio.getFechaFin() != null
+            && !r.fechaSesion().isBefore(anio.getFechaInicio())
+            && !r.fechaSesion().isAfter(anio.getFechaFin()),
+        "La fecha de asistencia está fuera del año lectivo de la matrícula");
     if (asistencias.buscarPorMatriculaId(r.matriculaId()).stream()
         .anyMatch(a -> a.getFechaSesion().equals(r.fechaSesion())))
       throw new com.colegio.shuji.asistencia.domain.exception.AsistenciaYaRegistradaException(

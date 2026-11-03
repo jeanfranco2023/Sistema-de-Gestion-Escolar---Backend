@@ -1,27 +1,30 @@
 package com.colegio.shuji.matricula.infrastructure.controller.rest;
 
+import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
 import com.colegio.shuji.matricula.application.port.in.RegistrarFichaFamiliarUseCase;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort.Identidad;
+import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/estudiantes")
@@ -59,6 +62,24 @@ public class EstudianteController {
   @Operation(summary = "familias.consultarEstudiante")
   public EstudianteResponseDto consultarEstudiante(@PathVariable @Positive Long id) {
     return familias.consultarEstudiante(id);
+  }
+
+  @PatchMapping("/{id}/dni")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "Corregir DNI del estudiante con auditoría")
+  public EstudianteResponseDto corregirDni(
+      @PathVariable @Positive Long id,
+      @Valid @RequestBody CorregirDniRequestDto request) {
+    return familias.corregirDniEstudiante(id, request);
+  }
+
+  @PatchMapping("/{id}/estado")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @Operation(summary = "Cambiar estado de estudiante (borrado lógico formal)")
+  public EstudianteResponseDto cambiarEstado(
+      @PathVariable @Positive Long id,
+      @Valid @RequestBody CambiarEstadoEstudianteRequestDto request) {
+    return familias.cambiarEstadoEstudiante(id, request);
   }
 
   @PostMapping("/apoderados")

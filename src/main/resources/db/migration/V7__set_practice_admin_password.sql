@@ -1,5 +1,4 @@
--- Contraseña sin hash del administrador de práctica (no usar en producción): Admin2026!
+-- Restablece la cuenta solo cuando se proporciona un hash BCrypt local.
 UPDATE usuarios
-SET password_hash = '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2'
-WHERE email = 'fq94289@gmail.com'
-  AND password_hash <> '$2a$10$m.2CkRxR18uYeRfeZKj8uOc3tcA77GRnQ1TVnhS9.GaOKLr2IMUa2';
+SET password_hash = current_setting('app.seed_password_hash', true)
+WHERE email = 'fq94289@gmail.com' AND current_setting('app.seed_password_hash', true) ~ '^\[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$' AND password_hash <> current_setting('app.seed_password_hash', true);

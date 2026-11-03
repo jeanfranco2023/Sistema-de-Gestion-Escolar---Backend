@@ -4,6 +4,7 @@ import com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryP
 import com.colegio.shuji.evaluacion.domain.model.CalificacionCneb;
 import com.colegio.shuji.evaluacion.infrastructure.repository.JpaCalificacionRepository;
 import jakarta.persistence.EntityManager;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,11 @@ public class CalificacionRepositoryAdapter implements CalificacionRepositoryPort
 
   public List<CalificacionCneb> buscarPorMatriculaId(Long valor) {
     return repository.buscarPorMatriculaId(valor).stream().map(mapper::toDomain).toList();
+  }
+
+  public List<CalificacionCneb> buscarPorMatriculaIds(Collection<Long> matriculaIds) {
+    if (matriculaIds == null || matriculaIds.isEmpty()) return List.of();
+    return repository.buscarPorMatriculaIds(matriculaIds).stream().map(mapper::toDomain).toList();
   }
 
   public List<CalificacionCneb> buscarPorAnioLectivoId(Short valor) {

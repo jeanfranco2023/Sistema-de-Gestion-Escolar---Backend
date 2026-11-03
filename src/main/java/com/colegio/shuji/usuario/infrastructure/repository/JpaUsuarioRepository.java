@@ -44,4 +44,9 @@ public interface JpaUsuarioRepository extends JpaRepository<UsuarioEntity, Long>
       "SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM UsuarioEntity u WHERE u.email ="
           + " :email")
   boolean existsByEmail(@Param("email") String email);
+
+  @Query(
+      "SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM UsuarioEntity u WHERE u.dni ="
+          + " :dni")
+  boolean existsByDni(@Param("dni") String dni);
 }

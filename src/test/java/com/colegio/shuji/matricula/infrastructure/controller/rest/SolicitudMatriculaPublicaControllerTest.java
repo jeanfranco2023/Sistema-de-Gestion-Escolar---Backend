@@ -13,7 +13,6 @@ import com.colegio.shuji.matricula.application.port.in.GestionarPagoMatriculaPub
 import com.colegio.shuji.matricula.application.port.out.AlmacenDocumentosMatriculaPort;
 import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
-import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService;
 import com.colegio.shuji.matricula.infrastructure.service.SolicitudMatriculaPublicaService;
 import com.colegio.shuji.shared.infrastructure.controller.exception.GlobalExceptionHandler;
@@ -41,7 +40,6 @@ class SolicitudMatriculaPublicaControllerTest {
         mock(GeminiDocumentoMatriculaPort.class),
         mock(FirmaDigitalDocumentoPort.class),
         mock(VerificacionIdentidadMatriculaService.class),
-        mock(ReniecServicePort.class),
         mock(AlmacenDocumentosMatriculaPort.class),
         mock(com.colegio.shuji.shared.application.port.out.ActorActualPort.class));
     MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)

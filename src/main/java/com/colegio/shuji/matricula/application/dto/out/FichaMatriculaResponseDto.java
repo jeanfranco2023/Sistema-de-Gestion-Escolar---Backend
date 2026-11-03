@@ -5,4 +5,5 @@ import java.util.List;
 public record FichaMatriculaResponseDto(
     MatriculaResponseDto matricula,
     EstudianteResponseDto estudiante,
-    List<ApoderadoResponseDto> apoderados) {}
+    List<ApoderadoFichaResponseDto> apoderados,
+    EstadoPagoMatriculaFicha estadoPagoMatricula) {}

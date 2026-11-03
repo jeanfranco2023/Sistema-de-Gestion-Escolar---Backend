@@ -1,0 +1,8 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  storage:
+    local-root: ${LOCAL_STORAGE_ROOT:./.runtime/private-files}
+    local-public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:http://localhost:${server.port}}
+    local-signed-url-seconds: ${LOCAL_STORAGE_SIGNED_URL_SECONDS:60}

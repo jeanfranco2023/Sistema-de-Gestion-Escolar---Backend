@@ -13,6 +13,7 @@ import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
 import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnualesRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionMatriculaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.ProcesarPagoWebhookRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RegistrarPagoCajaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RevertirPagoRequestDto;
@@ -113,6 +114,41 @@ public class TesoreriaService
       result.add(mapper.toResponse(obligaciones.guardar(o)));
     }
     return conNombres(result);
+  }
+
+  public ObligacionResponseDto generarObligacionMatricula(GenerarObligacionMatriculaRequestDto r) {
+    var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
+    exigir(
+        m.getEstadoMatricula() != EstadoMatricula.CANCELADA
+            && m.getEstadoMatricula() != EstadoMatricula.RETIRADO
+            && m.getEstadoMatricula() != EstadoMatricula.TRASLADADO,
+        "Matrícula inactiva");
+    requerido(anios.buscarPorId(m.getAnioLectivoId())).verificarAbierto();
+    boolean responsableEconomico = estudianteApoderados.buscarPorEstudianteId(m.getEstudianteId())
+        .stream().anyMatch(v -> Boolean.TRUE.equals(v.getEsResponsableEconomico()));
+    exigir(responsableEconomico, "La matrícula requiere un responsable económico");
+
+    var conceptosMatricula = conceptos.listar().stream()
+        .filter(c -> c.getTipoConcepto() == TipoConcepto.MATRICULA)
+        .toList();
+    exigir(conceptosMatricula.size() == 1, "Debe existir un único concepto de matrícula");
+    var concepto = conceptosMatricula.getFirst();
+    exigir(concepto.getMontoSugerido() != null && concepto.getMontoSugerido().signum() > 0,
+        "El monto del concepto de matrícula debe ser positivo");
+
+    var cuotasMatricula = obligaciones.buscarPorMatriculaId(m.getId()).stream()
+        .filter(o -> o.getNumeroCuota() == 0)
+        .toList();
+    if (!cuotasMatricula.isEmpty()) {
+      exigir(cuotasMatricula.size() == 1
+          && java.util.Objects.equals(cuotasMatricula.getFirst().getConceptoId(), concepto.getId()),
+          "Ya existe una cuota 0 con un concepto distinto");
+      return conNombres(List.of(mapper.toResponse(cuotasMatricula.getFirst()))).getFirst();
+    }
+
+    var obligacion = ObligacionPago.programar(
+        m.getId(), concepto, (short) 0, r.fechaVencimiento());
+    return conNombres(List.of(mapper.toResponse(obligaciones.guardar(obligacion)))).getFirst();
   }
 
   @Transactional(readOnly = true)

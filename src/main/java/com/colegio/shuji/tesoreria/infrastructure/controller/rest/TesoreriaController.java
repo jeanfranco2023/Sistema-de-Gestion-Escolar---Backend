@@ -2,6 +2,7 @@ package com.colegio.shuji.tesoreria.infrastructure.controller.rest;
 
 import com.colegio.shuji.tesoreria.application.dto.in.CrearPreferenciaMercadoPagoDto;
 import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionesAnualesRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionMatriculaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RegistrarPagoCajaRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.in.RevertirPagoRequestDto;
 import com.colegio.shuji.tesoreria.application.dto.out.EstadoCuentaEstudianteResponseDto;
@@ -50,6 +51,14 @@ public class TesoreriaController {
   public List<ObligacionResponseDto> generarCronograma(
       @Valid @RequestBody GenerarObligacionesAnualesRequestDto r) {
     return cronograma.generarCronograma(r);
+  }
+
+  @PostMapping("/obligaciones/matricula")
+  @PreAuthorize("hasRole('SECRETARIA')")
+  @Operation(summary = "tesoreria.generarObligacionUnicaMatricula")
+  public ObligacionResponseDto generarObligacionMatricula(
+      @Valid @RequestBody GenerarObligacionMatriculaRequestDto r) {
+    return cronograma.generarObligacionMatricula(r);
   }
 
   @GetMapping("/obligaciones")

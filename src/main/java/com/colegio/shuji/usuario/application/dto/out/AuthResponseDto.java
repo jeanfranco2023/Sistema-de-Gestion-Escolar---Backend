@@ -20,5 +20,6 @@ public class AuthResponseDto {
   @Builder.Default private String tokenType = "Bearer";
 
   private Long expiresIn;
+  private boolean debeCambiarPassword;
   private UserResponseDto user;
 }

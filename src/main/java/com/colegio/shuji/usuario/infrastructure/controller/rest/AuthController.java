@@ -1,11 +1,14 @@
 package com.colegio.shuji.usuario.infrastructure.controller.rest;
 
 import com.colegio.shuji.shared.application.dto.ApiResponse;
+import com.colegio.shuji.shared.application.port.out.ActorActualPort;
+import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordInicialRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.LoginRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RefreshTokenRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.AuthResponseDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
+import com.colegio.shuji.usuario.application.port.in.CambiarPasswordInicialUseCase;
 import com.colegio.shuji.usuario.application.port.in.LoginUseCase;
 import com.colegio.shuji.usuario.application.port.in.RefreshTokenUseCase;
 import com.colegio.shuji.usuario.application.port.in.RegisterUserUseCase;
@@ -37,6 +40,8 @@ public class AuthController {
   private final LoginUseCase loginUseCase;
   private final RegisterUserUseCase registerUserUseCase;
   private final RefreshTokenUseCase refreshTokenUseCase;
+  private final CambiarPasswordInicialUseCase cambiarPasswordInicialUseCase;
+  private final ActorActualPort actorActualPort;
 
   @Value("${app.security.behind-trusted-proxy:false}")
   private boolean behindTrustedProxy;
@@ -83,6 +88,19 @@ public class AuthController {
     AuthResponseDto response =
         refreshTokenUseCase.refreshToken(refreshRequest, ipAddress, userAgent);
     return ResponseEntity.ok(ApiResponse.ok(response, "Token de acceso renovado exitosamente"));
+  }
+
+  @Operation(
+      summary = "Cambiar contraseña inicial obligatoria",
+      description = "Permite al usuario autenticado por primera vez cambiar su contraseña temporal por una definitiva")
+  @PostMapping("/cambiar-password-inicial")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> cambiarPasswordInicial(
+      @Valid @RequestBody CambiarPasswordInicialRequestDto requestDto) {
+
+    Long usuarioId = actorActualPort.usuarioId();
+    cambiarPasswordInicialUseCase.cambiarPasswordInicial(usuarioId, requestDto);
+    return ResponseEntity.ok(ApiResponse.ok(null, "Contraseña actualizada exitosamente"));
   }
 
   private static final java.util.regex.Pattern IPV4_PATTERN =

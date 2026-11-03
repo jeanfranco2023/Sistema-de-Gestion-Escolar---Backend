@@ -29,6 +29,8 @@ public class Apoderado {
   private String ubigeoInei;
   private Boolean validadoReniec;
   private OrigenRegistro origenRegistro;
+  private Boolean activo;
+  private String estado;
   private OffsetDateTime fechaCreacion;
 
   public String nombreCompleto() {
@@ -45,6 +47,19 @@ public class Apoderado {
 
   public void vincularUsuario(Long usuarioId) {
     this.usuarioId = usuarioId;
+  }
+
+  public void corregirNumeroDocumento(String numeroDocumento) {
+    this.numeroDocumento = numeroDocumento;
+  }
+
+  public void cambiarEstado(String estado) {
+    String estadoNormalizado = estado == null ? null : estado.trim().toUpperCase(java.util.Locale.ROOT);
+    Reglas.exigir(
+        java.util.Set.of("ACTIVO", "INACTIVO", "SUSPENDIDO").contains(estadoNormalizado),
+        "Estado de apoderado inválido");
+    this.estado = estadoNormalizado;
+    this.activo = "ACTIVO".equals(estadoNormalizado);
   }
 
   public void marcarValidadoReniec() {
