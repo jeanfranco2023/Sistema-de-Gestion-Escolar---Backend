@@ -42,6 +42,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,6 +68,7 @@ class SolicitudMatriculaPublicaDocumentosTest {
   @Test
   void edadFueraDeRangoQuedaPendienteDeAutorizacionSinIniciarPago() {
     prepararAdmision();
+    ReflectionTestUtils.setField(service, "validarEdad", true);
     when(solicitudes.saveAndFlush(org.mockito.ArgumentMatchers.any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
     var request = solicitudPublicaConNacimiento(java.time.LocalDate.of(2020, 4, 1));
@@ -75,6 +77,20 @@ class SolicitudMatriculaPublicaDocumentosTest {
     verify(secciones).buscarPorAnioLectivoId((short) 2026);
     verify(solicitudes).saveAndFlush(org.mockito.ArgumentMatchers.any());
     org.mockito.Mockito.verifyNoInteractions(mercadoPago, cobrosMatricula);
+  }
+
+  @Test
+  void permiteContinuarConEdadFueraDeRangoCuandoLaValidacionEstaDesactivada() {
+    prepararAdmision();
+    ReflectionTestUtils.setField(service, "validarEdad", false);
+    var captor = org.mockito.ArgumentCaptor.forClass(SolicitudMatriculaPublicaEntity.class);
+    when(solicitudes.saveAndFlush(captor.capture()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var respuesta = service.crear(solicitudPublicaConNacimiento(java.time.LocalDate.of(2020, 4, 1)));
+
+    assertEquals(EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES, respuesta.estado());
+    assertFalse(captor.getValue().isRequiereAutorizacionEdad());
   }
 
   @Test

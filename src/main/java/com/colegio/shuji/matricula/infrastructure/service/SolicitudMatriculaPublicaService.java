@@ -106,6 +106,9 @@ public class SolicitudMatriculaPublicaService {
   @Value("${app.matricula-publica.duracion-reserva-minutos:30}")
   private long duracionReservaMinutos;
 
+  @Value("${app.matricula-publica.validar-edad:false}")
+  private boolean validarEdad;
+
   @Transactional(readOnly = true)
   public CatalogoMatriculaPublicaResponseDto catalogo() {
     var aniosAbiertos = anios.findAll().stream()
@@ -150,7 +153,8 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "No hay vacantes disponibles para el grado seleccionado");
     }
     var edades = limitesEdad(seccion);
-    boolean requiereAutorizacionEdad = !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
+    boolean requiereAutorizacionEdad = validarEdad
+        && !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
     var estudianteExistente = estudiantes.buscarPorNumeroDocumento(r.numeroDocumentoEstudiante().trim());
     if (!estudianteExistente.isEmpty()) {
       Long estudianteId = estudianteExistente.getFirst().getId();
