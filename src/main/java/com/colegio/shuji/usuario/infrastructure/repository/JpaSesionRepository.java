@@ -20,6 +20,10 @@ public interface JpaSesionRepository extends JpaRepository<SesionEntity, Long> {
   Optional<SesionEntity> findByTokenHash(@Param("tokenHash") String tokenHash);
 
   @Modifying
+  @Query("DELETE FROM SesionEntity s WHERE s.tokenHash = :tokenHash")
+  void deleteByTokenHash(@Param("tokenHash") String tokenHash);
+
+  @Modifying
   @Query("DELETE FROM SesionEntity s WHERE s.usuario.id = :usuarioId")
   void deleteByUsuarioId(@Param("usuarioId") Long usuarioId);
 

@@ -1,5 +1,6 @@
 package com.colegio.shuji.usuario;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,16 +8,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordInicialRequestDto;
+import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.LoginRequestDto;
+import com.colegio.shuji.usuario.application.dto.in.RefreshTokenRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
 import com.colegio.shuji.usuario.application.dto.out.AuthResponseDto;
 import com.colegio.shuji.usuario.application.dto.out.ExpedienteEmpleadoDocumentoResponseDto;
@@ -41,6 +46,7 @@ import com.colegio.shuji.shared.domain.exception.ResourceNotFoundException;
 import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.ExpedienteEmpleadoDocumento;
 import com.colegio.shuji.usuario.domain.model.ResultadoValidacionDocumentoEmpleado;
+import com.colegio.shuji.usuario.domain.model.Sesion;
 import com.colegio.shuji.usuario.domain.model.Usuario;
 import com.colegio.shuji.usuario.infrastructure.adapter.PdfBoxGeminiValidadorDocumentoEmpleadoAdapter;
 import com.colegio.shuji.usuario.infrastructure.controller.rest.UsuarioController;
@@ -149,22 +155,29 @@ class UsuarioFase2Test {
             new ObjectMapper());
   }
 
-  // --- REGLA 1: Bloqueo del rol APODERADO en creación de usuarios ---
+  // --- REGLA 1: El registro público no crea cuentas institucionales ---
 
   @Test
-  @DisplayName("register() rechaza rol APODERADO con ReglaNegocioException")
-  void registerRechazaRolApoderado() {
-    RegisterUserRequestDto request =
-        RegisterUserRequestDto.builder()
-            .username("apoderado_juan")
-            .email("juan@test.com")
-            .password("Pass1234!")
-            .roles(Set.of("APODERADO"))
-            .build();
+  @DisplayName("register() rechaza cualquier rol de forma uniforme y no persiste")
+  void registerPublicoRechazaUniformementeSinPersistir() {
+    String mensaje = "El registro público no está habilitado; las cuentas se crean mediante matrícula o por Dirección.";
+    List<Set<String>> rolesSolicitados = List.of(
+        Set.of("APODERADO"),
+        Set.of("DIRECCION", "ADMINISTRADOR"),
+        Set.<String>of());
 
-    ReglaNegocioException ex =
-        assertThrows(ReglaNegocioException.class, () -> authService.register(request));
-    assertTrue(ex.getMessage().contains("Los usuarios con rol APODERADO solo se originan automáticamente"));
+    for (Set<String> roles : rolesSolicitados) {
+      RegisterUserRequestDto request = RegisterUserRequestDto.builder()
+          .username("registro_prueba")
+          .email("registro@test.com")
+          .password("Pass1234!")
+          .roles(roles)
+          .build();
+      ReglaNegocioException ex = assertThrows(ReglaNegocioException.class, () -> authService.register(request));
+      assertEquals(mensaje, ex.getMessage());
+    }
+    verifyNoInteractions(userRepositoryPort, roleRepositoryPort, sessionRepositoryPort,
+        passwordEncoder, jwtTokenProvider, userMapper, auditoria);
   }
 
   @Test
@@ -237,6 +250,7 @@ class UsuarioFase2Test {
     when(userRepositoryPort.findByUsernameOrEmail("docente_carlos")).thenReturn(Optional.of(usuario));
     when(passwordEncoder.matches("TempPass123!", "$2a$10$hashed")).thenReturn(true);
     when(jwtTokenProvider.generateToken(any(), any(), any())).thenReturn("mock.jwt.token");
+    when(jwtTokenProvider.generateToken(any(), any(), any(), any())).thenReturn("mock.jwt.token");
     when(jwtTokenProvider.generateRefreshToken(any(), any())).thenReturn("mock.refresh.token");
     when(jwtTokenProvider.getJwtRefreshExpirationMs()).thenReturn(86400000L);
     when(jwtTokenProvider.getJwtExpirationMs()).thenReturn(3600000L);
@@ -273,6 +287,169 @@ class UsuarioFase2Test {
     assertFalse(usuario.getDebeCambiarPassword());
     assertEquals("$2a$10$hashedNewPassword", usuario.getUsuarioPassword());
     verify(userRepositoryPort).save(usuario);
+  }
+
+  @Test
+  @DisplayName("logout() revoca sesión eliminando por hash de refresh token")
+  void logoutEliminaSesionPorHash() {
+    String refreshToken = "sample-refresh-token-12345";
+    authService.logout(refreshToken);
+    verify(sessionRepositoryPort).deleteByTokenHash(anyString());
+  }
+
+  @Test
+  @DisplayName("logout() con token nulo o vacío es idempotente y no lanza excepción")
+  void logoutTokenNuloOInvalidoEsIdempotente() {
+    assertDoesNotThrow(() -> authService.logout(null));
+    assertDoesNotThrow(() -> authService.logout("   "));
+  }
+
+  @Test
+  @DisplayName("login() persiste sesión primero y emite token con sessionId")
+  void loginPersisteSesionPrimeroYEmiteTokenConSessionId() {
+    LoginRequestDto request = new LoginRequestDto("docente_carlos", "TempPass123!");
+    Usuario usuario =
+        Usuario.builder()
+            .id(10L)
+            .username("docente_carlos")
+            .usuarioPassword("$2a$10$hashed")
+            .activo(true)
+            .roles(new HashSet<>(List.of(Rol.builder().id((short) 2).codigo("DOCENTE").build())))
+            .build();
+
+    when(userRepositoryPort.findByUsernameOrEmail("docente_carlos")).thenReturn(Optional.of(usuario));
+    when(passwordEncoder.matches("TempPass123!", "$2a$10$hashed")).thenReturn(true);
+    when(sessionRepositoryPort.save(any(Sesion.class))).thenAnswer(inv -> {
+      Sesion s = inv.getArgument(0);
+      return Sesion.builder()
+          .id(777L)
+          .usuarioId(s.getUsuarioId())
+          .tokenHash(s.getTokenHash())
+          .ipAddress(s.getIpAddress())
+          .userAgent(s.getUserAgent())
+          .fechaExpiracion(s.getFechaExpiracion())
+          .fechaCreacion(s.getFechaCreacion())
+          .build();
+    });
+    when(jwtTokenProvider.generateRefreshToken(10L, "docente_carlos")).thenReturn("refresh.token.jwt");
+    when(jwtTokenProvider.getJwtRefreshExpirationMs()).thenReturn(86400000L);
+    when(jwtTokenProvider.getJwtExpirationMs()).thenReturn(3600000L);
+    when(jwtTokenProvider.generateToken(eq(10L), eq("docente_carlos"), any(), eq(777L)))
+        .thenReturn("access.token.with.session.777");
+    when(userMapper.toResponseDto(usuario))
+        .thenReturn(UserResponseDto.builder().username("docente_carlos").build());
+
+    AuthResponseDto response = authService.login(request, "127.0.0.1", "JUnit");
+
+    assertNotNull(response);
+    assertEquals("access.token.with.session.777", response.getAccessToken());
+    verify(sessionRepositoryPort).save(any(Sesion.class));
+    verify(jwtTokenProvider).generateToken(eq(10L), eq("docente_carlos"), any(), eq(777L));
+  }
+
+  @Test
+  @DisplayName("refreshToken() persiste renovación primero y emite token con sessionId")
+  void refreshTokenPersisteSesionYEmiteTokenConSessionId() {
+    String oldRefreshToken = "old.refresh.token";
+    RefreshTokenRequestDto request = new RefreshTokenRequestDto(oldRefreshToken);
+    Usuario usuario =
+        Usuario.builder()
+            .id(10L)
+            .username("docente_carlos")
+            .activo(true)
+            .roles(new HashSet<>(List.of(Rol.builder().id((short) 2).codigo("DOCENTE").build())))
+            .build();
+    Sesion sesionExistente =
+        Sesion.builder()
+            .id(555L)
+            .usuarioId(10L)
+            .tokenHash("hash-existente")
+            .fechaExpiracion(java.time.LocalDateTime.now().plusDays(1))
+            .fechaCreacion(java.time.LocalDateTime.now().minusDays(1))
+            .build();
+
+    when(jwtTokenProvider.validateRefreshToken(oldRefreshToken)).thenReturn(true);
+    when(sessionRepositoryPort.findByTokenHash(anyString())).thenReturn(Optional.of(sesionExistente));
+    when(userRepositoryPort.findById(10L)).thenReturn(Optional.of(usuario));
+    when(jwtTokenProvider.generateRefreshToken(10L, "docente_carlos")).thenReturn("new.refresh.token");
+    when(jwtTokenProvider.getJwtRefreshExpirationMs()).thenReturn(86400000L);
+    when(jwtTokenProvider.getJwtExpirationMs()).thenReturn(3600000L);
+    when(sessionRepositoryPort.save(any(Sesion.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(jwtTokenProvider.generateToken(eq(10L), eq("docente_carlos"), any(), eq(555L)))
+        .thenReturn("new.access.token.with.session.555");
+    when(userMapper.toResponseDto(usuario))
+        .thenReturn(UserResponseDto.builder().username("docente_carlos").build());
+
+    AuthResponseDto response = authService.refreshToken(request, "127.0.0.1", "JUnit");
+
+    assertNotNull(response);
+    assertEquals("new.access.token.with.session.555", response.getAccessToken());
+    verify(sessionRepositoryPort).save(any(Sesion.class));
+    verify(jwtTokenProvider).generateToken(eq(10L), eq("docente_carlos"), any(), eq(555L));
+  }
+
+  @Test
+  @DisplayName("RegisterUserRequestDto y CambiarPasswordRequestDto exigen mínimo 8 caracteres")
+  void validacionMinimoOchoCaracteres() {
+    jakarta.validation.Validator validator =
+        jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator();
+
+    RegisterUserRequestDto regInvalido = RegisterUserRequestDto.builder()
+        .username("usuario123")
+        .email("usuario@test.com")
+        .password("1234567")
+        .roles(Set.of("DOCENTE"))
+        .build();
+    var violationsReg = validator.validate(regInvalido);
+    assertTrue(violationsReg.stream().anyMatch(v -> v.getMessage().contains("entre 8 y 100 caracteres")));
+
+    RegisterUserRequestDto regValido = RegisterUserRequestDto.builder()
+        .username("usuario123")
+        .email("usuario@test.com")
+        .password("12345678")
+        .roles(Set.of("DOCENTE"))
+        .build();
+    var violationsRegValido = validator.validate(regValido);
+    assertTrue(violationsRegValido.isEmpty());
+
+    CambiarPasswordRequestDto passInvalido = CambiarPasswordRequestDto.builder()
+        .passwordActual("actual123")
+        .passwordNuevo("1234567")
+        .build();
+    var violationsPass = validator.validate(passInvalido);
+    assertTrue(violationsPass.stream().anyMatch(v -> v.getMessage().contains("entre 8 y 100 caracteres")));
+
+    CambiarPasswordRequestDto passValido = CambiarPasswordRequestDto.builder()
+        .passwordActual("actual123")
+        .passwordNuevo("12345678")
+        .build();
+    var violationsPassValido = validator.validate(passValido);
+    assertTrue(violationsPassValido.isEmpty());
+  }
+
+  @Test
+  @DisplayName("ConsultarAuditoriaCambiosService filtra y pagina cambios correctamente")
+  void consultarAuditoriaCambiosFiltrarYPaginacion() {
+    var port = mock(com.colegio.shuji.usuario.application.port.out.AuditoriaCambiosPort.class);
+    var service = new com.colegio.shuji.usuario.application.service.ConsultarAuditoriaCambiosService(port);
+    java.time.Instant inicio = java.time.Instant.now().minusSeconds(3600);
+    java.time.Instant fin = java.time.Instant.now();
+    org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+
+    var cambio = new com.colegio.shuji.usuario.domain.model.CambioAuditoria(
+        1L, "matricula", 50L, "MAT-001", "UPDATE",
+        null, "{\"estado\":\"CONFIRMADA\"}", 9L, "director_juan", "DIRECCION", java.time.Instant.now());
+
+    when(port.filtrar(inicio, fin, 9L, "matricula", pageable))
+        .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(cambio), pageable, 1));
+
+    var resultado = service.filtrar(inicio, fin, 9L, "matricula", pageable);
+
+    assertNotNull(resultado);
+    assertEquals(1, resultado.getTotalElements());
+    assertEquals("matricula", resultado.getContent().get(0).tablaAfectada());
+    assertEquals("director_juan", resultado.getContent().get(0).usuarioNombre());
+    assertFalse(resultado.getContent().get(0).contextoHistoricoSinSnapshot());
   }
 
   // --- REGLA 5: Borrado lógico y Corregir DNI transaccional ---

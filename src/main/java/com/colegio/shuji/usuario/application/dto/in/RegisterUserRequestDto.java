@@ -29,7 +29,7 @@ public class RegisterUserRequestDto {
   private String email;
 
   // Contraseña opcional para creación administrativa (se genera temporal si se omite)
-  @Size(min = 6, max = 100, message = "La contraseña debe tener entre 6 y 100 caracteres")
+  @Size(min = 8, max = 100, message = "La contraseña debe tener entre 8 y 100 caracteres")
   private String password;
 
   @NotEmpty(message = "Debe asignar al menos un rol al usuario")

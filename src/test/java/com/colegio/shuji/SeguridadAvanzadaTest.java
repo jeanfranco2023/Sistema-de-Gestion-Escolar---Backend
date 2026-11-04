@@ -60,6 +60,7 @@ import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
 import com.colegio.shuji.usuario.application.service.AuthService;
 import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.Usuario;
+import com.colegio.shuji.usuario.domain.exception.ReglaNegocioException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -461,8 +462,8 @@ class SeguridadAvanzadaTest {
   class ControlAccesoYAbusoTests {
 
     @Test
-    @DisplayName("Auto-registro público rechaza elevación de privilegios y fuerza exclusivamente rol APODERADO")
-    void autoRegistroFuerzaRolApoderadoRechazandoElevacionDePrivilegios() {
+    @DisplayName("Registro público rechaza roles privilegiados sin consultar catálogo ni persistir")
+    void autoRegistroRechazaElevacionSinPersistir() {
       var userRepo = mock(UserRepositoryPort.class);
       var roleRepo = mock(RoleRepositoryPort.class);
       var sessionRepo = mock(SessionRepositoryPort.class);
@@ -480,45 +481,11 @@ class SeguridadAvanzadaTest {
           .roles(Set.of("DIRECCION", "ADMINISTRADOR"))
           .build();
 
-      when(userRepo.existsByUsername("atacante")).thenReturn(false);
-      when(userRepo.existsByEmail("atacante@shuji.edu.pe")).thenReturn(false);
-      when(passEncoder.encode("Password123!")).thenReturn("encoded_pass");
-
-      var rolApoderado = Rol.builder().id((short) 1).codigo("APODERADO").nombre("Apoderado").build();
-      when(roleRepo.findByCodigoIn(List.of("APODERADO"))).thenReturn(List.of(rolApoderado));
-
-      when(userMapper.toDomain(request)).thenReturn(
-          Usuario.builder()
-              .username(request.getUsername())
-              .email(request.getEmail())
-              .build());
-
-      var usuarioCaptor = ArgumentCaptor.forClass(Usuario.class);
-      when(userRepo.save(usuarioCaptor.capture())).thenAnswer(inv -> {
-        Usuario u = inv.getArgument(0);
-        u.setId(50L);
-        return u;
-      });
-
-      when(userMapper.toResponseDto(any(Usuario.class))).thenAnswer(inv -> {
-        Usuario u = inv.getArgument(0);
-        return UserResponseDto.builder().id(u.getId()).username(u.getUsername()).email(u.getEmail()).build();
-      });
-
-      var result = authService.register(request);
-
-      assertNotNull(result);
-      assertEquals(50L, result.getId());
-
-      Usuario usuarioGuardado = usuarioCaptor.getValue();
-      assertNotNull(usuarioGuardado);
-      assertEquals(1, usuarioGuardado.getRoles().size());
-      assertTrue(usuarioGuardado.getRoles().stream().anyMatch(r -> "APODERADO".equals(r.getCodigo())));
-      assertFalse(usuarioGuardado.getRoles().stream().anyMatch(r -> "DIRECCION".equals(r.getCodigo())));
-      assertFalse(usuarioGuardado.getRoles().stream().anyMatch(r -> "ADMINISTRADOR".equals(r.getCodigo())));
-
-      verify(roleRepo, never()).findByCodigoIn(argThat(roles -> roles != null && roles.contains("DIRECCION")));
-      verify(roleRepo, times(1)).findByCodigoIn(List.of("APODERADO"));
+      var exception = assertThrows(ReglaNegocioException.class, () -> authService.register(request));
+      assertEquals(
+          "El registro público no está habilitado; las cuentas se crean mediante matrícula o por Dirección.",
+          exception.getMessage());
+      verifyNoInteractions(userRepo, roleRepo, sessionRepo, passEncoder, tokenPort, userMapper, auditPort);
     }
 
     @Test

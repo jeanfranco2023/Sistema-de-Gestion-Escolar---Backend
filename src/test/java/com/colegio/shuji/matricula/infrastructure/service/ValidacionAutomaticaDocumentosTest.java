@@ -58,9 +58,10 @@ class ValidacionAutomaticaDocumentosTest {
     subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.VALIDA, iaCorrecta, true);
     assertEquals(EstadoValidacionDocumento.VALIDADO, solicitud.getEstadoPartida());
   }
-  @Test void iaNoPuedeAprobarUnaPartidaSinFirmaDigital() {
+  @Test void partidaSinFirmaDigitalSeApruebaSiIaYDniCoinciden() {
     subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.NO_APLICA, iaCorrecta, true);
-    assertEquals(EstadoValidacionDocumento.OBSERVADO, solicitud.getEstadoPartida());
+    assertEquals(EstadoValidacionDocumento.VALIDADO, solicitud.getEstadoPartida());
+
   }
 
   @Test void partidaSinEvidenciaParentalNoSeAprueba() {

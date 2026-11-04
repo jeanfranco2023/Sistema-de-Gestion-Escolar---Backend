@@ -4,6 +4,22 @@ server:
     context-path: /
 
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:backend/.env[.properties]
+  mail:
+    host: ${SMTP_HOST:smtp-relay.brevo.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: ${SMTP_TLS:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   flyway:
     init-sqls:
       - "SELECT set_config('app.seed_password_hash', '${SHUJI_SEED_PASSWORD_HASH:}', false)"
@@ -55,6 +71,8 @@ app:
     allow-credentials: true
   security:
     behind-trusted-proxy: ${APP_SECURITY_BEHIND_TRUSTED_PROXY:false}
+  mail:
+    from: ${SMTP_FROM:}
   services:
     reniec:
       url: ${RENIEC_API_URL:https://api.reniec.gob.pe/v1}
@@ -86,7 +104,8 @@ logging:
 
 integraciones:
   reniec:
-    url: ${DNI_API_URL:${RENIEC_PROXY_URL:}}
+    url: ${DNI_API_URL:${RENIEC_PROXY_URL:https://api.apis.net.pe/v1/dni?numero={dni}}}
+    fallback-publico-habilitado: ${RENIEC_FALLBACK_HABILITADO:true}
     api-key: ${DNI_API_KEY:}
     token: ${DNI_API_TOKEN:${RENIEC_PROXY_TOKEN:}}
   pagos:

@@ -74,19 +74,39 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
    * @param roles Lista de nombres o códigos de roles asignados.
    * @return Token JWT firmado.
    */
+  @Override
   public String generateToken(Long userId, String username, List<String> roles) {
+    return generateToken(userId, username, roles, null);
+  }
+
+  /**
+   * Genera un token de acceso (Access Token) con claims personalizados de usuario, roles y sesión.
+   *
+   * @param userId ID del usuario en base de datos.
+   * @param username Nombre de usuario.
+   * @param roles Lista de nombres o códigos de roles asignados.
+   * @param sessionId ID de la sesión persistida.
+   * @return Token JWT firmado.
+   */
+  @Override
+  public String generateToken(Long userId, String username, List<String> roles, Long sessionId) {
     Date now = new Date();
     Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-    return Jwts.builder()
-        .subject(username)
-        .claim("userId", userId)
-        .claim("roles", roles)
-        .claim("type", "ACCESS")
-        .issuedAt(now)
-        .expiration(expiryDate)
-        .signWith(key)
-        .compact();
+    var builder =
+        Jwts.builder()
+            .subject(username)
+            .claim("userId", userId)
+            .claim("roles", roles)
+            .claim("type", "ACCESS")
+            .issuedAt(now)
+            .expiration(expiryDate);
+
+    if (sessionId != null) {
+      builder.claim("sessionId", sessionId);
+    }
+
+    return builder.signWith(key).compact();
   }
 
   /**
@@ -122,6 +142,19 @@ public class JwtTokenProvider implements com.colegio.shuji.usuario.application.p
     if (userIdObj instanceof Number number) {
       return number.longValue();
     } else if (userIdObj instanceof String str) {
+      return Long.parseLong(str);
+    }
+    return null;
+  }
+
+  /** Obtiene el ID numérico de sesión del token si está presente. */
+  @Override
+  public Long getSessionIdFromToken(String token) {
+    Claims claims = extractAllClaims(token);
+    Object sessionIdObj = claims.get("sessionId");
+    if (sessionIdObj instanceof Number number) {
+      return number.longValue();
+    } else if (sessionIdObj instanceof String str) {
       return Long.parseLong(str);
     }
     return null;

@@ -5,6 +5,10 @@ import java.util.List;
 public interface TokenPort {
   String generateToken(Long userId, String username, List<String> roles);
 
+  String generateToken(Long userId, String username, List<String> roles, Long sessionId);
+
+  Long getSessionIdFromToken(String token);
+
   String generateRefreshToken(Long userId, String username);
 
   boolean validateToken(String token);

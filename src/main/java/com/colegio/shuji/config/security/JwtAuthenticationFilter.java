@@ -1,6 +1,7 @@
 package com.colegio.shuji.config.security;
 
 import com.colegio.shuji.config.persistence.SupabaseAuditInterceptor;
+import com.colegio.shuji.usuario.application.port.out.SessionRepositoryPort;
 import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
 import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.Usuario;
@@ -13,8 +14,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -30,12 +31,31 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtTokenProvider tokenProvider;
   private final SupabaseAuditInterceptor supabaseAuditInterceptor;
   private final UserRepositoryPort userRepositoryPort;
+  private final SessionRepositoryPort sessionRepositoryPort;
+
+  @Autowired
+  public JwtAuthenticationFilter(
+      JwtTokenProvider tokenProvider,
+      SupabaseAuditInterceptor supabaseAuditInterceptor,
+      UserRepositoryPort userRepositoryPort,
+      @Autowired(required = false) SessionRepositoryPort sessionRepositoryPort) {
+    this.tokenProvider = tokenProvider;
+    this.supabaseAuditInterceptor = supabaseAuditInterceptor;
+    this.userRepositoryPort = userRepositoryPort;
+    this.sessionRepositoryPort = sessionRepositoryPort;
+  }
+
+  public JwtAuthenticationFilter(
+      JwtTokenProvider tokenProvider,
+      SupabaseAuditInterceptor supabaseAuditInterceptor,
+      UserRepositoryPort userRepositoryPort) {
+    this(tokenProvider, supabaseAuditInterceptor, userRepositoryPort, null);
+  }
 
   @Override
   protected void doFilterInternal(
@@ -48,6 +68,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       String jwt = getJwtFromRequest(request);
 
       if (StringUtils.hasText(jwt) && tokenProvider.validateAccessToken(jwt)) {
+        Long sessionId = tokenProvider.getSessionIdFromToken(jwt);
+        if (sessionId != null && sessionRepositoryPort != null && !sessionRepositoryPort.existsById(sessionId)) {
+          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+          response.setContentType("application/json");
+          response.setCharacterEncoding("UTF-8");
+          response.getWriter().write("{\"success\":false,\"status\":401,\"errorCode\":\"SESSION_REVOKED\",\"message\":\"Sesión cerrada o token revocado\"}");
+          return;
+        }
+
         String username = tokenProvider.getUsernameFromToken(jwt);
         Long userId = tokenProvider.getUserIdFromToken(jwt);
 

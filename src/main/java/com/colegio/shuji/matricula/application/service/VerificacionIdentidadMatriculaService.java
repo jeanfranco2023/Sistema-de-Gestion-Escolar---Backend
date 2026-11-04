@@ -27,8 +27,17 @@ public class VerificacionIdentidadMatriculaService {
   }
 
   public static boolean nombresCoinciden(String primero, String segundo) {
-    return primero != null && segundo != null && !normalizar(primero).isBlank()
-        && normalizar(primero).equals(normalizar(segundo));
+    if (primero == null || segundo == null) return false;
+    String p = normalizar(primero);
+    String s = normalizar(segundo);
+    if (p.isBlank() || s.isBlank()) return false;
+    if (p.equals(s)) return true;
+    var setP = new java.util.HashSet<>(java.util.Arrays.asList(p.split("\\s+")));
+    var setS = new java.util.HashSet<>(java.util.Arrays.asList(s.split("\\s+")));
+    if (setP.equals(setS)) return true;
+    long coincidencias = setP.stream().filter(setS::contains).count();
+    int minRequerido = Math.min(2, Math.min(setP.size(), setS.size()));
+    return minRequerido > 0 && coincidencias >= minRequerido;
   }
 
   private static String normalizar(String valor) {

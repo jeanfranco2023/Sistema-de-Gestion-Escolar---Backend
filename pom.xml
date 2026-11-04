@@ -54,6 +54,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Envío de correos transaccionales mediante SMTP (Brevo) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- 2. Persistencia JPA & Hibernate 6 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

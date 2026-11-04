@@ -12,6 +12,7 @@ import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 import com.colegio.shuji.usuario.application.mapper.UserMapper;
 import com.colegio.shuji.usuario.application.port.in.CambiarPasswordInicialUseCase;
 import com.colegio.shuji.usuario.application.port.in.LoginUseCase;
+import com.colegio.shuji.usuario.application.port.in.LogoutUseCase;
 import com.colegio.shuji.usuario.application.port.in.RefreshTokenUseCase;
 import com.colegio.shuji.usuario.application.port.in.RegisterUserUseCase;
 import com.colegio.shuji.usuario.application.port.out.PasswordHashPort;
@@ -46,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTokenUseCase, CambiarPasswordInicialUseCase {
+public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTokenUseCase, CambiarPasswordInicialUseCase, LogoutUseCase {
 
   private final UserRepositoryPort userRepositoryPort;
   private final RoleRepositoryPort roleRepositoryPort;
@@ -81,8 +82,6 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
 
     List<String> roles = usuario.getRoles().stream().map(Rol::getCodigo).toList();
 
-    String accessToken =
-        jwtTokenProvider.generateToken(usuario.getId(), usuario.getUsername(), roles);
     String refreshToken =
         jwtTokenProvider.generateRefreshToken(usuario.getId(), usuario.getUsername());
 
@@ -100,7 +99,11 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
             .fechaCreacion(LocalDateTime.now())
             .build();
 
-    sessionRepositoryPort.save(sesion);
+    Sesion sesionGuardada = sessionRepositoryPort.save(sesion);
+    Long sessionId = sesionGuardada != null ? sesionGuardada.getId() : null;
+
+    String accessToken =
+        jwtTokenProvider.generateToken(usuario.getId(), usuario.getUsername(), roles, sessionId);
 
     log.info(
         "Inicio de sesión exitoso para usuario: {} (ID: {})",
@@ -119,41 +122,9 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
 
   @Override
   public UserResponseDto register(RegisterUserRequestDto registerRequest) {
-    log.info("Registrando nuevo usuario (auto-registro público): {}", registerRequest.getUsername());
-
-    if (registerRequest.getRoles() == null
-        || registerRequest.getRoles().isEmpty()
-        || registerRequest.getRoles().stream().anyMatch(r -> r != null
-            && ("APODERADO".equalsIgnoreCase(r.trim()) || "ROL_APODERADO".equalsIgnoreCase(r.trim())))) {
-      throw new ReglaNegocioException(
-          "Los usuarios con rol APODERADO solo se originan automáticamente mediante el flujo de matrícula confirmada");
-    }
-
-    if (userRepositoryPort.existsByUsername(registerRequest.getUsername())) {
-      throw new UserAlreadyExistsException("nombre de usuario", registerRequest.getUsername());
-    }
-
-    if (userRepositoryPort.existsByEmail(registerRequest.getEmail())) {
-      throw new UserAlreadyExistsException("correo electrónico", registerRequest.getEmail());
-    }
-
-    // El cliente no puede elegir el rol asignado por el auto-registro público.
-    List<Rol> roles = roleRepositoryPort.findByCodigoIn(List.of("APODERADO"));
-    if (roles.isEmpty()) {
-      throw new ResourceNotFoundException(
-          "Ninguno de los roles solicitados fue encontrado en el catálogo institucional.");
-    }
-
-    Usuario usuario = userMapper.toDomain(registerRequest);
-    usuario.registrar(
-        passwordEncoder.encode(registerRequest.getPassword()),
-        new HashSet<>(roles),
-        LocalDateTime.now());
-
-    Usuario usuarioGuardado = userRepositoryPort.save(usuario);
-    log.info("Usuario registrado exitosamente con ID: {}", usuarioGuardado.getId());
-
-    return userMapper.toResponseDto(usuarioGuardado);
+    log.warn("Se rechazó un intento de registro público no habilitado");
+    throw new ReglaNegocioException(
+        "El registro público no está habilitado; las cuentas se crean mediante matrícula o por Dirección.");
   }
 
   @Override
@@ -236,8 +207,6 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
     List<String> roles = usuario.getRoles().stream().map(Rol::getCodigo).toList();
 
     // Rotación segura de refresh token
-    String newAccessToken =
-        jwtTokenProvider.generateToken(usuario.getId(), usuario.getUsername(), roles);
     String newRefreshToken =
         jwtTokenProvider.generateRefreshToken(usuario.getId(), usuario.getUsername());
 
@@ -248,7 +217,11 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
         userAgent,
         ahora,
         ahora.plusSeconds(jwtTokenProvider.getJwtRefreshExpirationMs() / 1000));
-    sessionRepositoryPort.save(sesion);
+    Sesion sesionGuardada = sessionRepositoryPort.save(sesion);
+    Long sessionId = sesionGuardada != null ? sesionGuardada.getId() : sesion.getId();
+
+    String newAccessToken =
+        jwtTokenProvider.generateToken(usuario.getId(), usuario.getUsername(), roles, sessionId);
 
     log.info("Token renovado exitosamente para usuario: {}", usuario.getUsername());
 
@@ -286,6 +259,16 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
 
     userRepositoryPort.save(usuario);
     log.info("Contraseña inicial actualizada exitosamente para usuario ID: {}", usuarioId);
+  }
+
+  @Override
+  public void logout(String refreshToken) {
+    if (refreshToken == null || refreshToken.isBlank()) {
+      return;
+    }
+    String tokenHash = hashToken(refreshToken.trim());
+    sessionRepositoryPort.deleteByTokenHash(tokenHash);
+    log.info("Sesión revocada exitosamente en logout");
   }
 
   private void validarNoRolApoderado(Collection<String> roles) {

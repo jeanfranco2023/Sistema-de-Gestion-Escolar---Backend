@@ -2,6 +2,7 @@ package com.colegio.shuji.matricula.infrastructure.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,6 +18,9 @@ import com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepositor
 import com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica;
 import com.colegio.shuji.matricula.domain.enums.Genero;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
+import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
+import com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital;
+import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
 import com.colegio.shuji.matricula.infrastructure.entity.SolicitudMatriculaPublicaEntity;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
 import com.colegio.shuji.matricula.infrastructure.repository.JpaApoderadoRepository;
@@ -106,6 +110,40 @@ class SolicitudMatriculaPublicaDocumentosTest {
     service.crear(request);
     assertNull(captor.getValue().getUbigeoApoderado());
     assertEquals("Ana", captor.getValue().getNombresEstudiante());
+  }
+
+  @Test
+  void permiteValidarDocumentosCuandoEstadoEsAutorizacionEdadPendiente() throws Exception {
+    var solicitud = new SolicitudMatriculaPublicaEntity();
+    solicitud.setId(SOLICITUD_ID);
+    solicitud.setTokenHash(hash(TOKEN));
+    solicitud.setEstado(EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE);
+    solicitud.setRequiereAutorizacionEdad(true);
+    solicitud.setParentesco(Parentesco.MADRE);
+    solicitud.setConsentimientoGemini(true);
+    solicitud.setNumeroDocumentoEstudiante("12345678");
+    solicitud.setNombresEstudiante("Ana");
+    solicitud.setApellidoPaternoEstudiante("Perez");
+    solicitud.setApellidoMaternoEstudiante("Ruiz");
+    solicitud.setNumeroDocumentoApoderado("87654321");
+    solicitud.setNombresApoderado("Rosa");
+    solicitud.setApellidoPaternoApoderado("Perez");
+    solicitud.setApellidoMaternoApoderado("Ruiz");
+
+    when(solicitudes.findById(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(solicitudes.saveAndFlush(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    var prep = service.prepararValidacion(SOLICITUD_ID, TOKEN, TipoDocumentoSolicitud.PARTIDA_NACIMIENTO);
+    assertNotNull(prep);
+    assertEquals("12345678", prep.dni());
+
+    var resGemini = new GeminiDocumentoMatriculaPort.Resultado(true, true, true, "OK", true, true);
+    var resFirma = new FirmaDigitalDocumentoPort.Resultado(EstadoFirmaDigital.VALIDA, "Firma verificada", "certSha256");
+
+    var resp = service.guardarResultadoDocumento(SOLICITUD_ID, TOKEN, TipoDocumentoSolicitud.PARTIDA_NACIMIENTO,
+        resGemini, resFirma, true, null, "bucket", "key", "application/pdf", 1024L, "sha256");
+    assertNotNull(resp);
   }
 
   private void prepararAdmision() {
@@ -350,6 +388,38 @@ class SolicitudMatriculaPublicaDocumentosTest {
     }
     when(documentos.findByIdSolicitudIdIn(java.util.List.of(SOLICITUD_ID))).thenReturn(archivos);
     when(versiones.findAllById(org.mockito.ArgumentMatchers.any())).thenReturn(evidencias);
+  }
+
+  @Test
+  void darVistoBuenoAdminApruebaDocumentosYActualizaEstado() throws Exception {
+    var solicitud = new SolicitudMatriculaPublicaEntity();
+    solicitud.setId(SOLICITUD_ID);
+    solicitud.setTokenHash(hash(TOKEN));
+    solicitud.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS);
+    solicitud.setEstadoPartida(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.OBSERVADO);
+    solicitud.setEstadoDniC4(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEstadoRecibo(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO);
+    solicitud.setEmailApoderado("apoderado@test.com");
+    solicitud.setNombresEstudiante("Carlos");
+    solicitud.setApellidoPaternoEstudiante("Perez");
+    solicitud.setApellidoMaternoEstudiante("Gomez");
+    solicitud.setNumeroDocumentoEstudiante("12345678");
+    solicitud.setNombresApoderado("Padre");
+    solicitud.setApellidoPaternoApoderado("Perez");
+    solicitud.setApellidoMaternoApoderado("Ruiz");
+    solicitud.setNumeroDocumentoApoderado("87654321");
+    solicitud.setParentesco(Parentesco.PADRE);
+    solicitud.setCelularApoderado("999888777");
+    solicitud.setAnioLectivoId((short) 2026);
+    solicitud.setGradoId((short) 1);
+    when(solicitudes.bloquearPorId(SOLICITUD_ID)).thenReturn(Optional.of(solicitud));
+    when(solicitudes.saveAndFlush(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+    var res = service.darVistoBuenoAdmin(SOLICITUD_ID, "Visto bueno directivo", 1L);
+
+    assertEquals(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS, res.estado());
+    org.junit.jupiter.api.Assertions.assertEquals(com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento.VALIDADO, solicitud.getEstadoPartida());
+    org.junit.jupiter.api.Assertions.assertNotEquals(hash(TOKEN), solicitud.getTokenHash());
   }
 
   private SolicitudMatriculaPublicaEntity solicitudConfirmada() throws Exception {

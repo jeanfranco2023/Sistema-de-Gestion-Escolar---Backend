@@ -10,6 +10,7 @@ import com.colegio.shuji.usuario.application.dto.out.AuthResponseDto;
 import com.colegio.shuji.usuario.application.dto.out.UserResponseDto;
 import com.colegio.shuji.usuario.application.port.in.CambiarPasswordInicialUseCase;
 import com.colegio.shuji.usuario.application.port.in.LoginUseCase;
+import com.colegio.shuji.usuario.application.port.in.LogoutUseCase;
 import com.colegio.shuji.usuario.application.port.in.RefreshTokenUseCase;
 import com.colegio.shuji.usuario.application.port.in.RegisterUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,7 @@ public class AuthController {
   private final RegisterUserUseCase registerUserUseCase;
   private final RefreshTokenUseCase refreshTokenUseCase;
   private final CambiarPasswordInicialUseCase cambiarPasswordInicialUseCase;
+  private final LogoutUseCase logoutUseCase;
   private final ActorActualPort actorActualPort;
 
   @Value("${app.security.behind-trusted-proxy:false}")
@@ -101,6 +103,19 @@ public class AuthController {
     Long usuarioId = actorActualPort.usuarioId();
     cambiarPasswordInicialUseCase.cambiarPasswordInicial(usuarioId, requestDto);
     return ResponseEntity.ok(ApiResponse.ok(null, "Contraseña actualizada exitosamente"));
+  }
+
+  @Operation(
+      summary = "Cerrar sesión",
+      description = "Revoca la sesión activa eliminando el refresh token")
+  @PostMapping("/logout")
+  @PreAuthorize("permitAll()")
+  public ResponseEntity<ApiResponse<Void>> logout(
+      @RequestBody(required = false) RefreshTokenRequestDto requestDto) {
+    if (requestDto != null && requestDto.getRefreshToken() != null && !requestDto.getRefreshToken().isBlank()) {
+      logoutUseCase.logout(requestDto.getRefreshToken());
+    }
+    return ResponseEntity.ok(ApiResponse.ok(null, "Sesión cerrada exitosamente"));
   }
 
   private static final java.util.regex.Pattern IPV4_PATTERN =

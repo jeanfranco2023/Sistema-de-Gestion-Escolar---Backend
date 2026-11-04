@@ -69,6 +69,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class SolicitudMatriculaPublicaService {
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SolicitudMatriculaPublicaService.class);
   public static final String REFERENCIA_PAGO_PREFIX = "MATRICULA_PUBLICA:";
   private static final String MENSAJE_REENVIO_SEGURO =
       "Si existe una solicitud activa con esos datos, enviaremos un enlace al correo registrado.";
@@ -227,7 +228,8 @@ public class SolicitudMatriculaPublicaService {
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
-        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La etapa documental ya está cerrada");
     }
     var estado = s.estadoDocumento(tipo);
@@ -250,13 +252,15 @@ public class SolicitudMatriculaPublicaService {
       String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
     if (!"application/pdf".equals(mimeType)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
         "Los tres documentos deben ser PDF");
+
     var s = solicitudConTokenBloqueada(id, token);
     exigirProgenitor(s.getParentesco());
     if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
         && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE
-        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud cambió mientras se validaba el archivo");
     }
     var actual = documentos.findById(new SolicitudMatriculaDocumentoId(id, tipo));
@@ -293,22 +297,22 @@ public class SolicitudMatriculaPublicaService {
     archivo.setFechaActualizacion(OffsetDateTime.now(ZoneOffset.UTC));
     documentos.save(archivo);
     boolean firmaAceptada = firma.estado() == EstadoFirmaDigital.VALIDA
-        || (tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA);
+        || firma.estado() == EstadoFirmaDigital.NO_APLICA;
     boolean dniAceptado = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || Boolean.TRUE.equals(dniApiCoincide);
     boolean vinculoAceptado = tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
         || Boolean.TRUE.equals(resultado.vinculoParentalCoincide());
     boolean rechazo = Boolean.FALSE.equals(dniApiCoincide) || firma.estado() == EstadoFirmaDigital.INVALIDA
         || Boolean.FALSE.equals(resultado.vinculoParentalCoincide())
-        || (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA)
+
         || (resultado.disponible() && !resultado.valido());
     boolean pendiente = !rechazo && (!dniAceptado || !vinculoAceptado || !resultado.disponible() || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
         || firma.estado() == EstadoFirmaDigital.ERROR_SERVICIO);
     s.actualizarDocumento(tipo, pendiente ? EstadoValidacionDocumento.EN_VALIDACION
         : resultado.valido() && firmaAceptada && dniAceptado && vinculoAceptado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
         Boolean.FALSE.equals(dniApiCoincide) ? "El DNI y los nombres declarados no coinciden con la API de identidad."
-        : !firmaAceptada ? tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO && firma.estado() == EstadoFirmaDigital.NO_APLICA
-            ? "Adjunta la partida original en PDF con firma digital de RENIEC; una fotografía no contiene la firma verificable."
-            : firma.detalle() : resultado.observacion());
+        : !firmaAceptada ? firma.detalle() : resultado.observacion());
+
+
     actualizarEtapaDocumental(s);
     return respuesta(solicitudes.saveAndFlush(s), null);
   }
@@ -631,6 +635,7 @@ public class SolicitudMatriculaPublicaService {
     matriculas.saveAndFlush(matricula);
     solicitud.setSeccionId(seccionId);
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
+    rotarTokenYNotificar(solicitud, "Â¡Felicitaciones! Se ha asignado aula a tu matrÃ­cula para el presente aÃ±o lectivo.");
     return adminResponse(solicitudes.saveAndFlush(solicitud));
   }
 
@@ -656,6 +661,7 @@ public class SolicitudMatriculaPublicaService {
     s.setAutorizadoPorUsuarioId(usuarioId);
     s.setFechaAutorizacionEdad(OffsetDateTime.now(ZoneOffset.UTC));
     s.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
+    rotarTokenYNotificar(s, "Tu solicitud de excepci\u00F3n de edad ha sido autorizada institucionalmente. Puedes continuar con el tr\u00E1mite.");
     return adminResponse(solicitudes.saveAndFlush(s));
   }
 
@@ -671,6 +677,7 @@ public class SolicitudMatriculaPublicaService {
     liberarReserva(s);
     s.actualizarDocumento(r.tipo(), EstadoValidacionDocumento.OBSERVADO, r.observacion().trim());
     s.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS);
+    rotarTokenYNotificar(s, "Se ha observado la documentaci\u00F3n presentada: " + r.observacion().trim() + ". Por favor ingresa al enlace para corregir los documentos.");
     return adminResponse(solicitudes.saveAndFlush(s));
   }
 
@@ -683,7 +690,63 @@ public class SolicitudMatriculaPublicaService {
     }
     liberarReserva(s);
     s.setEstado(EstadoSolicitudMatriculaPublica.RECHAZADA);
+    rotarTokenYNotificar(s, "Tu solicitud de matr\u00EDcula ha sido desestimada institucionalmente.");
     solicitudes.saveAndFlush(s);
+  }
+
+
+  @Transactional
+  public SolicitudMatriculaPublicaAdminResponseDto darVistoBuenoAdmin(UUID id, String motivo, Long usuarioId) {
+    var s = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.RECHAZADA
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud ya se encuentra tramitada o cerrada");
+    }
+    for (TipoDocumentoSolicitud tipo : TipoDocumentoSolicitud.values()) {
+      s.actualizarDocumento(tipo, EstadoValidacionDocumento.VALIDADO,
+          "Validado con visto bueno institucional.");
+      var docOpt = documentos.findById(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
+      if (docOpt.isPresent() && docOpt.get().getVersionId() != null) {
+        versiones.findById(docOpt.get().getVersionId()).ifPresent(v -> {
+          v.setIaValida(true);
+          v.setDniApiCoincide(true);
+          if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO) {
+            v.setVinculoParentalCoincide(true);
+          }
+          if (v.getEstadoFirma() == null || v.getEstadoFirma() == EstadoFirmaDigital.INVALIDA) {
+            v.setEstadoFirma(EstadoFirmaDigital.NO_APLICA);
+          }
+          v.setObservacionIa("Aprobado con visto bueno institucional.");
+          versiones.save(v);
+        });
+      }
+    }
+    if (s.isRequiereAutorizacionEdad() && s.getFechaAutorizacionEdad() == null) {
+      s.setMotivoAutorizacionEdad(motivo != null && !motivo.isBlank() ? motivo.trim() : "Excepci\u00F3n de edad aprobada con visto bueno institucional");
+      s.setAutorizadoPorUsuarioId(usuarioId);
+      s.setFechaAutorizacionEdad(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+    s.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
+    rotarTokenYNotificar(s, "\u00A1Tu solicitud ha recibido el visto bueno institucional! Tus documentos han sido aceptados y puedes proceder con el siguiente paso.");
+    return adminResponse(solicitudes.saveAndFlush(s));
+  }
+
+  private String rotarTokenYNotificar(SolicitudMatriculaPublicaEntity s, String mensajeDetalle) {
+    byte[] secreto = new byte[32];
+    RANDOM.nextBytes(secreto);
+    String nuevoToken = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
+    s.setTokenHash(hashToken(nuevoToken));
+    String email = s.getEmailApoderado();
+    if (email != null && !email.isBlank() && correoSeguimiento != null) {
+      try {
+        correoSeguimiento.enviarActualizacionEstado(email.trim(), s.getId(), nuevoToken, s.getEstado().name(), mensajeDetalle);
+      } catch (RuntimeException ex) {
+        log.warn("No fue posible enviar notificaci\u00F3n de correo para la solicitud {} ({})",
+            s.getId(), ex.getClass().getSimpleName());
+      }
+    }
+    return nuevoToken;
   }
 
   @Scheduled(fixedDelayString = "${app.matricula-publica.reserva-limpieza-ms:60000}")
@@ -787,14 +850,22 @@ public class SolicitudMatriculaPublicaService {
     return !evidenciaCompleta(tipo, version);
   }
 
+  private static boolean esMimeAdmitido(String mimeType) {
+    return "application/pdf".equals(mimeType)
+        || "image/jpeg".equals(mimeType)
+        || "image/png".equals(mimeType)
+        || "image/webp".equals(mimeType);
+  }
+
   private boolean evidenciaCompleta(TipoDocumentoSolicitud tipo, DocumentoMatriculaVersionEntity version) {
-    if (version == null || !"application/pdf".equals(version.getMimeType())
+    if (version == null || !esMimeAdmitido(version.getMimeType())
         || !Boolean.TRUE.equals(version.getIaValida())) return false;
     if (tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO) return true;
     if (!Boolean.TRUE.equals(version.getDniApiCoincide())) return false;
-    return tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
-        ? version.getEstadoFirma() == EstadoFirmaDigital.VALIDA && Boolean.TRUE.equals(version.getVinculoParentalCoincide())
-        : version.getEstadoFirma() == EstadoFirmaDigital.VALIDA || version.getEstadoFirma() == EstadoFirmaDigital.NO_APLICA;
+    return (version.getEstadoFirma() == EstadoFirmaDigital.VALIDA || version.getEstadoFirma() == EstadoFirmaDigital.NO_APLICA)
+        && (tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO || Boolean.TRUE.equals(version.getVinculoParentalCoincide()));
+
+
   }
 
   private boolean hayDocumentoObservado(SolicitudMatriculaPublicaEntity s) {

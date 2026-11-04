@@ -9,9 +9,13 @@ public interface SessionRepositoryPort {
 
   Sesion save(Sesion sesion);
 
+  boolean existsById(Long id);
+
   Optional<Sesion> findByTokenHash(String tokenHash);
 
   void deleteByUsuarioId(Long usuarioId);
+
+  void deleteByTokenHash(String tokenHash);
 
   void deleteExpiredSessions(LocalDateTime now);
 }

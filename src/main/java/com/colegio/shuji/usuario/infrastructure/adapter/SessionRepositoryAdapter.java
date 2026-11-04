@@ -45,6 +45,15 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
   }
 
   @Override
+  @org.springframework.transaction.annotation.Transactional(readOnly = true)
+  public boolean existsById(Long id) {
+    if (id == null) {
+      return false;
+    }
+    return jpaSesionRepository.existsById(id);
+  }
+
+  @Override
   public Optional<Sesion> findByTokenHash(String tokenHash) {
     return jpaSesionRepository.findByTokenHash(tokenHash).map(this::toDomain);
   }
@@ -53,6 +62,12 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
   public void deleteByUsuarioId(Long usuarioId) {
     auditoria.syncCurrentUserFromSecurityContext();
     jpaSesionRepository.deleteByUsuarioId(usuarioId);
+  }
+
+  @Override
+  public void deleteByTokenHash(String tokenHash) {
+    auditoria.syncCurrentUserFromSecurityContext();
+    jpaSesionRepository.deleteByTokenHash(tokenHash);
   }
 
   @Override

@@ -245,14 +245,14 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @PutMapping("/admin/{id}/asignar-seccion")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto asignarSeccion(
       @PathVariable UUID id, @Valid @RequestBody AsignarSeccionRequest request) {
     return solicitudes.asignarSeccion(id, request.seccionId());
   }
 
   @PutMapping("/admin/{id}/observar")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
       @PathVariable UUID id,
       @Valid @RequestBody ObservarSolicitudMatriculaPublicaRequestDto request) {
@@ -266,14 +266,24 @@ public class SolicitudMatriculaPublicaController {
     return solicitudes.historialDocumento(id, tipo);
   }
 
+@PostMapping("/admin/{id}/dar-visto-bueno")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  public SolicitudMatriculaPublicaAdminResponseDto darVistoBuenoAdmin(
+      @PathVariable UUID id, @RequestBody(required = false) DarVistoBuenoRequest request) {
+    String motivo = request != null ? request.motivo() : null;
+    return solicitudes.darVistoBuenoAdmin(id, motivo, actor.usuarioId());
+  }
+
+  public record DarVistoBuenoRequest(String motivo) {}
+
   @PostMapping("/admin/{id}/rechazar")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public void rechazarAdmin(@PathVariable UUID id) {
     solicitudes.rechazarAdmin(id);
   }
 
   @PostMapping("/admin/{id}/autorizar-excepcion-edad")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto autorizarExcepcionEdad(
       @PathVariable UUID id, @Valid @RequestBody AutorizarExcepcionEdadRequest request) {
     return solicitudes.autorizarExcepcionEdad(id, request.motivo(), actor.usuarioId());

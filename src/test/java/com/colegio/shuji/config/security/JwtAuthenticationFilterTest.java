@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.colegio.shuji.config.persistence.SupabaseAuditInterceptor;
+import com.colegio.shuji.usuario.application.port.out.SessionRepositoryPort;
 import com.colegio.shuji.usuario.application.port.out.UserRepositoryPort;
 import com.colegio.shuji.usuario.domain.model.Rol;
 import com.colegio.shuji.usuario.domain.model.Usuario;
@@ -118,6 +119,65 @@ class JwtAuthenticationFilterTest {
 
     var filter = new JwtAuthenticationFilter(tokenProvider, auditInterceptor, userRepository);
     var request = new MockHttpServletRequest("POST", "/api/v1/auth/cambiar-password-inicial");
+    request.addHeader("Authorization", "Bearer " + accessToken);
+    var response = new MockHttpServletResponse();
+    var chainContinued = new AtomicBoolean();
+
+    filter.doFilter(request, response, (req, res) -> chainContinued.set(true));
+
+    assertTrue(chainContinued.get());
+    assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+  }
+
+  @Test
+  void sesionRevocadaRetorna401Inmediatamente() throws Exception {
+    Long sessionId = 999L;
+    String accessToken =
+        tokenProvider.generateToken(10L, "docente_carlos", java.util.List.of("DOCENTE"), sessionId);
+    var userRepository = mock(UserRepositoryPort.class);
+    var auditInterceptor = mock(SupabaseAuditInterceptor.class);
+    var sessionRepository = mock(SessionRepositoryPort.class);
+
+    when(sessionRepository.existsById(sessionId)).thenReturn(false);
+
+    var filter =
+        new JwtAuthenticationFilter(tokenProvider, auditInterceptor, userRepository, sessionRepository);
+    var request = new MockHttpServletRequest("GET", "/api/v1/usuarios/me");
+    request.addHeader("Authorization", "Bearer " + accessToken);
+    var response = new MockHttpServletResponse();
+    var chainContinued = new AtomicBoolean();
+
+    filter.doFilter(request, response, (req, res) -> chainContinued.set(true));
+
+    assertFalse(chainContinued.get());
+    assertEquals(401, response.getStatus());
+    assertTrue(response.getContentAsString().contains("SESSION_REVOKED"));
+    assertTrue(response.getContentAsString().contains("Sesión cerrada o token revocado"));
+    verifyNoInteractions(userRepository, auditInterceptor);
+  }
+
+  @Test
+  void sesionActivaPermiteAcceso() throws Exception {
+    Long sessionId = 888L;
+    String accessToken =
+        tokenProvider.generateToken(10L, "docente_carlos", java.util.List.of("DOCENTE"), sessionId);
+    var userRepository = mock(UserRepositoryPort.class);
+    var auditInterceptor = mock(SupabaseAuditInterceptor.class);
+    var sessionRepository = mock(SessionRepositoryPort.class);
+
+    when(sessionRepository.existsById(sessionId)).thenReturn(true);
+    Usuario usuario =
+        Usuario.builder()
+            .id(10L)
+            .username("docente_carlos")
+            .activo(true)
+            .roles(Set.of(Rol.builder().id((short) 2).codigo("DOCENTE").build()))
+            .build();
+    when(userRepository.obtenerPorId(10L)).thenReturn(Optional.of(usuario));
+
+    var filter =
+        new JwtAuthenticationFilter(tokenProvider, auditInterceptor, userRepository, sessionRepository);
+    var request = new MockHttpServletRequest("GET", "/api/v1/usuarios/me");
     request.addHeader("Authorization", "Bearer " + accessToken);
     var response = new MockHttpServletResponse();
     var chainContinued = new AtomicBoolean();
