@@ -1,5 +1,6 @@
 package com.colegio.shuji.matricula.infrastructure.service;
 
+import com.colegio.shuji.matricula.domain.service.PoliticaAdmision;
 import com.colegio.shuji.academico.application.dto.out.AnioLectivoResponseDto;
 import com.colegio.shuji.academico.infrastructure.repository.JpaAnioLectivoRepository;
 import com.colegio.shuji.academico.infrastructure.repository.JpaSeccionRepository;
@@ -15,6 +16,7 @@ import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublica
 import com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto;
 import com.colegio.shuji.matricula.application.port.out.GeminiDocumentoMatriculaPort;
 import com.colegio.shuji.matricula.application.port.out.FirmaDigitalDocumentoPort;
+import com.colegio.shuji.matricula.application.port.out.CuentaApoderadoPort;
 import com.colegio.shuji.matricula.application.port.out.SeguimientoSolicitudCorreoPort;
 import com.colegio.shuji.matricula.application.dto.out.VersionDocumentoMatriculaResponseDto;
 import com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital;
@@ -23,6 +25,7 @@ import com.colegio.shuji.matricula.infrastructure.repository.JpaDocumentoMatricu
 import com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica;
 import com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento;
 import com.colegio.shuji.matricula.domain.enums.Genero;
+import com.colegio.shuji.matricula.domain.enums.ModalidadIngreso;
 import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
@@ -100,8 +103,29 @@ public class SolicitudMatriculaPublicaService {
   @Autowired(required = false)
   private SeguimientoSolicitudCorreoPort correoSeguimiento;
 
+  @Autowired(required = false)
+  private CuentaApoderadoPort cuentaApoderadoPort;
+
+  @Autowired(required = false)
+  private com.colegio.shuji.tesoreria.infrastructure.adapter.ComprobanteMatriculaPdfAdapter comprobantePdfAdapter;
+
+  public void setComprobantePdfAdapter(com.colegio.shuji.tesoreria.infrastructure.adapter.ComprobanteMatriculaPdfAdapter comprobantePdfAdapter) {
+    this.comprobantePdfAdapter = comprobantePdfAdapter;
+  }
+
+  public void setCuentaApoderadoPort(CuentaApoderadoPort cuentaApoderadoPort) {
+    this.cuentaApoderadoPort = cuentaApoderadoPort;
+  }
+
+  public void setCorreoSeguimiento(SeguimientoSolicitudCorreoPort correoSeguimiento) {
+    this.correoSeguimiento = correoSeguimiento;
+  }
+
   @Value("${app.matricula-publica.monto-matricula:350.00}")
   private BigDecimal montoMatriculaPublica = new BigDecimal("350.00");
+
+  @Value("${app.matricula-publica.monto-cobro:350.00}")
+  private BigDecimal montoCobroMatriculaPublica = new BigDecimal("350.00");
 
   @Value("${app.matricula-publica.duracion-reserva-minutos:30}")
   private long duracionReservaMinutos;
@@ -109,15 +133,57 @@ public class SolicitudMatriculaPublicaService {
   @Value("${app.matricula-publica.validar-edad:false}")
   private boolean validarEdad;
 
+  @Value("${integraciones.pagos.mercadopago.sandbox:false}")
+  private boolean mercadoPagoSandbox;
+
   @Transactional(readOnly = true)
   public CatalogoMatriculaPublicaResponseDto catalogo() {
     var aniosAbiertos = anios.findAll().stream()
         .filter(a -> Boolean.TRUE.equals(a.getAbierto()))
+        .filter(a -> PoliticaAdmision.admiteNuevasMatriculas(a.getAnio()))
         .map(a -> new AnioLectivoResponseDto(a.getId(), a.getAnio(), a.getFechaInicio(), a.getFechaFin(), a.getAbierto()))
         .toList();
+    var comparadorSeccion = java.util.Comparator
+        .<com.colegio.shuji.academico.infrastructure.entity.SeccionEntity, Integer>comparing(s -> {
+          var g = s.getRelacion1();
+          var n = g == null ? null : g.getRelacion0();
+          if (n != null) {
+            if (n.getCodigo() != null) {
+              return switch (n.getCodigo()) {
+                case INICIAL -> 1;
+                case PRIMARIA -> 2;
+                case SECUNDARIA -> 3;
+              };
+            }
+            if (n.getNombre() != null) {
+              String nombre = n.getNombre().toUpperCase(java.util.Locale.ROOT);
+              if (nombre.contains("INICIAL")) return 1;
+              if (nombre.contains("PRIMARIA")) return 2;
+              if (nombre.contains("SECUNDARIA")) return 3;
+            }
+          }
+          return 999;
+        })
+        .thenComparingInt(s -> {
+          var g = s.getRelacion1();
+          if (g != null && g.getNumeroGrado() != null) {
+            return g.getNumeroGrado();
+          }
+          if (g != null && g.getNombre() != null) {
+            var m = java.util.regex.Pattern.compile("\\d+").matcher(g.getNombre());
+            if (m.find()) {
+              return Integer.parseInt(m.group());
+            }
+          }
+          return 999;
+        })
+        .thenComparing(com.colegio.shuji.academico.infrastructure.entity.SeccionEntity::getLetra, java.util.Comparator.nullsLast(String::compareToIgnoreCase))
+        .thenComparing(s -> s.getId() == null ? 0 : s.getId());
+
     var opciones = aniosAbiertos.stream()
         .flatMap(a -> secciones.buscarPorAnioLectivoId(a.id()).stream())
         .filter(s -> s.getCupoMaximo() > s.getVacantesOcupadas())
+        .sorted(comparadorSeccion)
         .map(s -> {
           var grado = s.getRelacion1();
           var nivel = grado == null ? null : grado.getRelacion0();
@@ -140,6 +206,10 @@ public class SolicitudMatriculaPublicaService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Año lectivo inexistente"));
     if (!Boolean.TRUE.equals(anio.getAbierto())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El año lectivo no admite matrículas");
+    }
+    if (!PoliticaAdmision.admiteNuevasMatriculas(anio.getAnio())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          PoliticaAdmision.mensajeAnioNoDisponible());
     }
     var seccionesGrado = secciones.buscarPorAnioLectivoId(r.anioLectivoId());
     var seccion = seccionesGrado.stream()
@@ -167,6 +237,14 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una solicitud en trámite para este DNI. Puedes solicitar el reenvío de tu enlace de seguimiento.");
     }
 
+    ModalidadIngreso modalidad = r.modalidadIngreso() != null ? r.modalidadIngreso() : ModalidadIngreso.REGULAR;
+    String colegioProcedencia = r.colegioProcedencia() == null ? null : r.colegioProcedencia().trim();
+    if (colegioProcedencia != null && colegioProcedencia.isEmpty()) colegioProcedencia = null;
+    if (modalidad == ModalidadIngreso.TRASLADO && (colegioProcedencia == null || colegioProcedencia.length() < 3)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "En solicitudes por traslado debes indicar el colegio de procedencia");
+    }
+
     byte[] secreto = new byte[32];
     RANDOM.nextBytes(secreto);
     String token = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
@@ -180,6 +258,8 @@ public class SolicitudMatriculaPublicaService {
     s.setAnioLectivoId(r.anioLectivoId());
     s.setGradoId(r.gradoId());
     s.setSeccionId(null);
+    s.setModalidadIngreso(modalidad);
+    s.setColegioProcedencia(colegioProcedencia);
     s.setNumeroDocumentoEstudiante(r.numeroDocumentoEstudiante().trim());
     s.setNombresEstudiante(r.nombresEstudiante().trim());
     s.setApellidoPaternoEstudiante(r.apellidoPaternoEstudiante().trim());
@@ -200,13 +280,29 @@ public class SolicitudMatriculaPublicaService {
     s.setParentesco(r.parentesco());
     s.setConsentimientoGemini(r.consentimientoGemini());
     s.setPagoMonto(obtenerMontoMatriculaPublica());
+    SolicitudMatriculaPublicaEntity guardada;
     try {
-      return respuesta(solicitudes.saveAndFlush(s), token);
+      guardada = solicitudes.saveAndFlush(s);
     } catch (DataIntegrityViolationException ex) {
       // Una solicitud simultánea en otra sección puede ganar el índice único del DNI.
       throw new ResponseStatusException(HttpStatus.CONFLICT,
           "La solicitud entra en conflicto con un registro existente; consulta tu expediente antes de reintentar", ex);
     }
+    String email = guardada.getEmailApoderado();
+    if (email != null && !email.isBlank()) {
+      if (correoSeguimiento == null) {
+        log.warn("Solicitud {} creada; adaptador de correo no disponible, se devuelve enlace de seguimiento",
+            guardada.getId());
+      } else {
+        try {
+          correoSeguimiento.enviarEnlaceSeguimiento(email.trim(), guardada.getId(), token);
+        } catch (RuntimeException ex) {
+          log.warn("Solicitud {} creada; no se pudo enviar el enlace SMTP ({})",
+              guardada.getId(), ex.getClass().getSimpleName());
+        }
+      }
+    }
+    return respuesta(guardada, token);
   }
 
   private ReglaEdadMatricula.Rango limitesEdad(
@@ -223,7 +319,11 @@ public class SolicitudMatriculaPublicaService {
 
   @Transactional(readOnly = true)
   public PreparacionDocumento prepararValidacion(UUID id, String token, TipoDocumentoSolicitud tipo) {
+    if (!TipoDocumentoSolicitud.REQUERIDOS_TRASLADO.contains(tipo)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de documento no admitido para esta operación");
     var s = solicitudConToken(id, token);
+    if (!s.tiposRequeridos().contains(tipo)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de documento no requerido para esta modalidad de ingreso");
+    }
     exigirProgenitor(s.getParentesco());
     if (!s.isConsentimientoGemini()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No se autorizó enviar los documentos a Gemini");
@@ -254,6 +354,24 @@ public class SolicitudMatriculaPublicaService {
       UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
       FirmaDigitalDocumentoPort.Resultado firma, Boolean dniApiCoincide, UUID versionEsperada,
       String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
+    return guardarResultadoDocumento(id, token, tipo, resultado, firma, dniApiCoincide, versionEsperada,
+        bucket, objectKey, mimeType, tamanoBytes, sha256, false);
+  }
+
+  @Transactional
+  public SolicitudMatriculaPublicaResponseDto guardarResultadoDocumentoPresentacion(
+      UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
+      FirmaDigitalDocumentoPort.Resultado firma, UUID versionEsperada,
+      String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256) {
+    return guardarResultadoDocumento(id, token, tipo, resultado, firma, null, versionEsperada,
+        bucket, objectKey, mimeType, tamanoBytes, sha256, true);
+  }
+
+  private SolicitudMatriculaPublicaResponseDto guardarResultadoDocumento(
+      UUID id, String token, TipoDocumentoSolicitud tipo, GeminiDocumentoMatriculaPort.Resultado resultado,
+      FirmaDigitalDocumentoPort.Resultado firma, Boolean dniApiCoincide, UUID versionEsperada,
+      String bucket, String objectKey, String mimeType, long tamanoBytes, String sha256,
+      boolean modoPresentacion) {
     if (!"application/pdf".equals(mimeType)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
         "Los tres documentos deben ser PDF");
 
@@ -272,6 +390,23 @@ public class SolicitudMatriculaPublicaService {
         || !java.util.Objects.equals(versionEsperada, actual.map(SolicitudMatriculaDocumentoEntity::getVersionId).orElse(null))) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "El documento fue actualizado o revisado; consulta el trámite nuevamente");
     }
+    boolean comprobarIdentidad = tipo == TipoDocumentoSolicitud.DNI_C4
+        || tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
+    boolean esProgenitor = s.getParentesco() == Parentesco.PADRE || s.getParentesco() == Parentesco.MADRE;
+    boolean vinculoAceptado = tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
+        || !esProgenitor
+        || Boolean.TRUE.equals(resultado.vinculoParentalCoincide());
+    boolean identidadAceptada = !modoPresentacion || !comprobarIdentidad
+        || (resultado.valido() && (tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO || vinculoAceptado));
+    String observacion = modoPresentacion
+        ? !comprobarIdentidad
+            ? "Modo presentación: archivo recibido; su contenido no se evaluó."
+            : identidadAceptada
+                ? tipo == TipoDocumentoSolicitud.DNI_C4
+                    ? "Modo presentación: identidad coincide; se compararon el DNI y nombre del estudiante."
+                    : "Modo presentación: identidad coincide; se compararon los nombres del estudiante y apoderado, y el DNI del apoderado si figura en el acta."
+                : "Modo presentación: identidad no coincide; revisa el DNI o los nombres declarados."
+        : resultado.observacion();
     var version = new DocumentoMatriculaVersionEntity();
     version.setId(UUID.randomUUID());
     version.setSolicitudId(id);
@@ -281,13 +416,15 @@ public class SolicitudMatriculaPublicaService {
     version.setMimeType(mimeType);
     version.setTamanoBytes(tamanoBytes);
     version.setSha256(sha256);
-    version.setIaValida(resultado.disponible() ? resultado.valido() : null);
-    version.setDniApiCoincide(dniApiCoincide);
+    version.setIaValida(modoPresentacion && !comprobarIdentidad
+        ? null : resultado.disponible() ? resultado.valido() : null);
+    version.setDniApiCoincide(modoPresentacion ? null : dniApiCoincide);
     version.setVinculoParentalCoincide(resultado.vinculoParentalCoincide());
-    version.setObservacionIa(resultado.observacion());
-    version.setEstadoFirma(firma.estado());
-    version.setDetalleFirma(firma.detalle());
-    version.setCertificadoSha256(firma.certificadoSha256());
+    version.setObservacionIa(observacion);
+    version.setEstadoFirma(modoPresentacion ? EstadoFirmaDigital.NO_APLICA : firma.estado());
+    version.setDetalleFirma(modoPresentacion
+        ? "No se verifica firma digital en el modo de presentación." : firma.detalle());
+    version.setCertificadoSha256(modoPresentacion ? null : firma.certificadoSha256());
     version.setFechaCarga(OffsetDateTime.now(ZoneOffset.UTC));
     versiones.saveAndFlush(version);
     var archivo = new SolicitudMatriculaDocumentoEntity();
@@ -300,21 +437,25 @@ public class SolicitudMatriculaPublicaService {
     archivo.setSha256(sha256);
     archivo.setFechaActualizacion(OffsetDateTime.now(ZoneOffset.UTC));
     documentos.save(archivo);
-    boolean firmaAceptada = firma.estado() == EstadoFirmaDigital.VALIDA
+    boolean firmaAceptada = modoPresentacion || firma.estado() == EstadoFirmaDigital.VALIDA
         || firma.estado() == EstadoFirmaDigital.NO_APLICA;
-    boolean dniAceptado = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || Boolean.TRUE.equals(dniApiCoincide);
-    boolean vinculoAceptado = tipo != TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
-        || Boolean.TRUE.equals(resultado.vinculoParentalCoincide());
-    boolean rechazo = Boolean.FALSE.equals(dniApiCoincide) || firma.estado() == EstadoFirmaDigital.INVALIDA
-        || Boolean.FALSE.equals(resultado.vinculoParentalCoincide())
-
-        || (resultado.disponible() && !resultado.valido());
-    boolean pendiente = !rechazo && (!dniAceptado || !vinculoAceptado || !resultado.disponible() || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
-        || firma.estado() == EstadoFirmaDigital.ERROR_SERVICIO);
+    boolean dniAceptado = modoPresentacion || tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
+        || Boolean.TRUE.equals(dniApiCoincide);
+    boolean rechazo = modoPresentacion ? !identidadAceptada
+        : Boolean.FALSE.equals(dniApiCoincide) || firma.estado() == EstadoFirmaDigital.INVALIDA
+            || (esProgenitor && Boolean.FALSE.equals(resultado.vinculoParentalCoincide()))
+            || (resultado.disponible() && !resultado.valido());
+    boolean pendiente = !modoPresentacion && !rechazo
+        && (!dniAceptado || !vinculoAceptado || !resultado.disponible()
+            || firma.estado() == EstadoFirmaDigital.NO_VERIFICABLE
+            || firma.estado() == EstadoFirmaDigital.ERROR_SERVICIO);
+    boolean aprobado = modoPresentacion ? identidadAceptada
+        : resultado.valido() && firmaAceptada && dniAceptado && vinculoAceptado;
     s.actualizarDocumento(tipo, pendiente ? EstadoValidacionDocumento.EN_VALIDACION
-        : resultado.valido() && firmaAceptada && dniAceptado && vinculoAceptado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
-        Boolean.FALSE.equals(dniApiCoincide) ? "El DNI y los nombres declarados no coinciden con la API de identidad."
-        : !firmaAceptada ? firma.detalle() : resultado.observacion());
+        : aprobado ? EstadoValidacionDocumento.VALIDADO : EstadoValidacionDocumento.OBSERVADO,
+        modoPresentacion ? observacion
+            : Boolean.FALSE.equals(dniApiCoincide) ? "El DNI y los nombres declarados no coinciden con la API de identidad."
+            : !firmaAceptada ? firma.detalle() : resultado.observacion());
 
 
     actualizarEtapaDocumental(s);
@@ -398,15 +539,48 @@ public class SolicitudMatriculaPublicaService {
   public String generarComprobanteHtml(UUID id, String token) {
     var s = solicitudConToken(id, token);
     validarDocumentosEmitidos(s);
+    boolean efectivo = s.getPagoId() != null && s.getPagoId().startsWith("CAJA");
     String filas = fila("Estudiante", nombreEstudiante(s))
         + fila("DNI del estudiante", s.getNumeroDocumentoEstudiante())
         + fila("Código de matrícula", "FIC-MAT-" + s.getMatriculaId())
-        + fila("Referencia de pago Mercado Pago", s.getPagoId())
-        + fila("Importe pagado", "S/ " + s.getPagoMonto().toPlainString() + " PEN")
+        + fila("Medio de pago", efectivo ? "Efectivo" : "Mercado Pago")
+        + fila("Referencia de pago", s.getPagoId())
+        + fila("Importe pagado", "S/ " + (s.isPresencial() || efectivo
+            ? s.getPagoMonto() : obtenerMontoCobroMatriculaPublica()).toPlainString() + " PEN")
+        + fila("Monto nominal de matrícula", "S/ " + s.getPagoMonto().toPlainString() + " PEN")
         + fila("Estado", "PAGO APROBADO Y VERIFICADO")
         + fila("Emitido", fechaDocumento(s.getFechaEmisionDocumentos()));
     String aviso = "Comprobante interno de pago. No es una boleta electrónica ni reemplaza un comprobante tributario emitido ante SUNAT.";
     return documentoHtml("Comprobante de pago de matrícula", s.getComprobantePagoCodigo(), filas, aviso);
+  }
+
+  @Transactional(readOnly = true)
+  public byte[] generarComprobantePdf(UUID id, String token) {
+    var s = solicitudConToken(id, token);
+    validarDocumentosEmitidos(s);
+    if (comprobantePdfAdapter == null) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Generador institucional de PDF no disponible");
+    }
+    String detalleGrado = resolverDetalleGrado(s);
+    var pdfDto = new com.colegio.shuji.tesoreria.application.dto.out.ComprobanteMatriculaPdfDto(
+        s.getComprobantePagoCodigo(),
+        "CONSTANCIA DE PAGO",
+        s.getFechaEmisionDocumentos(),
+        s.getPagoId() != null && s.getPagoId().startsWith("CAJA") ? "EFECTIVO - CAJA" : "MERCADO PAGO",
+        s.getPagoId(),
+        nombreApoderado(s),
+        s.getNumeroDocumentoApoderado(),
+        s.getEmailApoderado(),
+        s.getCelularApoderado(),
+        s.getDireccionApoderado(),
+        nombreEstudiante(s),
+        s.getNumeroDocumentoEstudiante(),
+        detalleGrado,
+        "FIC-MAT-" + s.getMatriculaId(),
+        s.getPagoMonto(),
+        "Derecho de Matricula Escolar"
+    );
+    return comprobantePdfAdapter.generarPdf(pdfDto);
   }
 
   @Transactional(readOnly = true)
@@ -462,17 +636,29 @@ public class SolicitudMatriculaPublicaService {
         "Los documentos todavía no completaron la verificación automática");
     exigirEvidenciaDocumental(s);
     var ahora = OffsetDateTime.now(ZoneOffset.UTC);
-    if (s.isVacanteReservada() && s.getFechaExpiracionPago() != null && s.getFechaExpiracionPago().isAfter(ahora)
+    if (s.getFechaExpiracionPago() != null && s.getFechaExpiracionPago().isAfter(ahora)
         && s.getPagoEnlace() != null && !s.getPagoEnlace().isBlank()) {
       return pagoResponse(s);
     }
     // La sección se asigna después del pago por Secretaría; el checkout no consume vacantes.
     if (s.isVacanteReservada()) liberarReserva(s);
-    s.setFechaExpiracionPago(ahora.plusMinutes(Math.max(5, duracionReservaMinutos)));
-    s.setPagoMonto(obtenerMontoMatriculaPublica());
+    s.setFechaExpiracionPago(ahora.plusHours(24));
+    BigDecimal montoCheckout = obtenerMontoCobroMatriculaPublica();
+    s.setPagoMonto(s.isPresencial() ? montoCheckout : obtenerMontoMatriculaPublica());
     String referencia = REFERENCIA_PAGO_PREFIX + s.getId();
-    var preferencia = mercadoPago.crearPreferenciaMatriculaPublica(
-        referencia, obtenerMontoMatriculaPublica(), "Derecho de matrícula escolar");
+    com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto preferencia;
+    try {
+      preferencia = mercadoPago.crearPreferenciaMatriculaPublica(
+          referencia, montoCheckout, "Derecho de matrícula escolar");
+    } catch (BusinessException ex) {
+      if (!mercadoPagoSandbox) {
+        throw ex;
+      }
+      log.warn("Usando preferencia sandbox simulada para solicitud {} ({})", s.getId(), ex.getMessage());
+      String enlaceSim = "https://sandbox.mercadopago.com.pe/checkout/v1/redirect?pref_id=SIM-" + s.getId();
+      preferencia = new com.colegio.shuji.tesoreria.application.dto.out.PreferenciaMercadoPagoResponseDto(
+          "SIM-PREF-" + s.getId(), enlaceSim, enlaceSim, null);
+    }
     s.setPagoPreferenciaId(preferencia.preferenceId());
     if (preferencia.initPoint() == null || preferencia.initPoint().isBlank()) {
       throw new BusinessException("Mercado Pago no devolvió el enlace de pago para la matrícula");
@@ -481,6 +667,60 @@ public class SolicitudMatriculaPublicaService {
     s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
     solicitudes.saveAndFlush(s);
     return pagoResponse(s);
+  }
+
+  @Transactional
+  public SolicitudMatriculaPublicaResponseDto simularPago(
+      UUID id,
+      String token,
+      com.colegio.shuji.tesoreria.domain.enums.MetodoPago metodo,
+      String referenciaOperacion) {
+    if (!mercadoPagoSandbox) {
+      throw new ResponseStatusException(
+          HttpStatus.FORBIDDEN, "La simulación de pagos solo está habilitada en entorno sandbox");
+    }
+    if (metodo == null || metodo == com.colegio.shuji.tesoreria.domain.enums.MetodoPago.EFECTIVO) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "Selecciona un medio de pago en línea válido");
+    }
+    var s = solicitudConTokenBloqueada(id, token);
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA) {
+      return respuesta(s, null);
+    }
+    if (s.getEstado() != EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
+        && s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "Completa la verificación automática de los documentos antes del pago");
+    }
+    if (!todosDocumentosValidados(s)) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "Los documentos todavía no completaron la verificación automática");
+    }
+    exigirEvidenciaDocumental(s);
+    BigDecimal montoCheckout = s.isPresencial() && s.getPagoMonto() != null
+        ? s.getPagoMonto()
+        : obtenerMontoCobroMatriculaPublica();
+    if (s.getPagoMonto() == null) {
+      s.setPagoMonto(s.isPresencial() ? montoCheckout : obtenerMontoMatriculaPublica());
+    }
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS) {
+      s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_PENDIENTE);
+      solicitudes.saveAndFlush(s);
+    }
+    String sufijo = referenciaOperacion != null && !referenciaOperacion.isBlank()
+        ? referenciaOperacion.trim().replaceAll("[^A-Za-z0-9_-]", "")
+        : UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+    String txId = "SIM-" + metodo.name() + "-" + sufijo;
+    var pago = new PagoVerificado(
+        txId.length() > 64 ? txId.substring(0, 64) : txId,
+        null,
+        montoCheckout,
+        "PEN",
+        metodo,
+        true,
+        REFERENCIA_PAGO_PREFIX + s.getId());
+    return finalizarPagoVerificado(id, token, pago);
   }
 
   @Transactional
@@ -504,11 +744,12 @@ public class SolicitudMatriculaPublicaService {
     if (!todosDocumentosValidados(s)) throw new ResponseStatusException(HttpStatus.CONFLICT,
         "Pago recibido; la documentación requiere conciliación administrativa");
     exigirEvidenciaDocumental(s);
-    if (pago.monto() == null || s.getPagoMonto() == null || pago.monto().compareTo(s.getPagoMonto()) != 0
+    BigDecimal montoEsperado = s.isPresencial() ? s.getPagoMonto() : obtenerMontoCobroMatriculaPublica();
+    if (pago.monto() == null || pago.monto().compareTo(montoEsperado) != 0
         || !"PEN".equalsIgnoreCase(pago.moneda())) {
       throw new ResponseStatusException(
           HttpStatus.CONFLICT,
-          "El pago debe coincidir con S/ " + obtenerMontoMatriculaPublica().toPlainString() + " PEN");
+          "El pago debe coincidir con S/ " + montoEsperado.toPlainString() + " PEN");
     }
     if (s.isVacanteReservada()) liberarReserva(s);
 
@@ -524,21 +765,24 @@ public class SolicitudMatriculaPublicaService {
     }
 
     var existentes = estudiantes.buscarPorNumeroDocumento(s.getNumeroDocumentoEstudiante());
-    if (!existentes.isEmpty()) {
+    var estudiante = existentes.isEmpty() ? new EstudianteEntity() : existentes.getFirst();
+    if (!existentes.isEmpty() && (!s.isPresencial()
+        || matriculas.existsByEstudianteIdAndAnioLectivoId(estudiante.getId(), s.getAnioLectivoId()))) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Pago confirmado; el DNI del estudiante requiere conciliación administrativa");
     }
-    var estudiante = new EstudianteEntity();
-    estudiante.setTipoDocumento(TipoDocumento.DNI);
-    estudiante.setNumeroDocumento(s.getNumeroDocumentoEstudiante());
-    estudiante.setNombres(s.getNombresEstudiante());
-    estudiante.setApellidoPaterno(s.getApellidoPaternoEstudiante());
-    estudiante.setApellidoMaterno(s.getApellidoMaternoEstudiante());
-    estudiante.setFechaNacimiento(s.getFechaNacimientoEstudiante());
-    estudiante.setGenero(s.getGeneroEstudiante());
-    estudiante.setValidadoReniec(false);
-    estudiante.setOrigenRegistro(OrigenRegistro.MANUAL_CONTINGENCIA);
-    estudiante.setActivo(true);
-    estudiante = estudiantes.saveAndFlush(estudiante);
+    if (existentes.isEmpty()) {
+      estudiante.setTipoDocumento(TipoDocumento.DNI);
+      estudiante.setNumeroDocumento(s.getNumeroDocumentoEstudiante());
+      estudiante.setNombres(s.getNombresEstudiante());
+      estudiante.setApellidoPaterno(s.getApellidoPaternoEstudiante());
+      estudiante.setApellidoMaterno(s.getApellidoMaternoEstudiante());
+      estudiante.setFechaNacimiento(s.getFechaNacimientoEstudiante());
+      estudiante.setGenero(s.getGeneroEstudiante());
+      estudiante.setValidadoReniec(false);
+      estudiante.setOrigenRegistro(OrigenRegistro.MANUAL_CONTINGENCIA);
+      estudiante.setActivo(true);
+      estudiante = estudiantes.saveAndFlush(estudiante);
+    }
 
     var apoderado = apoderados.buscarPorNumeroDocumento(s.getNumeroDocumentoApoderado()).stream()
         .findFirst().orElse(null);
@@ -561,21 +805,61 @@ public class SolicitudMatriculaPublicaService {
       apoderado = apoderados.saveAndFlush(apoderado);
     }
 
-    var vinculo = new EstudianteApoderadoEntity();
-    vinculo.setEstudianteId(estudiante.getId());
-    vinculo.setApoderadoId(apoderado.getId());
-    vinculo.setParentesco(s.getParentesco());
-    vinculo.setEsResponsableEconomico(true);
-    vinculo.setTieneCustodia(true);
-    vinculo.setPermiteRecojo(true);
-    vinculos.saveAndFlush(vinculo);
+    String passwordTemporal = null;
+    String usernameApoderado = null;
+    if (cuentaApoderadoPort != null && s.getEmailApoderado() != null && !s.getEmailApoderado().isBlank()) {
+      try {
+        var creds = cuentaApoderadoPort.asegurarCuentaApoderado(
+            s.getNumeroDocumentoApoderado(),
+            s.getEmailApoderado(),
+            s.getNombresApoderado(),
+            s.getApellidoPaternoApoderado(),
+            s.getApellidoMaternoApoderado(),
+            s.getCelularApoderado(),
+            s.getDireccionApoderado());
+        if (creds != null && creds.usuarioId() != null) {
+          apoderado.setUsuarioId(creds.usuarioId());
+          apoderado = apoderados.saveAndFlush(apoderado);
+          passwordTemporal = creds.passwordTemporal();
+          usernameApoderado = creds.username();
+        }
+      } catch (Exception ex) {
+        log.warn("No se pudo aprovisionar usuario institucional para apoderado {}: {}",
+            s.getNumeroDocumentoApoderado(), ex.getMessage());
+      }
+    }
 
+    Long apoderadoId = apoderado.getId();
+    boolean vinculado = vinculos.buscarPorEstudianteId(estudiante.getId()).stream()
+        .anyMatch(v -> apoderadoId.equals(v.getApoderadoId()));
+    if (!vinculado) {
+      var vinculo = new EstudianteApoderadoEntity();
+      vinculo.setEstudianteId(estudiante.getId());
+      vinculo.setApoderadoId(apoderado.getId());
+      vinculo.setParentesco(s.getParentesco());
+      vinculo.setEsResponsableEconomico(true);
+      vinculo.setTieneCustodia(true);
+      vinculo.setPermiteRecojo(true);
+      vinculos.saveAndFlush(vinculo);
+    }
+
+    var seccion = s.isPresencial() && s.getSeccionId() != null
+        ? secciones.bloquearPorId(s.getSeccionId())
+            .filter(aula -> aula.getAnioLectivoId().equals(s.getAnioLectivoId())
+                && aula.getGradoId().equals(s.getGradoId())
+                && aula.getVacantesOcupadas() < aula.getCupoMaximo()).orElse(null)
+        : null;
     var matricula = new MatriculaEntity();
     matricula.setAnioLectivoId(s.getAnioLectivoId());
     matricula.setEstudianteId(estudiante.getId());
-    matricula.setSeccionId(null);
-    matricula.setEstadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION);
-    matricula.setObservaciones("Pago de matrícula confirmado; pendiente asignar grado y aula por Secretaría");
+    matricula.setSeccionId(seccion == null ? null : seccion.getId());
+    matricula.setModalidadIngreso(s.getModalidadIngreso() != null ? s.getModalidadIngreso() : ModalidadIngreso.REGULAR);
+    matricula.setColegioProcedencia(s.getColegioProcedencia());
+    matricula.setEstadoMatricula(seccion == null
+        ? com.colegio.shuji.matricula.domain.enums.EstadoMatricula.PENDIENTE_ASIGNACION
+        : com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO);
+    matricula.setObservaciones(seccion == null ? "Pago confirmado; pendiente asignar aula por Secretaría"
+        : "Matrícula presencial con pago confirmado por Mercado Pago");
     matricula = matriculas.saveAndFlush(matricula);
 
     s.setPagoId(pago.transaccionId());
@@ -584,9 +868,71 @@ public class SolicitudMatriculaPublicaService {
     s.setMatriculaId(matricula.getId());
     s.setComprobantePagoCodigo(cobrosMatricula.registrar(matricula.getId(), s.getPagoMonto(), pago));
     s.setFechaEmisionDocumentos(OffsetDateTime.now(ZoneOffset.UTC));
-    s.setEstado(EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION);
+    s.setSeccionId(matricula.getSeccionId());
+    s.setEstado(seccion == null ? EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
+        : EstadoSolicitudMatriculaPublica.MATRICULADA);
     s.setFechaExpiracionPago(null);
-    return respuesta(solicitudes.saveAndFlush(s), null);
+    String tokenSeguimiento = token;
+    if (tokenSeguimiento == null || tokenSeguimiento.isBlank()) {
+      byte[] secreto = new byte[32];
+      RANDOM.nextBytes(secreto);
+      tokenSeguimiento = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
+      s.setTokenHash(hashToken(tokenSeguimiento));
+    }
+
+    var guardada = solicitudes.saveAndFlush(s);
+
+    if (correoSeguimiento != null && guardada.getEmailApoderado() != null
+        && !guardada.getEmailApoderado().isBlank()) {
+      try {
+        String detalleGrado = resolverDetalleGrado(guardada);
+        detalleGrado += seccion == null ? " · Sección pendiente" : " · Sección " + seccion.getLetra();
+        byte[] pdfBytes = null;
+        String nombrePdf = "Constancia_Matricula_" + guardada.getComprobantePagoCodigo() + ".pdf";
+        if (comprobantePdfAdapter != null) {
+          try {
+            var pdfDto = new com.colegio.shuji.tesoreria.application.dto.out.ComprobanteMatriculaPdfDto(
+                guardada.getComprobantePagoCodigo(),
+                "BOLETA DE VENTA ELECTRONICA",
+                guardada.getFechaEmisionDocumentos(),
+                "MERCADO PAGO",
+                guardada.getPagoId(),
+                nombreApoderado(guardada),
+                guardada.getNumeroDocumentoApoderado(),
+                guardada.getEmailApoderado(),
+                guardada.getCelularApoderado(),
+                guardada.getDireccionApoderado(),
+                nombreEstudiante(guardada),
+                guardada.getNumeroDocumentoEstudiante(),
+                detalleGrado,
+                "FIC-MAT-" + guardada.getMatriculaId(),
+                guardada.getPagoMonto(),
+                "Derecho de Matricula Escolar"
+            );
+            pdfBytes = comprobantePdfAdapter.generarPdf(pdfDto, usernameApoderado, passwordTemporal);
+          } catch (Exception exPdf) {
+            log.warn("No fue posible compilar PDF del voucher para la solicitud {}: {}", guardada.getId(), exPdf.getMessage());
+          }
+        }
+        if (pdfBytes == null) throw new IllegalStateException("No se generó la constancia de pago");
+        correoSeguimiento.enviarCredencialesMatricula(
+            guardada.getEmailApoderado().trim(),
+            nombreApoderado(guardada),
+            nombreEstudiante(guardada),
+            passwordTemporal,
+            detalleGrado,
+            guardada.getComprobantePagoCodigo(),
+            guardada.getId(),
+            tokenSeguimiento,
+            pdfBytes,
+            nombrePdf);
+      } catch (Exception ex) {
+        log.warn("No fue posible enviar correo de confirmación de matrícula para solicitud {}: {}",
+            guardada.getId(), ex.getMessage());
+      }
+    }
+
+    return respuesta(guardada, null);
   }
 
   @Transactional(readOnly = true)
@@ -599,7 +945,8 @@ public class SolicitudMatriculaPublicaService {
             nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(),
             s.getAnioLectivoId(), s.getGradoId(), s.getSeccionId(), documentos(s, archivos), s.getFechaCreacion(),
             s.getEstudianteId(), s.getMatriculaId(), s.isRequiereAutorizacionEdad(),
-            s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(), s.getFechaAutorizacionEdad())).toList();
+            s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(), s.getFechaAutorizacionEdad(),
+            s.getModalidadIngreso(), s.getColegioProcedencia())).toList();
   }
 
   @Transactional
@@ -639,7 +986,7 @@ public class SolicitudMatriculaPublicaService {
     matriculas.saveAndFlush(matricula);
     solicitud.setSeccionId(seccionId);
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.MATRICULADA);
-    rotarTokenYNotificar(solicitud, "Â¡Felicitaciones! Se ha asignado aula a tu matrÃ­cula para el presente aÃ±o lectivo.");
+    rotarTokenYNotificar(solicitud, "¡Felicitaciones! Se ha asignado aula a tu matrícula para el presente año lectivo.");
     return adminResponse(solicitudes.saveAndFlush(solicitud));
   }
 
@@ -673,6 +1020,7 @@ public class SolicitudMatriculaPublicaService {
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
       UUID id, ObservarSolicitudMatriculaPublicaRequestDto r) {
     var s = solicitudes.bloquearPorId(id).orElseThrow(() -> noEncontrada());
+    if (!s.tiposRequeridos().contains(r.tipo())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de documento no admitido para esta modalidad de solicitud");
     if (s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
         || s.getEstado() == EstadoSolicitudMatriculaPublica.MATRICULADA
         || s.getEstado() == EstadoSolicitudMatriculaPublica.RECHAZADA) {
@@ -707,7 +1055,7 @@ public class SolicitudMatriculaPublicaService {
         || s.getEstado() == EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud ya se encuentra tramitada o cerrada");
     }
-    for (TipoDocumentoSolicitud tipo : TipoDocumentoSolicitud.values()) {
+    for (TipoDocumentoSolicitud tipo : s.tiposRequeridos()) {
       s.actualizarDocumento(tipo, EstadoValidacionDocumento.VALIDADO,
           "Validado con visto bueno institucional.");
       var docOpt = documentos.findById(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
@@ -737,20 +1085,27 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private String rotarTokenYNotificar(SolicitudMatriculaPublicaEntity s, String mensajeDetalle) {
+    String email = s.getEmailApoderado();
+    if (email == null || email.isBlank()) {
+      log.warn("No se rotó el token de la solicitud {} porque no hay correo de seguimiento disponible", s.getId());
+      return null;
+    }
+    if (correoSeguimiento == null) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+          "El servicio de correo no está disponible; intenta nuevamente");
+    }
     byte[] secreto = new byte[32];
     RANDOM.nextBytes(secreto);
     String nuevoToken = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
-    s.setTokenHash(hashToken(nuevoToken));
-    String email = s.getEmailApoderado();
-    if (email != null && !email.isBlank() && correoSeguimiento != null) {
-      try {
-        correoSeguimiento.enviarActualizacionEstado(email.trim(), s.getId(), nuevoToken, s.getEstado().name(), mensajeDetalle);
-      } catch (RuntimeException ex) {
-        log.warn("No fue posible enviar notificaci\u00F3n de correo para la solicitud {} ({})",
-            s.getId(), ex.getClass().getSimpleName());
-      }
+    try {
+      correoSeguimiento.enviarActualizacionEstado(email.trim(), s.getId(), nuevoToken, s.getEstado().name(), mensajeDetalle);
+      s.setTokenHash(hashToken(nuevoToken));
+      return nuevoToken;
+    } catch (RuntimeException ex) {
+      log.warn("No fue posible enviar notificaci\u00F3n de correo para la solicitud {} ({})",
+          s.getId(), ex.getClass().getSimpleName());
+      return null;
     }
-    return nuevoToken;
   }
 
   @Scheduled(fixedDelayString = "${app.matricula-publica.reserva-limpieza-ms:60000}")
@@ -826,9 +1181,8 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private boolean todosDocumentosValidados(SolicitudMatriculaPublicaEntity s) {
-    return s.getEstadoPartida() == EstadoValidacionDocumento.VALIDADO
-        && s.getEstadoDniC4() == EstadoValidacionDocumento.VALIDADO
-        && s.getEstadoRecibo() == EstadoValidacionDocumento.VALIDADO;
+    return s.tiposRequeridos().stream()
+        .allMatch(tipo -> s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO);
   }
 
   private void exigirProgenitor(Parentesco parentesco) {
@@ -839,12 +1193,14 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private void exigirEvidenciaDocumental(SolicitudMatriculaPublicaEntity s) {
-    exigirProgenitor(s.getParentesco());
+    if (!s.isPresencial()) exigirProgenitor(s.getParentesco());
     var actuales = cargarVersiones(List.of(s.getId()));
-    for (var tipo : TipoDocumentoSolicitud.values()) {
+    for (var tipo : s.tiposRequeridos()) {
       var version = actuales.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
       if (!evidenciaCompleta(tipo, version)) throw new ResponseStatusException(HttpStatus.CONFLICT,
-          "Revalida los tres PDF y el vínculo del padre o madre antes de continuar");
+          s.getModalidadIngreso() == ModalidadIngreso.TRASLADO
+              ? "Revalida los cuatro PDF (incluido el certificado de estudios o libreta) y el vínculo del padre o madre antes de continuar"
+              : "Revalida los tres PDF y el vínculo del padre o madre antes de continuar");
     }
   }
 
@@ -862,8 +1218,14 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private boolean evidenciaCompleta(TipoDocumentoSolicitud tipo, DocumentoMatriculaVersionEntity version) {
-    if (version == null || !esMimeAdmitido(version.getMimeType())
-        || !Boolean.TRUE.equals(version.getIaValida())) return false;
+    if (version == null || !esMimeAdmitido(version.getMimeType())) return false;
+    String observacion = version.getObservacionIa();
+    boolean evidenciaPresentacion = "No se verifica firma digital en el modo de presentación."
+        .equals(version.getDetalleFirma());
+    if (evidenciaPresentacion && observacion != null
+        && (observacion.startsWith("Modo presentación: identidad coincide")
+            || observacion.startsWith("Modo presentación: archivo recibido"))) return true;
+    if (!Boolean.TRUE.equals(version.getIaValida())) return false;
     if (tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO) return true;
     if (!Boolean.TRUE.equals(version.getDniApiCoincide())) return false;
     return (version.getEstadoFirma() == EstadoFirmaDigital.VALIDA || version.getEstadoFirma() == EstadoFirmaDigital.NO_APLICA)
@@ -873,9 +1235,8 @@ public class SolicitudMatriculaPublicaService {
   }
 
   private boolean hayDocumentoObservado(SolicitudMatriculaPublicaEntity s) {
-    return s.getEstadoPartida() == EstadoValidacionDocumento.OBSERVADO
-        || s.getEstadoDniC4() == EstadoValidacionDocumento.OBSERVADO
-        || s.getEstadoRecibo() == EstadoValidacionDocumento.OBSERVADO;
+    return s.tiposRequeridos().stream()
+        .anyMatch(tipo -> s.estadoDocumento(tipo) == EstadoValidacionDocumento.OBSERVADO);
   }
 
   private List<DocumentoSolicitudResponseDto> documentos(SolicitudMatriculaPublicaEntity s) {
@@ -896,14 +1257,14 @@ public class SolicitudMatriculaPublicaService {
 
   private List<DocumentoSolicitudResponseDto> documentos(SolicitudMatriculaPublicaEntity s,
       java.util.Map<SolicitudMatriculaDocumentoId, DocumentoMatriculaVersionEntity> archivos) {
-    return java.util.Arrays.stream(TipoDocumentoSolicitud.values()).map(tipo -> {
+    return s.tiposRequeridos().stream().map(tipo -> {
       var v = archivos.get(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
       boolean revalidar = s.getEstado() != EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
           && s.getEstado() != EstadoSolicitudMatriculaPublica.MATRICULADA
           && s.getEstado() != EstadoSolicitudMatriculaPublica.RECHAZADA
           && s.estadoDocumento(tipo) == EstadoValidacionDocumento.VALIDADO && !evidenciaCompleta(tipo, v);
       return new DocumentoSolicitudResponseDto(tipo, revalidar ? EstadoValidacionDocumento.EN_VALIDACION : s.estadoDocumento(tipo),
-          revalidar ? "Actualiza la evidencia: se requieren tres PDF y el vínculo del padre o madre con la partida." : s.observacionDocumento(tipo),
+          revalidar ? "Actualiza la evidencia: se requieren los PDF solicitados y el vínculo del padre o madre con la partida." : s.observacionDocumento(tipo),
           v == null ? null : v.getId(), v == null ? null : v.getIaValida(),
           v == null ? null : v.getDniApiCoincide(),
           v == null ? null : v.getEstadoFirma(), v == null ? null : v.getDetalleFirma(),
@@ -918,7 +1279,7 @@ public class SolicitudMatriculaPublicaService {
       s.setEstado(EstadoSolicitudMatriculaPublica.AUTORIZACION_EDAD_PENDIENTE);
       return;
     }
-    boolean cargados = java.util.Arrays.stream(TipoDocumentoSolicitud.values())
+    boolean cargados = s.tiposRequeridos().stream()
         .allMatch(tipo -> s.estadoDocumento(tipo) != EstadoValidacionDocumento.PENDIENTE);
     s.setEstado(todosDocumentosValidados(s) ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS
         : hayDocumentoObservado(s) ? EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS
@@ -937,7 +1298,7 @@ public class SolicitudMatriculaPublicaService {
   private SolicitudMatriculaPublicaResponseDto respuesta(SolicitudMatriculaPublicaEntity s, String token) {
     return new SolicitudMatriculaPublicaResponseDto(
         s.getId(), token, s.getEstado(), nombreEstudiante(s), documentos(s), s.getPagoEnlace(),
-        s.getPagoMonto(), s.getEstudianteId(), s.getMatriculaId());
+        s.getPagoMonto(), s.getEstudianteId(), s.getMatriculaId(), s.getModalidadIngreso(), s.getColegioProcedencia());
   }
 
   private PagoMatriculaPublicaResponseDto pagoResponse(SolicitudMatriculaPublicaEntity s) {
@@ -950,7 +1311,7 @@ public class SolicitudMatriculaPublicaService {
         nombreApoderado(s), s.getCelularApoderado(), s.getEmailApoderado(), s.getAnioLectivoId(),
         s.getGradoId(), s.getSeccionId(), documentos(s), s.getFechaCreacion(), s.getEstudianteId(), s.getMatriculaId(),
         s.isRequiereAutorizacionEdad(), s.getMotivoAutorizacionEdad(), s.getAutorizadoPorUsuarioId(),
-        s.getFechaAutorizacionEdad());
+        s.getFechaAutorizacionEdad(), s.getModalidadIngreso(), s.getColegioProcedencia());
   }
 
   private String nombreEstudiante(SolicitudMatriculaPublicaEntity s) {
@@ -1042,7 +1403,7 @@ public class SolicitudMatriculaPublicaService {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud inexistente o token inválido");
   }
 
-  private BigDecimal obtenerMontoMatriculaPublica() {
+  BigDecimal obtenerMontoMatriculaPublica() {
     if (montoMatriculaPublica == null || montoMatriculaPublica.signum() <= 0) {
       throw new IllegalStateException("El monto de matrícula debe ser mayor que cero");
     }
@@ -1051,5 +1412,32 @@ public class SolicitudMatriculaPublicaService {
     } catch (ArithmeticException e) {
       throw new IllegalStateException("El monto de matrícula debe tener como máximo dos decimales", e);
     }
+  }
+
+  private BigDecimal obtenerMontoCobroMatriculaPublica() {
+    if (montoCobroMatriculaPublica == null || montoCobroMatriculaPublica.signum() <= 0) {
+      throw new IllegalStateException("El monto de cobro debe ser mayor que cero");
+    }
+    try {
+      return montoCobroMatriculaPublica.setScale(2, RoundingMode.UNNECESSARY);
+    } catch (ArithmeticException e) {
+      throw new IllegalStateException("El monto de cobro debe tener como máximo dos decimales", e);
+    }
+  }
+
+
+  private String resolverDetalleGrado(SolicitudMatriculaPublicaEntity s) {
+    try {
+      var seccionGrado = secciones.buscarPorAnioLectivoId(s.getAnioLectivoId()).stream()
+          .filter(opcion -> opcion.getGradoId().equals(s.getGradoId())).findFirst().orElse(null);
+      if (seccionGrado != null && seccionGrado.getRelacion1() != null) {
+        var grado = seccionGrado.getRelacion1();
+        var nivel = grado.getRelacion0();
+        String nivelNombre = nivel != null ? nivel.getNombre() : "";
+        return (nivelNombre.isBlank() ? "" : nivelNombre + " · ") + grado.getNombre();
+      }
+    } catch (Exception ignored) {
+    }
+    return "Grado " + s.getGradoId();
   }
 }

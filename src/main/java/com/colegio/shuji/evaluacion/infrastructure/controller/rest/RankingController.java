@@ -24,14 +24,14 @@ public class RankingController {
   private final ConsultarRankingAcademicoUseCase rankingUseCase;
 
   @GetMapping("/seccion/{seccionId}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','TUTOR')")
   @Operation(summary = "Obtener ranking académico por sección")
   public CuadroHonorResponseDto obtenerRankingSeccion(@PathVariable @Positive Integer seccionId) {
     return rankingUseCase.obtenerRankingSeccion(seccionId);
   }
 
   @GetMapping("/cuadro-honor")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','TUTOR')")
   @Operation(summary = "Obtener cuadro de honor por grado y/o año lectivo")
   public CuadroHonorResponseDto obtenerCuadroHonor(
       @RequestParam(value = "gradoId", required = false) @Positive Short gradoId,

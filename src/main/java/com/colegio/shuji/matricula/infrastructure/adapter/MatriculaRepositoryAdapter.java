@@ -66,6 +66,11 @@ public class MatriculaRepositoryAdapter implements MatriculaRepositoryPort {
     return repository.buscarPorEstudianteId(valor).stream().map(mapper::toDomain).toList();
   }
 
+  public List<Matricula> buscarPorEstudianteIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.buscarPorEstudianteIds(ids).stream().map(mapper::toDomain).toList();
+  }
+
   public boolean existePorEstudianteIdYAnioLectivoId(Long estudianteId, Short anioLectivoId) {
     return repository.existsByEstudianteIdAndAnioLectivoId(estudianteId, anioLectivoId);
   }

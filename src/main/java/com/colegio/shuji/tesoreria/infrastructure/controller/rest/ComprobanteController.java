@@ -26,14 +26,14 @@ public class ComprobanteController {
   private final EmitirComprobanteUseCase comprobantes;
 
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "comprobantes.emitir")
   public ComprobanteResponseDto emitirComprobante(@Valid @RequestBody EmitirComprobanteRequestDto r) {
     return comprobantes.emitir(r);
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "comprobantes.consultar")
   public ComprobanteResponseDto consultarComprobante(@PathVariable @Positive Long id) {
     return comprobantes.consultar(id);

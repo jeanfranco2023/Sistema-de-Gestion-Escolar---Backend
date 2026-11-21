@@ -60,6 +60,13 @@ public class InscripcionRefuerzoRepositoryAdapter implements InscripcionRefuerzo
     return repository.buscarPorSesionRefuerzoId(valor).stream().map(mapper::toDomain).toList();
   }
 
+  @Override
+  public List<InscripcionRefuerzo> buscarPorSesionRefuerzoIds(
+      java.util.Collection<Long> sesionIds) {
+    if (sesionIds == null || sesionIds.isEmpty()) return List.of();
+    return repository.buscarPorSesionRefuerzoIds(sesionIds).stream().map(mapper::toDomain).toList();
+  }
+
   public List<InscripcionRefuerzo> buscarPorEstudianteId(Long valor) {
     return repository.buscarPorEstudianteId(valor).stream().map(mapper::toDomain).toList();
   }

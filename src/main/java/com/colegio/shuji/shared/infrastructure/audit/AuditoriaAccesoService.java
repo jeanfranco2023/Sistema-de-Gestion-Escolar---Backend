@@ -62,6 +62,21 @@ public class AuditoriaAccesoService {
     return repository.findAllByOrderByFechaEventoDesc(pageable);
   }
 
+  @Transactional(readOnly = true)
+  public org.springframework.data.domain.Page<AuditoriaAccesoEntity> listar(
+      String usuarioNombre,
+      String metodo,
+      String ruta,
+      org.springframework.data.domain.Pageable pageable) {
+    String u = StringUtils.hasText(usuarioNombre) ? usuarioNombre.trim() : null;
+    String m = StringUtils.hasText(metodo) ? metodo.trim() : null;
+    String r = StringUtils.hasText(ruta) ? ruta.trim() : null;
+    if (u == null && m == null && r == null) {
+      return repository.findAllByOrderByFechaEventoDesc(pageable);
+    }
+    return repository.filtrar(u, m, r, pageable);
+  }
+
   private static String rutaAuditable(String ruta) {
     if (ruta == null) return null;
     try {

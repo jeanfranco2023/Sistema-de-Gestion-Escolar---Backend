@@ -1,5 +1,7 @@
 package com.colegio.shuji.academico.infrastructure.controller.rest;
 
+import com.colegio.shuji.academico.application.dto.in.ActualizarAulaRequestDto;
+import com.colegio.shuji.academico.application.dto.in.CambiarEstadoAulaRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CambiarEstadoPeriodoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearAulaRequestDto;
@@ -46,63 +48,79 @@ public class AcademicoController {
   private final GestionarAulasUseCase aulas;
 
   @PostMapping("/aulas")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "estructura.crearAula")
   public AulaResponseDto crearAula(@Valid @RequestBody CrearAulaRequestDto request) {
     return aulas.crearAula(request);
   }
 
   @GetMapping("/aulas")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE')")
   @Operation(summary = "estructura.listarAulas")
   public List<AulaResponseDto> listarAulas() {
     return aulas.listarAulas();
   }
 
+  @PutMapping("/aulas/{id}")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @Operation(summary = "estructura.actualizarAula")
+  public AulaResponseDto actualizarAula(
+      @PathVariable @Positive Integer id, @Valid @RequestBody ActualizarAulaRequestDto request) {
+    return aulas.actualizarAula(id, request);
+  }
+
+  @PutMapping("/aulas/{id}/estado")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @Operation(summary = "estructura.cambiarEstadoAula")
+  public AulaResponseDto cambiarEstadoAula(
+      @PathVariable @Positive Integer id, @Valid @RequestBody CambiarEstadoAulaRequestDto request) {
+    return aulas.cambiarEstadoAula(id, request);
+  }
+
   @PostMapping("/anios")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "calendario.crearAnio")
   public AnioLectivoResponseDto crearAnio(@Valid @RequestBody CrearAnioLectivoRequestDto r) {
     return calendario.crearAnio(r);
   }
 
   @GetMapping("/anios")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','AUXILIAR','TUTOR')")
   @Operation(summary = "calendario.listarAnios")
   public List<AnioLectivoResponseDto> listarAnios() {
     return calendario.listarAnios();
   }
 
   @PutMapping("/anios/{id}/cierre")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "calendario.cerrarAnio")
   public void cerrarAnio(@PathVariable @Positive Short id) {
     calendario.cerrarAnio(id);
   }
 
   @PostMapping("/periodos")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "calendario.crearPeriodo")
   public PeriodoResponseDto crearPeriodo(@Valid @RequestBody CrearPeriodoRequestDto r) {
     return calendario.crearPeriodo(r);
   }
 
   @GetMapping("/periodos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE')")
   @Operation(summary = "calendario.listarPeriodos")
   public List<PeriodoResponseDto> listarPeriodos(@RequestParam Short anioId) {
     return calendario.listarPeriodos(anioId);
   }
 
   @PutMapping("/periodos/{id}/cierre")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "calendario.cerrarPeriodo")
   public void cerrarPeriodo(@PathVariable @Positive Short id) {
     calendario.cerrarPeriodo(id);
   }
 
   @PutMapping("/periodos/{id}/estado")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "calendario.cambiarEstadoPeriodo")
   public void cambiarEstadoPeriodo(
       @PathVariable @Positive Short id, @Valid @RequestBody CambiarEstadoPeriodoRequestDto request) {
@@ -110,35 +128,35 @@ public class AcademicoController {
   }
 
   @GetMapping("/niveles")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "estructura.listarNiveles")
   public List<NivelResponseDto> listarNiveles() {
     return estructura.listarNiveles();
   }
 
   @GetMapping("/grados")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "estructura.listarGrados")
   public List<GradoResponseDto> listarGrados(@RequestParam Short nivelId) {
     return estructura.listarGrados(nivelId);
   }
 
   @PostMapping("/grados")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "estructura.crearGrado")
   public GradoResponseDto crearGrado(@Valid @RequestBody CrearGradoRequestDto r) {
     return estructura.crearGrado(r);
   }
 
   @PostMapping("/secciones")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "estructura.crearSeccion")
   public SeccionResponseDto crearSeccion(@Valid @RequestBody CrearSeccionRequestDto r) {
     return estructura.crearSeccion(r);
   }
 
   @GetMapping("/secciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "estructura.listarSecciones")
   public List<SeccionResponseDto> listarSecciones(
       @RequestParam Short anioId, @RequestParam(required = false) Short nivelId) {
@@ -146,7 +164,7 @@ public class AcademicoController {
   }
 
   @GetMapping("/secciones/{id}/vacantes")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "cupos.vacantes")
   public VacantesSeccionResponseDto consultarVacantes(@PathVariable @Positive Integer id) {
     return cupos.vacantes(id);

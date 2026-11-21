@@ -45,6 +45,8 @@ class ValidacionAutomaticaDocumentosTest {
     solicitud.setEstadoPartida(EstadoValidacionDocumento.PENDIENTE);
     solicitud.setEstadoDniC4(EstadoValidacionDocumento.PENDIENTE);
     solicitud.setEstadoRecibo(EstadoValidacionDocumento.PENDIENTE);
+    solicitud.setEstadoCertificado(EstadoValidacionDocumento.PENDIENTE);
+    when(solicitudes.findById(id)).thenReturn(Optional.of(solicitud));
     when(solicitudes.bloquearPorId(id)).thenReturn(Optional.of(solicitud));
     when(solicitudes.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
   }
@@ -116,5 +118,34 @@ class ValidacionAutomaticaDocumentosTest {
     solicitud.setEstado(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS);
     assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.crearPago(id,token)).getStatusCode().value());
     verifyNoInteractions(mercado);
+  }
+
+  @Test void trasladoExigeCertificadoEstudiosAntesDeValidarEtapaDocumental() {
+    solicitud.setConsentimientoGemini(true);
+    solicitud.setModalidadIngreso(ModalidadIngreso.REGULAR);
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> service.prepararValidacion(id, token, TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS)).getStatusCode().value());
+
+    solicitud.setModalidadIngreso(ModalidadIngreso.TRASLADO);
+    solicitud.setColegioProcedencia("I.E. Alfonso Ugarte");
+    assertDoesNotThrow(() -> service.prepararValidacion(id, token, TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS));
+
+    subir(TipoDocumentoSolicitud.PARTIDA_NACIMIENTO, EstadoFirmaDigital.VALIDA, iaCorrecta, true);
+    subir(TipoDocumentoSolicitud.DNI_C4, EstadoFirmaDigital.NO_APLICA, iaCorrecta, true);
+    subir(TipoDocumentoSolicitud.RECIBO_SERVICIO, EstadoFirmaDigital.NO_APLICA, iaCorrecta, null);
+    assertEquals(EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES, solicitud.getEstado());
+
+    var resFinal = subirAndReturn(TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS, EstadoFirmaDigital.NO_APLICA, iaCorrecta, true);
+    assertEquals(EstadoValidacionDocumento.VALIDADO, solicitud.getEstadoCertificado());
+    assertEquals(EstadoSolicitudMatriculaPublica.DOCUMENTOS_VALIDADOS, solicitud.getEstado());
+    assertEquals(4, resFinal.documentos().size());
+    assertEquals(ModalidadIngreso.TRASLADO, resFinal.modalidadIngreso());
+  }
+
+  private com.colegio.shuji.matricula.application.dto.out.SolicitudMatriculaPublicaResponseDto subirAndReturn(
+      TipoDocumentoSolicitud tipo, EstadoFirmaDigital firma, GeminiDocumentoMatriculaPort.Resultado ia, Boolean dni) {
+    return service.guardarResultadoDocumento(id, token, tipo, ia,
+        new FirmaDigitalDocumentoPort.Resultado(firma, "Resultado firma.", null),
+        dni, null, "bucket", "ruta-aleatoria.pdf", "application/pdf", 100, "a".repeat(64));
   }
 }

@@ -10,11 +10,11 @@ import jakarta.validation.constraints.Size;
 public record RegistrarApoderadoRequestDto(
     @NotNull TipoDocumento tipoDocumento,
     @NotBlank @Size(min = 8, max = 8) @Pattern(regexp = "[0-9]{8}") String numeroDocumento,
-    @NotBlank @Size(max = 20) String nombres,
-    @NotBlank @Size(max = 20) String apellidoPaterno,
-    @NotBlank @Size(max = 20) String apellidoMaterno,
+    @NotBlank @Size(max = 30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "Los nombres solo deben contener letras y espacios") String nombres,
+    @NotBlank @Size(max = 30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "El apellido paterno solo debe contener letras y espacios") String apellidoPaterno,
+    @NotBlank @Size(max = 30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "El apellido materno solo debe contener letras y espacios") String apellidoMaterno,
     @NotBlank @Pattern(regexp = "9[0-9]{8}") String celular,
     @Email @Size(max = 100) String email,
-    @NotBlank @Size(max = 150) String direccion,
+    @NotBlank @Size(max = 150) @Pattern(regexp = "^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\\s#.,\\-_/°º]+$", message = "La dirección no permite caracteres especiales extraños") String direccion,
     @NotBlank @Pattern(regexp = "[0-9]{6}") String ubigeoInei,
     Long usuarioId) {}

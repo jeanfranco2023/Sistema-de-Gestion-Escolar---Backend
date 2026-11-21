@@ -36,7 +36,7 @@ public class ConvivenciaController {
   private final GestionarIncidenciasUseCase gestion;
 
   @GetMapping("/incidencias")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR','TUTOR')")
   public List<IncidenciaResponseDto> listarIncidencias() {
     return gestion.listar();
   }
@@ -49,7 +49,7 @@ public class ConvivenciaController {
   }
 
   @PutMapping("/incidencias/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "gestion.actualizar")
   public IncidenciaResponseDto actualizarEstadoIncidencia(
       @PathVariable @Positive Long id, @Valid @RequestBody ActualizarEstadoIncidenciaRequestDto r) {
@@ -57,21 +57,21 @@ public class ConvivenciaController {
   }
 
   @GetMapping("/incidencias/{id}/historial")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR','TUTOR')")
   public List<HistorialEstadoIncidenciaResponseDto> consultarHistorialEstados(
       @PathVariable @Positive Long id) {
     return gestion.historialEstados(id);
   }
 
   @GetMapping("/matricula/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.historial")
   public HistorialConductualEstudianteResponseDto consultarHistorialConductual(@PathVariable @Positive Long id) {
     return gestion.historial(id);
   }
 
   @GetMapping("/incidencias/citaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR','TUTOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR','TUTOR')")
   @Operation(summary = "gestion.citaciones")
   public List<IncidenciaResponseDto> listarCitaciones(
       @RequestParam(name = "page", defaultValue = "0") @PositiveOrZero int page,

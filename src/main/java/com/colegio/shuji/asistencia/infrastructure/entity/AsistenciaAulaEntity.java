@@ -37,7 +37,7 @@ public class AsistenciaAulaEntity {
   @Column(name = "fecha_sesion", nullable = false)
   private LocalDate fechaSesion;
 
-  @Column(name = "hora_registro", nullable = false)
+  @Column(name = "hora_registro")
   private LocalTime horaRegistro;
 
   @Enumerated(EnumType.STRING)

@@ -4,6 +4,8 @@ import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.fechas;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
+import com.colegio.shuji.academico.application.dto.in.ActualizarAulaRequestDto;
+import com.colegio.shuji.academico.application.dto.in.CambiarEstadoAulaRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearAnioLectivoRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearAulaRequestDto;
 import com.colegio.shuji.academico.application.dto.in.CrearGradoRequestDto;
@@ -106,6 +108,9 @@ public class AcademicoService
   }
 
   public SeccionResponseDto crearSeccion(CrearSeccionRequestDto r) {
+    exigir(r.cupoMaximo() != null && r.cupoMaximo() > 0
+        && r.cupoMaximo() <= com.colegio.shuji.academico.domain.model.Aula.CAPACIDAD_MAXIMA,
+        "El cupo de la sección debe estar entre 1 y 30 estudiantes");
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
     var grado = requerido(grados.buscarPorId(r.gradoId()));
     exigir(grado.getNivelId().equals(r.nivelId()), "El grado no pertenece al nivel");
@@ -146,6 +151,18 @@ public class AcademicoService
   @Transactional(readOnly = true)
   public List<AulaResponseDto> listarAulas() {
     return aulas.listar().stream().map(mapper::toResponse).toList();
+  }
+
+  public AulaResponseDto actualizarAula(Integer id, ActualizarAulaRequestDto r) {
+    var aula = requerido(aulas.buscarPorId(id));
+    aula.actualizar(r.nombre(), r.ubicacion(), r.capacidad());
+    return mapper.toResponse(aulas.guardar(aula));
+  }
+
+  public AulaResponseDto cambiarEstadoAula(Integer id, CambiarEstadoAulaRequestDto r) {
+    var aula = requerido(aulas.buscarPorId(id));
+    aula.cambiarEstado(r.activa());
+    return mapper.toResponse(aulas.guardar(aula));
   }
 
   @Transactional(readOnly = true)

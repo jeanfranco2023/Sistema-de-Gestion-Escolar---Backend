@@ -1,6 +1,7 @@
 package com.colegio.shuji.matricula.domain.model;
 
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import com.colegio.shuji.matricula.domain.enums.ModalidadIngreso;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
@@ -23,6 +24,8 @@ public class Matricula {
   private EstadoMatricula estadoMatricula;
   private OffsetDateTime fechaExpiracionReserva;
   private String observaciones;
+  private ModalidadIngreso modalidadIngreso;
+  private String colegioProcedencia;
 
   public void reservar(OffsetDateTime vencimiento) {
     if (estadoMatricula != EstadoMatricula.SOLICITADA

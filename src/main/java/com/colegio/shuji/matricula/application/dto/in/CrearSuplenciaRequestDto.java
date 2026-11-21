@@ -11,8 +11,8 @@ import java.time.ZoneId;
 
 public record CrearSuplenciaRequestDto(@NotNull @Positive Long estudianteId,
     @NotBlank @Pattern(regexp="[0-9]{8}") String numeroDocumento,
-    @NotBlank @Size(max=20) String nombres, @NotBlank @Size(max=20) String apellidoPaterno,
-    @NotBlank @Size(max=20) String apellidoMaterno, @NotBlank @Size(max=30) String parentesco,
+    @NotBlank @Size(max=30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "Los nombres solo deben contener letras y espacios") String nombres, @NotBlank @Size(max=30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "El apellido paterno solo debe contener letras y espacios") String apellidoPaterno,
+    @NotBlank @Size(max=30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "El apellido materno solo debe contener letras y espacios") String apellidoMaterno, @NotBlank @Size(max=30) @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-]+$", message = "El parentesco solo debe contener letras y espacios") String parentesco,
     @NotBlank @Pattern(regexp="9[0-9]{8}") String celular,
     @NotNull LocalDate fechaInicio, @NotNull LocalDate fechaFin) {
   @AssertTrue(message="Las fechas deben ser válidas, desde hoy en Perú y con fin posterior o igual al inicio")

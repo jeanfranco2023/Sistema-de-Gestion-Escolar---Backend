@@ -47,7 +47,7 @@ public class EvaluacionController {
   }
 
   @GetMapping("/libreta/{matriculaId}/pdf")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE','APODERADO')")
   public org.springframework.http.ResponseEntity<byte[]> descargarLibretaPdf(@PathVariable @Positive Long matriculaId) {
     return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
         .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"libreta_" + matriculaId + ".pdf\"")
@@ -84,14 +84,14 @@ public class EvaluacionController {
   }
 
   @GetMapping("/cneb")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   public List<CalificacionResponseDto> listarCalificaciones(
       @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId) {
     return registro.listar(asignacionDocenteId, periodoAcademicoId);
   }
 
   @GetMapping("/cneb/matriz")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   public List<FilaCalificacionResponseDto> listarMatriz(
       @RequestParam Long asignacionDocenteId, @RequestParam Short periodoAcademicoId,
       @RequestParam Short competenciaId) {
@@ -99,14 +99,14 @@ public class EvaluacionController {
   }
 
   @GetMapping("/libreta/{matriculaId}")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE','APODERADO')")
   @Operation(summary = "consulta.libreta")
   public LibretaNotasResponseDto consultarLibretaNotas(@PathVariable @Positive Long matriculaId) {
     return consulta.libreta(matriculaId);
   }
 
   @GetMapping("/riesgo")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "consulta.riesgo")
   public EstudiantesEnRiesgoResponseDto consultarEstudiantesEnRiesgo(@RequestParam Short periodoId) {
     return consulta.riesgo(periodoId);

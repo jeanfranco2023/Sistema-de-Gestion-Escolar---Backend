@@ -25,6 +25,12 @@ public interface UserRepositoryPort {
 
   List<Usuario> findAll();
 
+  default List<Usuario> findByIds(java.util.Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    var set = java.util.Set.copyOf(ids);
+    return findAll().stream().filter(u -> set.contains(u.getId())).toList();
+  }
+
   boolean existsByUsername(String username);
 
   boolean existsByEmail(String email);

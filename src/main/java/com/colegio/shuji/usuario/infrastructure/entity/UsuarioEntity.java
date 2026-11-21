@@ -41,6 +41,9 @@ public class UsuarioEntity {
   @Column(name = "nombre_usuario", nullable = false, unique = true, length = 30)
   private String username;
 
+  @Column(name = "nombre_completo", length = 200)
+  private String nombreCompleto;
+
   @Column(name = "correo_electronico", nullable = false, unique = true, length = 100)
   private String email;
 

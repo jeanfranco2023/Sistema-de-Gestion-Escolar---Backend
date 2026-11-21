@@ -58,4 +58,48 @@ class DashboardControllerTest {
         .andExpect(jsonPath("$.asistenciaHoy").value(0))
         .andExpect(jsonPath("$.recaudacionMes").value(0));
   }
+
+  @Test
+  void retornaIndicadoresDireccionConDesempenoCoberturaYAsistencia() throws Exception {
+    var actual = (short) java.time.LocalDate.now(java.time.ZoneId.of("America/Lima")).getYear();
+    when(anios.listar()).thenReturn(List.of(AnioLectivo.builder().id((short) 1).anio(actual).build()));
+    when(matriculas.buscarPorAnioLectivoId((short) 1)).thenReturn(List.of(
+        com.colegio.shuji.matricula.domain.model.Matricula.builder()
+            .id(101L)
+            .anioLectivoId((short) 1)
+            .estudianteId(10L)
+            .seccionId(1)
+            .estadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO)
+            .build(),
+        com.colegio.shuji.matricula.domain.model.Matricula.builder()
+            .id(102L)
+            .anioLectivoId((short) 1)
+            .estudianteId(11L)
+            .seccionId(1)
+            .estadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO)
+            .build()));
+    when(calificaciones.buscarPorAnioLectivoId((short) 1)).thenReturn(List.of(
+        com.colegio.shuji.evaluacion.domain.model.CalificacionCneb.builder()
+            .id(1L)
+            .matriculaId(101L)
+            .anioLectivoId((short) 1)
+            .periodoAcademicoId((short) 1)
+            .calificacionCualitativa(com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa.AD)
+            .build()));
+    when(asistencias.buscarPorMatriculaIds(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(List.of(
+        com.colegio.shuji.asistencia.domain.model.AsistenciaAula.builder()
+            .id(1L)
+            .matriculaId(101L)
+            .fechaSesion(java.time.LocalDate.now(java.time.ZoneId.of("America/Lima")))
+            .estado(com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula.PRESENTE)
+            .build()));
+
+    mvc.perform(get("/api/v1/dashboard/indicadores"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.desempeno.destacados").value(1))
+        .andExpect(jsonPath("$.desempeno.totalEvaluados").value(1))
+        .andExpect(jsonPath("$.desempeno.sinEvaluacion").value(1))
+        .andExpect(jsonPath("$.cobertura.porcentajeCobertura").value(50.0))
+        .andExpect(jsonPath("$.asistenciaCupos.porcentajeAsistencia").value(100.0));
+  }
 }

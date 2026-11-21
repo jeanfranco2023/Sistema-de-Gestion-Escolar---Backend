@@ -10,21 +10,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoFichaResponseDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
 import com.colegio.shuji.matricula.application.port.in.RegistrarFichaFamiliarUseCase;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort.Identidad;
 import com.colegio.shuji.matricula.domain.enums.Genero;
 import com.colegio.shuji.matricula.domain.enums.OrigenRegistro;
+import com.colegio.shuji.matricula.domain.enums.Parentesco;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.matricula.infrastructure.controller.exception.MatriculaExceptionHandler;
 import com.colegio.shuji.shared.infrastructure.controller.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -90,6 +95,34 @@ class EstudianteControllerTest {
         .andExpect(status().isBadRequest());
 
     verify(familias, never()).registrarEstudiante(any(RegistrarEstudianteRequestDto.class));
+  }
+
+  @Test
+  void listarApoderadosPorEstudianteDevuelveLista() throws Exception {
+    var apoderado = new ApoderadoResponseDto(
+        10L, 20L, TipoDocumento.DNI, "87654321", "Carlos", "Pérez", "Gómez",
+        "987654321", "carlos@gmail.com", "Av. Sol 123", "150101", true,
+        OrigenRegistro.MANUAL_CONTINGENCIA, OffsetDateTime.now());
+    var ficha = new ApoderadoFichaResponseDto(apoderado, Parentesco.PADRE, true);
+
+    when(familias.listarApoderadosPorEstudiante(7L)).thenReturn(List.of(ficha));
+
+    mvc.perform(get("/api/v1/estudiantes/7/apoderados"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].apoderado.numeroDocumento").value("87654321"))
+        .andExpect(jsonPath("$[0].parentesco").value("PADRE"))
+        .andExpect(jsonPath("$[0].esResponsableEconomico").value(true));
+  }
+
+  @Test
+  void listarApoderadosPorEstudianteTienePreAuthorizeExclusivoDireccionYSecretaria() throws NoSuchMethodException {
+    var metodo = EstudianteController.class.getDeclaredMethod("listarApoderadosPorEstudiante", Long.class);
+    var preAuth = metodo.getAnnotation(PreAuthorize.class);
+    org.junit.jupiter.api.Assertions.assertNotNull(preAuth, "El endpoint debe tener anotación @PreAuthorize");
+    org.junit.jupiter.api.Assertions.assertEquals(
+        "hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')",
+        preAuth.value(),
+        "El endpoint GET /api/v1/estudiantes/{id}/apoderados debe permitir exclusivamente a DIRECCION, ADMINISTRADOR y SECRETARIA");
   }
 
   private RegistrarEstudianteRequestDto solicitud(String documento, String nombres) {

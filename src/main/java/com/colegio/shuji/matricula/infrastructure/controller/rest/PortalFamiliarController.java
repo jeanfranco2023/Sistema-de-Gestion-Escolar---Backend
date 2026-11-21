@@ -20,7 +20,7 @@ public class PortalFamiliarController {
   private final com.colegio.shuji.academico.application.port.in.GestionarAnioLectivoUseCase calendario;
 
   @GetMapping("/periodos-seguimiento")
-  @PreAuthorize("hasAnyRole('DIRECCION','TUTOR','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','TUTOR','AUXILIAR')")
   public List<PeriodoResponseDto> periodosSeguimiento(@org.springframework.web.bind.annotation.RequestParam Short anioId) {
     return consulta.periodosSeguimiento(anioId);
   }
@@ -38,7 +38,7 @@ public class PortalFamiliarController {
   public List<HijoPortalResponseDto> hijos() { return consulta.hijos(); }
 
   @GetMapping("/alumnos-seguimiento")
-  @PreAuthorize("hasAnyRole('DIRECCION','TUTOR','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','TUTOR','AUXILIAR')")
   public List<HijoPortalResponseDto> seguimiento() { return consulta.alumnosSeguimiento(); }
 
   @GetMapping("/seguimiento/riesgo-calificaciones")

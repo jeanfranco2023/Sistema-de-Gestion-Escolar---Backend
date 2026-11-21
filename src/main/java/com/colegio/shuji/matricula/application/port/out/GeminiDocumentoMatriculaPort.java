@@ -26,4 +26,14 @@ public interface GeminiDocumentoMatriculaPort {
       String nombresDeclarados,
       String documentoDeclarado,
       ContextoParental progenitor);
+
+  default Resultado validarIdentidadParaPresentacion(
+      TipoDocumentoSolicitud tipo,
+      byte[] contenido,
+      String mimeType,
+      String nombresDeclarados,
+      String documentoDeclarado,
+      ContextoParental progenitor) {
+    return validar(tipo, contenido, mimeType, nombresDeclarados, documentoDeclarado, progenitor);
+  }
 }

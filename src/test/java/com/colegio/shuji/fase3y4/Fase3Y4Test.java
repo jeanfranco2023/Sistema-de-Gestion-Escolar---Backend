@@ -181,10 +181,10 @@ class Fase3Y4Test {
   @DisplayName("Fase 3: Rechazar 409 Conflict si el estudiante ya cuenta con matrícula activa para el año lectivo")
   void crearSolicitudRechazaSiEstudianteTieneMatriculaActiva() {
     var anio = new AnioLectivoEntity();
-    anio.setId((short) 2026);
-    anio.setAnio((short) 2026);
+    anio.setId((short) 2027);
+    anio.setAnio((short) 2027);
     anio.setAbierto(true);
-    when(aniosRepo.findById((short) 2026)).thenReturn(Optional.of(anio));
+    when(aniosRepo.findById((short) 2027)).thenReturn(Optional.of(anio));
 
     var nivel = new NivelEntity();
     nivel.setCodigo(NivelCodigo.PRIMARIA);
@@ -202,16 +202,16 @@ class Fase3Y4Test {
     seccion.setCupoMaximo((short) 30);
     seccion.setVacantesOcupadas((short) 10);
     seccion.setRelacion1(grado);
-    when(seccionesRepo.buscarPorAnioLectivoId((short) 2026)).thenReturn(List.of(seccion));
+    when(seccionesRepo.buscarPorAnioLectivoId((short) 2027)).thenReturn(List.of(seccion));
 
     var estudiante = new EstudianteEntity();
     estudiante.setId(100L);
     estudiante.setNumeroDocumento("71234567");
     when(estudiantesRepo.buscarPorNumeroDocumento("71234567")).thenReturn(List.of(estudiante));
-    when(matriculasRepo.existsByEstudianteIdAndAnioLectivoId(100L, (short) 2026)).thenReturn(true);
+    when(matriculasRepo.existsByEstudianteIdAndAnioLectivoId(100L, (short) 2027)).thenReturn(true);
 
     var req = new CrearSolicitudMatriculaPublicaRequestDto(
-        (short) 2026, (short) 1, "71234567", "Juan", "Perez", "Gomez",
+        (short) 2027, (short) 1, "71234567", "Juan", "Perez", "Gomez",
         LocalDate.of(2020, 5, 10), Genero.M, "40123456", "Pedro", "Perez", "Soto",
         "987654321", "pedro@gmail.com", "Av Principal 123", null, Parentesco.PADRE, true);
 
@@ -224,10 +224,10 @@ class Fase3Y4Test {
   @DisplayName("Fase 3: Rechazar 409 Conflict si ya existe una solicitud en trámite para el DNI")
   void crearSolicitudRechazaSiYaExisteSolicitudActiva() {
     var anio = new AnioLectivoEntity();
-    anio.setId((short) 2026);
-    anio.setAnio((short) 2026);
+    anio.setId((short) 2027);
+    anio.setAnio((short) 2027);
     anio.setAbierto(true);
-    when(aniosRepo.findById((short) 2026)).thenReturn(Optional.of(anio));
+    when(aniosRepo.findById((short) 2027)).thenReturn(Optional.of(anio));
 
     var nivel = new NivelEntity();
     nivel.setCodigo(NivelCodigo.PRIMARIA);
@@ -245,14 +245,14 @@ class Fase3Y4Test {
     seccion.setCupoMaximo((short) 30);
     seccion.setVacantesOcupadas((short) 10);
     seccion.setRelacion1(grado);
-    when(seccionesRepo.buscarPorAnioLectivoId((short) 2026)).thenReturn(List.of(seccion));
+    when(seccionesRepo.buscarPorAnioLectivoId((short) 2027)).thenReturn(List.of(seccion));
 
     when(estudiantesRepo.buscarPorNumeroDocumento("71234567")).thenReturn(List.of());
     when(solicitudesRepo.existsByNumeroDocumentoEstudianteAndEstadoIn(eq("71234567"), any()))
         .thenReturn(true);
 
     var req = new CrearSolicitudMatriculaPublicaRequestDto(
-        (short) 2026, (short) 1, "71234567", "Juan", "Perez", "Gomez",
+        (short) 2027, (short) 1, "71234567", "Juan", "Perez", "Gomez",
         LocalDate.of(2020, 5, 10), Genero.M, "40123456", "Pedro", "Perez", "Soto",
         "987654321", "pedro@gmail.com", "Av Principal 123", null, Parentesco.PADRE, true);
 
@@ -267,17 +267,17 @@ class Fase3Y4Test {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setId(UUID.randomUUID());
     solicitud.setNumeroDocumentoEstudiante("71234567");
-    solicitud.setAnioLectivoId((short) 2026);
+    solicitud.setAnioLectivoId((short) 2027);
     solicitud.setEmailApoderado("pedro.alvarez@gmail.com");
     solicitud.setTokenHash("oldhash123");
 
-    when(solicitudesRepo.buscarActivasPorDniYAnio(eq("71234567"), eq((short) 2026), any()))
+    when(solicitudesRepo.buscarActivasPorDniYAnio(eq("71234567"), eq((short) 2027), any()))
         .thenReturn(List.of(solicitud));
     when(solicitudesRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
     var correo = mock(SeguimientoSolicitudCorreoPort.class);
     ReflectionTestUtils.setField(solicitudService, "correoSeguimiento", correo);
 
-    var req = new ReenviarTokenSolicitudRequestDto("71234567", (short) 2026);
+    var req = new ReenviarTokenSolicitudRequestDto("71234567", (short) 2027);
     ReenviarTokenSolicitudResponseDto resp = solicitudService.reenviarToken(req);
 
     assertNotNull(resp);
@@ -290,7 +290,7 @@ class Fase3Y4Test {
   @DisplayName("Fase 3: Sin transporte de correo responde 503 antes de consultar o rotar tokens")
   void reenviarTokenSinTransporteNoBuscaSolicitud() {
     var ex = assertThrows(ResponseStatusException.class,
-        () -> solicitudService.reenviarToken(new ReenviarTokenSolicitudRequestDto("71234567", (short) 2026)));
+        () -> solicitudService.reenviarToken(new ReenviarTokenSolicitudRequestDto("71234567", (short) 2027)));
 
     assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());
     verifyNoInteractions(solicitudesRepo);
@@ -302,10 +302,10 @@ class Fase3Y4Test {
     var solicitud = new SolicitudMatriculaPublicaEntity();
     solicitud.setId(UUID.randomUUID());
     solicitud.setNumeroDocumentoEstudiante("71234567");
-    solicitud.setAnioLectivoId((short) 2026);
+    solicitud.setAnioLectivoId((short) 2027);
     solicitud.setEmailApoderado("apoderado@example.test");
     solicitud.setTokenHash("oldhash123");
-    when(solicitudesRepo.buscarActivasPorDniYAnio(eq("71234567"), eq((short) 2026), any()))
+    when(solicitudesRepo.buscarActivasPorDniYAnio(eq("71234567"), eq((short) 2027), any()))
         .thenReturn(List.of(solicitud));
     var correo = mock(SeguimientoSolicitudCorreoPort.class);
     org.mockito.Mockito.doThrow(new IllegalStateException("mail transport unavailable"))
@@ -313,7 +313,7 @@ class Fase3Y4Test {
     ReflectionTestUtils.setField(solicitudService, "correoSeguimiento", correo);
 
     var ex = assertThrows(ResponseStatusException.class,
-        () -> solicitudService.reenviarToken(new ReenviarTokenSolicitudRequestDto("71234567", (short) 2026)));
+        () -> solicitudService.reenviarToken(new ReenviarTokenSolicitudRequestDto("71234567", (short) 2027)));
 
     assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());
     assertEquals("oldhash123", solicitud.getTokenHash());

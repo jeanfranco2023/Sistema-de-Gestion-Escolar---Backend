@@ -1,7 +1,18 @@
 server:
   port: ${SERVER_PORT:8080}
 
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
 app:
+  biometrico:
+    queue-enabled: ${BIOMETRICO_QUEUE_ENABLED:true}
+  matricula-publica:
+    monto-cobro: ${MATRICULA_PAGO_MONTO_PRUEBA:1.00}
   storage:
     local-root: ${LOCAL_STORAGE_ROOT:./.runtime/private-files}
     local-public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:http://localhost:${server.port}}

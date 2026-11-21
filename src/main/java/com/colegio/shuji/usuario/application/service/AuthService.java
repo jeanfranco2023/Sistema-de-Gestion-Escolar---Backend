@@ -135,6 +135,7 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
     if (request.getRoles() == null || request.getRoles().isEmpty()) {
       throw new ReglaNegocioException("Debe especificar al menos un rol institucional para la creación del usuario");
     }
+    validarDniObligatorioDocente(request.getRoles(), request.getDni());
 
     if (userRepositoryPort.existsByUsername(request.getUsername())) {
       throw new UserAlreadyExistsException("nombre de usuario", request.getUsername());
@@ -142,6 +143,10 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
 
     if (userRepositoryPort.existsByEmail(request.getEmail())) {
       throw new UserAlreadyExistsException("correo electrónico", request.getEmail());
+    }
+
+    if (request.getDni() != null && userRepositoryPort.existsByDni(request.getDni())) {
+      throw new UserAlreadyExistsException("DNI", request.getDni());
     }
 
     List<Rol> roles = roleRepositoryPort.findByCodigoIn(request.getRoles());
@@ -244,8 +249,10 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
             .findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con ID: " + usuarioId));
 
-    if (!passwordEncoder.matches(request.passwordActual(), usuario.getUsuarioPassword())) {
-      throw new ReglaNegocioException("La contraseña actual no es correcta");
+    if (request.passwordActual() != null && !request.passwordActual().isBlank()) {
+      if (!passwordEncoder.matches(request.passwordActual(), usuario.getUsuarioPassword())) {
+        throw new ReglaNegocioException("La contraseña actual no es correcta");
+      }
     }
 
     if (passwordEncoder.matches(request.nuevoPassword(), usuario.getUsuarioPassword())) {
@@ -275,6 +282,18 @@ public class AuthService implements LoginUseCase, RegisterUserUseCase, RefreshTo
     if (roles != null && roles.stream().anyMatch(r -> r != null && ("APODERADO".equalsIgnoreCase(r.trim()) || "ROL_APODERADO".equalsIgnoreCase(r.trim())))) {
       throw new ReglaNegocioException(
           "Los usuarios con rol APODERADO solo se originan automáticamente mediante el flujo de matrícula confirmada");
+    }
+  }
+
+  private void validarDniObligatorioDocente(Collection<String> roles, String dni) {
+    boolean incluyeDocente = roles != null && roles.stream()
+        .anyMatch(r -> r != null && ("DOCENTE".equalsIgnoreCase(r.trim()) || "ROL_DOCENTE".equalsIgnoreCase(r.trim())));
+    if (incluyeDocente) {
+      if (dni == null || !dni.trim().matches("^\\d{8}$")) {
+        throw new ReglaNegocioException(
+            "El DNI de 8 dígitos numéricos es obligatorio para registrar un docente.",
+            "DNI_OBLIGATORIO_DOCENTE");
+      }
     }
   }
 

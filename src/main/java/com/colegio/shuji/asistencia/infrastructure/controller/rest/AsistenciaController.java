@@ -8,15 +8,17 @@ import com.colegio.shuji.asistencia.application.dto.out.DiscrepanciaAlertaRespon
 import com.colegio.shuji.asistencia.application.dto.out.DocenteAsistenciaDiariaResponseDto;
 import com.colegio.shuji.asistencia.application.dto.out.DocenteMatriculaAsistenciaDto;
 import com.colegio.shuji.asistencia.application.dto.out.LoteBiometricoResponseDto;
+import com.colegio.shuji.asistencia.application.dto.out.ImportacionBiometricaResponseDto;
 import com.colegio.shuji.asistencia.application.dto.out.ReporteAsistenciaDiariaResponseDto;
 import com.colegio.shuji.asistencia.application.port.in.EjecutarConciliacionDiariaUseCase;
-import com.colegio.shuji.asistencia.application.port.in.ProcesarBiometricoUseCase;
 import com.colegio.shuji.asistencia.application.port.in.RegistrarListaAulaUseCase;
+import com.colegio.shuji.asistencia.application.service.ImportacionBiometricaService;
 import com.colegio.shuji.asistencia.application.port.out.AlmacenJustificacionPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +36,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.UUID;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api/v1/asistencia")
@@ -43,23 +47,23 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 @Tag(name = "Asistencia")
 public class AsistenciaController {
-  private final ProcesarBiometricoUseCase biometrico;
+  private final ImportacionBiometricaService importaciones;
   private final RegistrarListaAulaUseCase aula;
   private final EjecutarConciliacionDiariaUseCase conciliacion;
   private final AlmacenJustificacionPort almacenamiento;
 
   @PostMapping("/biometrico/importar")
-  @PreAuthorize("hasAnyRole('SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "biometrico.importar")
-  public LoteBiometricoResponseDto importarLoteBiometrico(
+  public ResponseEntity<ImportacionBiometricaResponseDto> importarLoteBiometrico(
       @Valid @RequestBody ImportarLoteBiometricoRequestDto r) {
-    return biometrico.importar(r);
+    return ResponseEntity.accepted().body(importaciones.encolar(r));
   }
 
   @PostMapping(value = "/biometrico/importar-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("hasAnyRole('SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "biometrico.importarCsv")
-  public LoteBiometricoResponseDto importarArchivoBiometrico(@org.springframework.web.bind.annotation.RequestPart("archivo") MultipartFile archivo) {
+  public ResponseEntity<ImportacionBiometricaResponseDto> importarArchivoBiometrico(@org.springframework.web.bind.annotation.RequestPart("archivo") MultipartFile archivo) {
     String nombreOriginal = archivo == null ? null : archivo.getOriginalFilename();
     if (archivo == null || archivo.isEmpty() || archivo.getSize() > 5L * 1024 * 1024
         || nombreOriginal == null
@@ -71,10 +75,17 @@ public class AsistenciaController {
       var marcas = com.colegio.shuji.asistencia.infrastructure.adapter.LectorArchivoBiometrico.leer(
           archivo.getBytes(), nombreOriginal);
       var nombre = nombreOriginal.replaceAll("[\\r\\n\\\\/]+", "_");
-      return biometrico.importar(new ImportarLoteBiometricoRequestDto(nombre, marcas));
+      return ResponseEntity.accepted().body(importaciones.encolar(new ImportarLoteBiometricoRequestDto(nombre, marcas)));
     } catch (IOException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo leer el CSV biométrico");
     }
+  }
+
+  @GetMapping("/biometrico/importaciones/{id}")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
+  @Operation(summary = "biometrico.estadoImportacion")
+  public ImportacionBiometricaResponseDto estadoImportacion(@PathVariable UUID id) {
+    return importaciones.estado(id);
   }
 
   @PostMapping("/aula")
@@ -137,7 +148,7 @@ public class AsistenciaController {
   }
 
   @GetMapping("/aula/{asistenciaId}/justificacion/documento")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "aula.documentoSustentoPrivado")
   public DocumentoSustentoResponse descargarSustentoPrivado(@PathVariable Long asistenciaId) {
     return new DocumentoSustentoResponse(almacenamiento.urlFirmada(aula.documentoSustentoKey(asistenciaId)));
@@ -146,14 +157,24 @@ public class AsistenciaController {
   public record DocumentoSustentoResponse(String url) {}
 
   @GetMapping("/aula")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "aula.reporte")
   public ReporteAsistenciaDiariaResponseDto obtenerReporteDiario(@RequestParam LocalDate fecha) {
     return aula.reporte(fecha);
   }
 
+  @GetMapping("/aula/fechas")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR','TUTOR','DOCENTE')")
+  @Operation(summary = "aula.fechasConRegistros")
+  public List<LocalDate> fechasConRegistros(@RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
+    if (desde.isAfter(hasta) || ChronoUnit.DAYS.between(desde, hasta) > 42) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rango de fechas no es válido");
+    }
+    return aula.fechasConRegistros(desde, hasta);
+  }
+
   @PostMapping("/conciliacion")
-  @PreAuthorize("hasAnyRole('SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "conciliacion.conciliar")
   public List<ConciliacionAsistenciaResponseDto> conciliarAsistencia(
       @RequestParam Short anioId,
@@ -163,7 +184,7 @@ public class AsistenciaController {
   }
 
   @GetMapping("/conciliacion/alertas")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','AUXILIAR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','AUXILIAR')")
   @Operation(summary = "conciliacion.alertas")
   public List<DiscrepanciaAlertaResponseDto> consultarAlertas(@RequestParam LocalDate fecha) {
     return conciliacion.alertas(fecha);

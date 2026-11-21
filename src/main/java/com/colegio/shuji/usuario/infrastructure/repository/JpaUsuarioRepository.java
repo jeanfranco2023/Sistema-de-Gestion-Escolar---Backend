@@ -35,6 +35,9 @@ public interface JpaUsuarioRepository extends JpaRepository<UsuarioEntity, Long>
   @Query("SELECT DISTINCT u FROM UsuarioEntity u LEFT JOIN FETCH u.roles ORDER BY u.id ASC")
   List<UsuarioEntity> findAllWithRoles();
 
+  @Query("SELECT u FROM UsuarioEntity u WHERE u.id IN :ids")
+  List<UsuarioEntity> findResumenByIds(@Param("ids") java.util.Collection<Long> ids);
+
   @Query(
       "SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM UsuarioEntity u WHERE u.username"
           + " = :username")
@@ -49,4 +52,7 @@ public interface JpaUsuarioRepository extends JpaRepository<UsuarioEntity, Long>
       "SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM UsuarioEntity u WHERE u.dni ="
           + " :dni")
   boolean existsByDni(@Param("dni") String dni);
+
+  @Query("SELECT u FROM UsuarioEntity u LEFT JOIN FETCH u.roles WHERE u.dni = :dni")
+  Optional<UsuarioEntity> findByDni(@Param("dni") String dni);
 }

@@ -45,4 +45,16 @@ public interface JpaCalificacionRepository extends JpaRepository<CalificacionCne
 
   @Query("select e from CalificacionCnebEntity e where e.asignacionDocenteId = :asigId and e.periodoAcademicoId = :periodoId order by e.id")
   List<CalificacionCnebEntity> buscarPorAsignacionYPeriodo(@Param("asigId") Long asigId, @Param("periodoId") Short periodoId);
+
+  @Query("select e from CalificacionCnebEntity e where e.anioLectivoId = :anioId and e.periodoAcademicoId = :periodoId order by e.id")
+  List<CalificacionCnebEntity> buscarPorAnioYPeriodo(@Param("anioId") Short anioId, @Param("periodoId") Short periodoId);
+
+  @Query("select e from CalificacionCnebEntity e where e.anioLectivoId = :anioId and e.calificacionCualitativa in ('B', 'C') order by e.id")
+  List<CalificacionCnebEntity> buscarRiesgosPorAnio(@Param("anioId") Short anioId);
+
+  @Query("select e from CalificacionCnebEntity e where e.anioLectivoId = :anioId and e.periodoAcademicoId = :periodoId and e.calificacionCualitativa in ('B', 'C') order by e.id")
+  List<CalificacionCnebEntity> buscarRiesgosPorAnioYPeriodo(@Param("anioId") Short anioId, @Param("periodoId") Short periodoId);
+
+  @Query("select e from CalificacionCnebEntity e where e.periodoAcademicoId = :periodoId and e.calificacionCualitativa in ('B', 'C') order by e.id")
+  List<CalificacionCnebEntity> buscarRiesgosPorPeriodo(@Param("periodoId") Short periodoId);
 }

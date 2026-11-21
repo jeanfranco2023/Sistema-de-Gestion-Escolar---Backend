@@ -26,6 +26,24 @@ import org.springframework.web.server.ResponseStatusException;
 
 class SolicitudMatriculaPublicaControllerTest {
   @Test
+  void modoPresentacionSeInformaDeshabilitadoPorDefecto() throws Exception {
+    var solicitudes = mock(SolicitudMatriculaPublicaService.class);
+    var controller = new SolicitudMatriculaPublicaController(
+        solicitudes,
+        mock(GestionarPagoMatriculaPublicaUseCase.class),
+        mock(GeminiDocumentoMatriculaPort.class),
+        mock(FirmaDigitalDocumentoPort.class),
+        mock(VerificacionIdentidadMatriculaService.class),
+        mock(AlmacenDocumentosMatriculaPort.class),
+        mock(com.colegio.shuji.shared.application.port.out.ActorActualPort.class));
+    MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+    mvc.perform(get("/api/v1/solicitudes-matricula/public/modo-presentacion"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activo").value(false));
+  }
+
+  @Test
   void fichaSinDocumentosEmitidosDevuelve409JsonConAcceptDeNavegadorYEstrictHtml()
       throws Exception {
     var solicitudes = mock(SolicitudMatriculaPublicaService.class);

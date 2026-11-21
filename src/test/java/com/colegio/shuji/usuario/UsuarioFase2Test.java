@@ -214,12 +214,14 @@ class UsuarioFase2Test {
     RegisterUserRequestDto request =
         RegisterUserRequestDto.builder()
             .username("docente_carlos")
+            .dni("12345678")
             .email("carlos@test.com")
             .roles(Set.of("DOCENTE"))
             .build();
 
     when(userRepositoryPort.existsByUsername("docente_carlos")).thenReturn(false);
     when(userRepositoryPort.existsByEmail("carlos@test.com")).thenReturn(false);
+    when(userRepositoryPort.existsByDni("12345678")).thenReturn(false);
     when(roleRepositoryPort.findByCodigoIn(any())).thenReturn(List.of(Rol.builder().id((short) 2).codigo("DOCENTE").build()));
     when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashedTemporalPassword");
     when(userMapper.toDomain(any())).thenReturn(Usuario.builder().username("docente_carlos").email("carlos@test.com").build());
@@ -231,6 +233,19 @@ class UsuarioFase2Test {
     assertNotNull(response);
     assertTrue(Boolean.TRUE.equals(response.getDebeCambiarPassword()));
     verify(passwordEncoder).encode(anyString());
+  }
+
+  @Test
+  @DisplayName("registrarPorDireccion() exige DNI obligatorio de 8 dígitos cuando el rol incluye DOCENTE")
+  void registrarPorDireccionExigeDniParaDocente() {
+    RegisterUserRequestDto sinDni =
+        RegisterUserRequestDto.builder()
+            .username("docente_sin_dni")
+            .email("sindni@test.com")
+            .roles(Set.of("DOCENTE"))
+            .build();
+
+    assertThrows(ReglaNegocioException.class, () -> authService.registrarPorDireccion(sinDni));
   }
 
   @Test
@@ -664,14 +679,14 @@ class UsuarioFase2Test {
   }
 
   @Test
-  @DisplayName("El endpoint de descarga firmada requiere el rol Dirección")
+  @DisplayName("El endpoint de descarga firmada requiere el rol Dirección o Administrador")
   void descargaFirmadaRestringidaADireccion() throws NoSuchMethodException {
     var method = UsuarioController.class.getMethod(
         "obtenerEnlaceDescargaDocumento", Long.class, Long.class);
     var authorization = method.getAnnotation(PreAuthorize.class);
 
     assertNotNull(authorization);
-    assertEquals("hasRole('DIRECCION')", authorization.value());
+    assertEquals("hasAnyRole('DIRECCION','ADMINISTRADOR')", authorization.value());
   }
 
   @Test

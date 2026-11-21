@@ -30,28 +30,28 @@ public class ApoderadoController {
   private final RegistrarFichaFamiliarUseCase familias;
 
   @PostMapping("")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "familias.registrarApoderado")
   public ApoderadoResponseDto registrarApoderado(@Valid @RequestBody RegistrarApoderadoRequestDto r) {
     return familias.registrarApoderado(r);
   }
 
   @GetMapping("")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "familias.listarApoderados")
   public List<ApoderadoResponseDto> listarApoderados() {
     return familias.listarApoderados();
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "familias.consultarApoderado")
   public ApoderadoResponseDto consultarApoderado(@PathVariable @Positive Long id) {
     return familias.consultarApoderado(id);
   }
 
   @PatchMapping("/{id}/dni")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "Corregir DNI del apoderado con auditoría")
   public ApoderadoResponseDto corregirDni(
       @PathVariable @Positive Long id,
@@ -60,7 +60,7 @@ public class ApoderadoController {
   }
 
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "Cambiar estado del apoderado (borrado lógico formal)")
   public ApoderadoResponseDto cambiarEstado(
       @PathVariable @Positive Long id,

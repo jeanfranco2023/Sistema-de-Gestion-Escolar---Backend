@@ -1,14 +1,18 @@
 package com.colegio.shuji.asistencia.infrastructure.adapter;
 
 import com.colegio.shuji.asistencia.application.port.out.AsistenciaAulaRepositoryPort;
+import com.colegio.shuji.asistencia.application.port.out.SeccionAsistencia;
 import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
+import com.colegio.shuji.asistencia.infrastructure.entity.AsistenciaAulaEntity;
 import com.colegio.shuji.asistencia.infrastructure.repository.JpaAsistenciaAulaRepository;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,23 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
     repository.saveAndFlush(entity);
     entityManager.refresh(entity);
     return mapper.toDomain(entity);
+  }
+
+  public List<AsistenciaAula> guardarTodos(Collection<AsistenciaAula> valores) {
+    if (valores == null || valores.isEmpty()) return List.of();
+    auditoria.syncCurrentUserFromSecurityContext();
+    var idsExistentes = valores.stream().map(AsistenciaAula::getId).filter(java.util.Objects::nonNull).distinct().toList();
+    var entidadesExistentes = repository.findAllById(idsExistentes).stream()
+        .collect(Collectors.toMap(AsistenciaAulaEntity::getId, Function.identity()));
+    var entidades = valores.stream().map(valor -> {
+      var entidad = valor.getId() == null ? mapper.toEntity(valor) : entidadesExistentes.get(valor.getId());
+      if (entidad == null) {
+        throw new com.colegio.shuji.shared.domain.exception.BusinessException("Registro no encontrado");
+      }
+      mapper.actualizar(valor, entidad);
+      return entidad;
+    }).toList();
+    return repository.saveAll(entidades).stream().map(mapper::toDomain).toList();
   }
 
   public Optional<AsistenciaAula> buscarPorId(Long id) {
@@ -70,6 +91,15 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
 
   public List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor) {
     return repository.buscarPorFechaSesion(valor).stream().map(mapper::toDomain).toList();
+  }
+
+  public List<SeccionAsistencia> buscarSeccionesPorMatriculaIds(Collection<Long> matriculaIds) {
+    if (matriculaIds == null || matriculaIds.isEmpty()) return List.of();
+    return repository.buscarSeccionesPorMatriculaIds(matriculaIds);
+  }
+
+  public List<LocalDate> buscarFechasConRegistros(LocalDate desde, LocalDate hasta) {
+    return repository.buscarFechasConRegistros(desde, hasta);
   }
 
   public List<AsistenciaAula> buscarPorFechaSesionYMatriculaIds(

@@ -27,6 +27,7 @@ public interface MatriculaMapper {
   Matricula toDomain(SolicitarMatriculaRequestDto request);
 
   @Mapping(target = "codigoInterno", ignore = true)
+  @Mapping(target = "tieneApoderado", constant = "false")
   EstudianteResponseDto toResponse(Estudiante model);
 
   ApoderadoResponseDto toResponse(Apoderado model);

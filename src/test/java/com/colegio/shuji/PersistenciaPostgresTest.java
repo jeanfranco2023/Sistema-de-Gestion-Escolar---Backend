@@ -262,6 +262,10 @@ class PersistenciaPostgresTest {
     var periodo=calendario.listarPeriodos(anioId).stream().filter(p->p.activo()&&!p.cerrado()).findFirst().orElseThrow();
     var area=curriculo.crearArea(new CrearAreaRequestDto(nivelId,"PBK","Matemática"));
     var competencia=curriculo.crearCompetencia(new CrearCompetenciaRequestDto(area.id(),(short)1,"Resuelve problemas de cantidad",null));
+    assertTrue(carga.listarDocentesPorArea(area.id()).isEmpty());
+    habilitarDocentePara(area.id());
+    assertEquals(List.of(usuarioId),
+        carga.listarDocentesPorArea(area.id()).stream().map(docente -> docente.id()).toList());
     var asignacion=carga.asignarDocente(new AsignarDocenteRequestDto(usuarioId,seccionId,anioId,nivelId,area.id()));
     autenticar("DOCENTE");
     assertTrue(evaluacion.listarMatriz(asignacion.id(), periodo.id(), competencia.id()).stream()
@@ -496,6 +500,7 @@ class PersistenciaPostgresTest {
             .map(com.colegio.shuji.academico.application.dto.out.SeccionResponseDto::aulaFisica)
             .findFirst()
             .orElseThrow();
+    habilitarDocentePara(area.id());
     var asignacion =
         carga.asignarDocente(
             new AsignarDocenteRequestDto(usuarioId, seccionId, anioId, nivelId, area.id()));
@@ -573,6 +578,7 @@ class PersistenciaPostgresTest {
   void incidenciasDevuelvenElNombreDelEstudianteDeLaMatricula() {
     autenticar("DIRECCION");
     var area = curriculo.crearArea(new CrearAreaRequestDto(nivelId, "INCTEST", "Tutoría"));
+    habilitarDocentePara(area.id());
     carga.asignarDocente(
         new AsignarDocenteRequestDto(usuarioId, seccionId, anioId, nivelId, area.id()));
     autenticar("TUTOR");
@@ -582,6 +588,18 @@ class PersistenciaPostgresTest {
             com.colegio.shuji.convivencia.domain.enums.TipoFalta.LEVE,
             "Observación de prueba", false));
     assertTrue(incidencia.nombreEstudiante().contains("Ana"));
+  }
+
+  private void habilitarDocentePara(Short areaId) {
+    em.createNativeQuery("""
+        insert into public.postulaciones_docentes (docente_usuario_id, nivel_id, estado)
+        values (:docente, :nivel, 'APROBADA')
+        """).setParameter("docente", usuarioId).setParameter("nivel", nivelId).executeUpdate();
+    em.createNativeQuery("""
+        insert into public.docente_areas_curriculares (docente_usuario_id, nivel_id, area_curricular_id)
+        values (:docente, :nivel, :area)
+        """).setParameter("docente", usuarioId).setParameter("nivel", nivelId)
+        .setParameter("area", areaId).executeUpdate();
   }
 
   @Test

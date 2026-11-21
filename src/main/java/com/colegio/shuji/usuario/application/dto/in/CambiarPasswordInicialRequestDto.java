@@ -7,8 +7,7 @@ import jakarta.validation.constraints.Size;
 
 @Schema(description = "Solicitud para establecer la contraseña definitiva en el primer inicio de sesión")
 public record CambiarPasswordInicialRequestDto(
-    @Schema(description = "Contraseña temporal o actual", example = "Temp1234#")
-    @NotBlank(message = "La contraseña actual es obligatoria")
+    @Schema(description = "Contraseña temporal o actual (opcional para simplificar primer inicio de sesión)", example = "Temp1234#")
     String passwordActual,
 
     @Schema(description = "Nueva contraseña segura", example = "MiNuevaPassword2026!")

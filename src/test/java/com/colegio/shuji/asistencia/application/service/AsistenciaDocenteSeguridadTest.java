@@ -9,6 +9,7 @@ import com.colegio.shuji.asistencia.application.mapper.AsistenciaMapper;
 import com.colegio.shuji.asistencia.application.port.out.AsistenciaAulaRepositoryPort;
 import com.colegio.shuji.asistencia.application.port.out.BiometricoRepositoryPort;
 import com.colegio.shuji.asistencia.application.port.out.MarcaPorteriaRepositoryPort;
+import com.colegio.shuji.asistencia.application.port.out.SeccionAsistencia;
 import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.model.AsistenciaAula;
 import com.colegio.shuji.curriculo.application.port.out.AsignacionRepositoryPort;
@@ -17,6 +18,7 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.model.Matricula;
+import com.colegio.shuji.matricula.domain.model.Estudiante;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -27,9 +29,54 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.security.access.AccessDeniedException;
 
 class AsistenciaDocenteSeguridadTest {
+  @Test
+  void reporteDiarioIncluyeSeccionesDeDistintoGradoConUnaCargaAgrupada() {
+    var fecha = LocalDate.of(2027, 3, 1);
+    var registros = List.of(
+        AsistenciaAula.builder().id(1L).matriculaId(40L).fechaSesion(fecha).build(),
+        AsistenciaAula.builder().id(2L).matriculaId(41L).fechaSesion(fecha).build());
+    var matriculas = List.of(
+        Matricula.builder().id(40L).estudianteId(400L).seccionId(10).build(),
+        Matricula.builder().id(41L).estudianteId(401L).seccionId(20).build());
+    var alumnos = List.of(
+        Estudiante.builder().id(400L).nombres("Ana").apellidoPaterno("Rojas").build(),
+        Estudiante.builder().id(401L).nombres("Luis").apellidoPaterno("Torres").build());
+    var cargasSeccion = new AtomicInteger();
+    var servicio = new AsistenciaService(
+        Mappers.getMapper(AsistenciaMapper.class),
+        port(BiometricoRepositoryPort.class, (m, a) -> null),
+        port(MarcaPorteriaRepositoryPort.class, (m, a) -> null),
+        port(EstudianteRepositoryPort.class,
+            (m, a) -> m.getName().equals("buscarPorIds") ? alumnos : null),
+        port(MatriculaRepositoryPort.class,
+            (m, a) -> m.getName().equals("buscarPorIds") ? matriculas : null),
+        port(AsistenciaAulaRepositoryPort.class, (m, a) -> {
+          if (m.getName().equals("buscarPorFechaSesion")) return registros;
+          if (m.getName().equals("buscarSeccionesPorMatriculaIds")) {
+            cargasSeccion.incrementAndGet();
+            return List.of(
+                new SeccionAsistencia(40L, 10, "Primer grado", "Secundaria", "A"),
+                new SeccionAsistencia(41L, 20, "Segundo grado", "Secundaria", "A"));
+          }
+          return null;
+        }),
+        port(AsignacionRepositoryPort.class, (m, a) -> null),
+        port(AnioLectivoRepositoryPort.class, (m, a) -> null),
+        port(ActorActualPort.class, (m, a) -> null));
+
+    var reporte = servicio.reporte(fecha);
+
+    assertEquals(1, cargasSeccion.get());
+    assertEquals(10, reporte.asistencias().get(0).seccionId());
+    assertEquals("Primer grado · Secundaria · Sección A", reporte.asistencias().get(0).seccion());
+    assertEquals(20, reporte.asistencias().get(1).seccionId());
+    assertEquals("Segundo grado · Secundaria · Sección A", reporte.asistencias().get(1).seccion());
+  }
+
   @Test
   void rechazaFechaDeAsistenciaFueraDelAnioDeLaMatricula() {
     var inicio = LocalDate.of(2027, 3, 1);

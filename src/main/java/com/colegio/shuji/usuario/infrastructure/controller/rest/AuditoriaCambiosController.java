@@ -27,7 +27,7 @@ public class AuditoriaCambiosController {
   private final ConsultarAuditoriaCambiosUseCase consulta;
 
   @GetMapping
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
   public Page<CambioAuditoriaResponseDto> listar(
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fechaInicio,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fechaFin,
@@ -41,7 +41,7 @@ public class AuditoriaCambiosController {
   }
 
   @GetMapping("/recientes")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
   public List<CambioAuditoriaResponseDto> listarRecientes(
       @RequestParam(defaultValue = "100") @Positive @Max(200) int limite) {
     return consulta.listarRecientes(limite);

@@ -26,6 +26,7 @@ public class Usuario {
 
   private Long id;
   private String username;
+  private String nombreCompleto;
   private String email;
   private String usuarioPassword;
   private Boolean activo;
@@ -108,6 +109,14 @@ public class Usuario {
 
   public void corregirDni(String nuevoDni, LocalDateTime ahora) {
     this.dni = nuevoDni;
+    this.fechaActualizacion = ahora;
+  }
+
+  public void actualizarNombreCompleto(String nombreCompleto, LocalDateTime ahora) {
+    if (nombreCompleto == null || nombreCompleto.isBlank()) {
+      throw new com.colegio.shuji.shared.domain.exception.BusinessException("El nombre completo es obligatorio");
+    }
+    this.nombreCompleto = nombreCompleto.trim();
     this.fechaActualizacion = ahora;
   }
 

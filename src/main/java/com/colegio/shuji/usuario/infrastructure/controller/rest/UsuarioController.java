@@ -58,9 +58,11 @@ public class UsuarioController {
 
   @Operation(
       summary = "Crear nuevo usuario institucional",
-      description = "Permite a Dirección dar de alta usuarios institucionales asignando roles específicos")
+      description = "Dirección puede crear usuarios institucionales, incluidos docentes, con el "
+          + "expediente vacío. Los documentos laborales son opcionales y se adjuntan por separado "
+          + "después del alta.")
   @PostMapping
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<UserResponseDto>> crearUsuario(
       @Valid @RequestBody RegisterUserRequestDto requestDto) {
     UserResponseDto usuario = gestionUsuarioUseCase.registrarPorDireccion(requestDto);
@@ -72,7 +74,7 @@ public class UsuarioController {
       summary = "Obtener perfil propio",
       description = "Retorna la información del usuario actualmente autenticado")
   @GetMapping("/me")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<UserResponseDto>> obtenerMiPerfil(
       @AuthenticationPrincipal UserPrincipal principal) {
 
@@ -84,7 +86,7 @@ public class UsuarioController {
       summary = "Actualizar perfil propio",
       description = "Actualiza los datos básicos del usuario autenticado")
   @PutMapping("/me")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<UserResponseDto>> actualizarMiPerfil(
       @AuthenticationPrincipal UserPrincipal principal,
       @Valid @RequestBody UpdateUsuarioRequestDto requestDto) {
@@ -100,7 +102,7 @@ public class UsuarioController {
           "Lista todos los usuarios o filtra según el código de rol institucional (ej: DOCENTE,"
               + " SECRETARIA)")
   @GetMapping
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<List<UserResponseDto>>> listarUsuarios(
       @Parameter(description = "Código del rol (opcional)", example = "DOCENTE")
           @RequestParam(name = "rol", required = false)
@@ -114,7 +116,7 @@ public class UsuarioController {
       summary = "Cambiar estado activo/inactivo de un usuario (borrado lógico)",
       description = "Permite a Dirección activar o suspender una cuenta institucional")
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<UserResponseDto>> cambiarEstado(
       @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
           Long id,
@@ -137,7 +139,7 @@ public class UsuarioController {
       summary = "Corregir DNI de un usuario institucional",
       description = "Acción transaccional restringida a Dirección para corregir el DNI con registro de auditoría")
   @PatchMapping("/{id}/dni")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<UserResponseDto>> corregirDni(
       @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
           Long id,
@@ -151,7 +153,7 @@ public class UsuarioController {
       summary = "Cambiar contraseña del usuario autenticado",
       description = "Permite al usuario actual modificar su contraseña validando la anterior")
   @PutMapping("/password")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE','AUXILIAR','TUTOR','APODERADO')")
   public ResponseEntity<ApiResponse<Void>> cambiarPassword(
       @AuthenticationPrincipal UserPrincipal principal,
       @Valid @RequestBody CambiarPasswordRequestDto requestDto) {
@@ -164,7 +166,7 @@ public class UsuarioController {
       summary = "Subir documento del expediente de empleado",
       description = "Carga un PDF privado. Solo devuelve VALIDADO_IA cuando el motor configurado confirma tipo, legibilidad e identidad; sin IA requiere revisión manual.")
   @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<ExpedienteEmpleadoDocumentoResponseDto>> subirDocumento(
       @Parameter(description = "ID del usuario empleado", required = true) @PathVariable("id")
           Long id,
@@ -192,7 +194,7 @@ public class UsuarioController {
       summary = "Listar documentos del expediente de un empleado",
       description = "Obtiene los documentos cargados para el empleado junto con sus dictámenes de validación IA")
   @GetMapping("/{id}/documentos")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<List<ExpedienteEmpleadoDocumentoResponseDto>>> listarDocumentos(
       @Parameter(description = "ID del usuario empleado", required = true) @PathVariable("id")
           Long id) {
@@ -206,7 +208,7 @@ public class UsuarioController {
       summary = "Obtener un enlace temporal de descarga del expediente de empleado",
       description = "Solo Dirección puede generar el enlace firmado de corta duración para un documento del empleado indicado.")
   @GetMapping("/{id}/documentos/{documentoId}/descarga")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<String>> obtenerEnlaceDescargaDocumento(
       @Parameter(description = "ID del usuario empleado", required = true) @PathVariable("id") Long id,
       @Parameter(description = "ID del documento", required = true) @PathVariable("documentoId") Long documentoId) {
@@ -218,7 +220,7 @@ public class UsuarioController {
       summary = "Revocar rol de un usuario institucional",
       description = "Revoca un rol institucional garantizando que quede al menos un administrador y bloqueando autorevocación")
   @DeleteMapping("/{id}/roles/{rolId}")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public ResponseEntity<ApiResponse<UserResponseDto>> revocarRol(
       @Parameter(description = "ID del usuario", required = true) @PathVariable("id")
           Long id,

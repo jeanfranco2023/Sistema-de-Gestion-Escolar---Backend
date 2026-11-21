@@ -3,7 +3,9 @@ package com.colegio.shuji.matricula.infrastructure.entity;
 import com.colegio.shuji.matricula.domain.enums.EstadoSolicitudMatriculaPublica;
 import com.colegio.shuji.matricula.domain.enums.EstadoValidacionDocumento;
 import com.colegio.shuji.matricula.domain.enums.Genero;
+import com.colegio.shuji.matricula.domain.enums.ModalidadIngreso;
 import com.colegio.shuji.matricula.domain.enums.Parentesco;
+import com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -28,6 +30,9 @@ import lombok.Setter;
 @NoArgsConstructor
 public class SolicitudMatriculaPublicaEntity {
   @Id private UUID id;
+
+  @Column(nullable = false)
+  private boolean presencial;
 
   @Column(name = "huella_token", nullable = false, unique = true, length = 64)
   private String tokenHash;
@@ -94,6 +99,20 @@ public class SolicitudMatriculaPublicaEntity {
 
   @Column(name = "consentimiento_gemini", nullable = false)
   private boolean consentimientoGemini;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "modalidad_ingreso", nullable = false, length = 20)
+  private ModalidadIngreso modalidadIngreso = ModalidadIngreso.REGULAR;
+
+  @Column(name = "colegio_procedencia", length = 150)
+  private String colegioProcedencia;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "estado_certificado", nullable = false, length = 15)
+  private EstadoValidacionDocumento estadoCertificado = EstadoValidacionDocumento.PENDIENTE;
+
+  @Column(name = "observacion_certificado", length = 500)
+  private String observacionCertificado;
 
   @Column(name = "requiere_autorizacion_edad", nullable = false)
   private boolean requiereAutorizacionEdad;
@@ -181,32 +200,40 @@ public class SolicitudMatriculaPublicaEntity {
     fechaActualizacion = OffsetDateTime.now(ZoneOffset.UTC);
   }
 
-  public EstadoValidacionDocumento estadoDocumento(
-      com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud tipo) {
+  public java.util.List<TipoDocumentoSolicitud> tiposRequeridos() {
+    return TipoDocumentoSolicitud.requeridosPara(modalidadIngreso);
+  }
+
+  public EstadoValidacionDocumento estadoDocumento(TipoDocumentoSolicitud tipo) {
     return switch (tipo) {
       case PARTIDA_NACIMIENTO -> estadoPartida;
       case DNI_C4 -> estadoDniC4;
       case RECIBO_SERVICIO -> estadoRecibo;
+      case CERTIFICADO_ESTUDIOS -> estadoCertificado;
+      case CONSTANCIA_PAGO -> throw new IllegalArgumentException("La constancia no forma parte de la validación documental");
     };
   }
 
-  public String observacionDocumento(
-      com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud tipo) {
+  public String observacionDocumento(TipoDocumentoSolicitud tipo) {
     return switch (tipo) {
       case PARTIDA_NACIMIENTO -> observacionPartida;
       case DNI_C4 -> observacionDniC4;
       case RECIBO_SERVICIO -> observacionRecibo;
+      case CERTIFICADO_ESTUDIOS -> observacionCertificado;
+      case CONSTANCIA_PAGO -> throw new IllegalArgumentException("La constancia no forma parte de la validación documental");
     };
   }
 
   public void actualizarDocumento(
-      com.colegio.shuji.matricula.domain.enums.TipoDocumentoSolicitud tipo,
+      TipoDocumentoSolicitud tipo,
       EstadoValidacionDocumento estado,
       String observacion) {
     switch (tipo) {
       case PARTIDA_NACIMIENTO -> { estadoPartida = estado; observacionPartida = observacion; }
       case DNI_C4 -> { estadoDniC4 = estado; observacionDniC4 = observacion; }
       case RECIBO_SERVICIO -> { estadoRecibo = estado; observacionRecibo = observacion; }
+      case CERTIFICADO_ESTUDIOS -> { estadoCertificado = estado; observacionCertificado = observacion; }
+      case CONSTANCIA_PAGO -> throw new IllegalArgumentException("La constancia no forma parte de la validación documental");
     }
   }
 }

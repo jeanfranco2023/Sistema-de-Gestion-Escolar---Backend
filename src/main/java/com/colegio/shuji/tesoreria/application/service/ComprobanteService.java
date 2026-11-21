@@ -44,6 +44,11 @@ public class ComprobanteService implements EmitirComprobanteUseCase {
     return emitirConContador(pago, tipo, serie);
   }
 
+  @Transactional(readOnly = true)
+  public ComprobanteResponseDto consultarPorPago(Long pagoId) {
+    return mapper.toResponse(requerido(comprobantes.buscarPorPagoTransaccionId(pagoId).stream().findFirst()));
+  }
+
   private ComprobanteResponseDto emitirConContador(
       com.colegio.shuji.tesoreria.domain.model.PagoTransaccion pago,
       TipoComprobante tipo,

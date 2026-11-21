@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.colegio.shuji.asistencia.application.dto.in.ImportarLoteBiometricoRequestDto;
 import com.colegio.shuji.asistencia.application.port.in.EjecutarConciliacionDiariaUseCase;
-import com.colegio.shuji.asistencia.application.port.in.ProcesarBiometricoUseCase;
 import com.colegio.shuji.asistencia.application.port.in.RegistrarListaAulaUseCase;
 import com.colegio.shuji.asistencia.application.port.out.AlmacenJustificacionPort;
+import com.colegio.shuji.asistencia.application.service.ImportacionBiometricaService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,14 +22,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 class AsistenciaControllerImportacionTest {
-  private ProcesarBiometricoUseCase biometrico;
+  private ImportacionBiometricaService importaciones;
   private AsistenciaController controller;
 
   @BeforeEach
   void preparar() {
-    biometrico = mock(ProcesarBiometricoUseCase.class);
+    importaciones = mock(ImportacionBiometricaService.class);
     controller = new AsistenciaController(
-        biometrico,
+        importaciones,
         mock(RegistrarListaAulaUseCase.class),
         mock(EjecutarConciliacionDiariaUseCase.class),
         mock(AlmacenJustificacionPort.class));
@@ -49,7 +49,7 @@ class AsistenciaControllerImportacionTest {
   }
 
   @Test
-  void importaCsvValidoYEntregaElLoteAlCasoDeUso() {
+  void importaCsvValidoYLoEncolaParaProcesamiento() {
     byte[] csv = ("dni,fecha_hora,dispositivo_codigo\n"
         + "00000000,2026-10-28T08:30:00-05:00,PUERTA1\n").getBytes(StandardCharsets.UTF_8);
     var archivo = new MockMultipartFile("archivo", "marcas.csv", "text/csv", csv);
@@ -57,7 +57,7 @@ class AsistenciaControllerImportacionTest {
     controller.importarArchivoBiometrico(archivo);
 
     var captor = org.mockito.ArgumentCaptor.forClass(ImportarLoteBiometricoRequestDto.class);
-    verify(biometrico).importar(captor.capture());
+    verify(importaciones).encolar(captor.capture());
     assertEquals("marcas.csv", captor.getValue().nombreArchivo());
     assertEquals(1, captor.getValue().marcas().size());
     assertEquals("00000000", captor.getValue().marcas().getFirst().dniLeido());

@@ -24,12 +24,19 @@ public class AuditoriaAccesoController {
   private final AuditoriaAccesoService auditoria;
 
   @GetMapping
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
   public Page<AuditoriaAccesoResponseDto> listar(
+      @RequestParam(required = false) String usuarioNombre,
+      @RequestParam(required = false) String metodo,
+      @RequestParam(required = false) String ruta,
       @RequestParam(defaultValue = "0") @PositiveOrZero int page,
       @RequestParam(defaultValue = "50") @Positive @Max(100) int size) {
     return auditoria
-        .listar(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "fechaEvento")))
+        .listar(
+            usuarioNombre,
+            metodo,
+            ruta,
+            PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "fechaEvento")))
         .map(AuditoriaAccesoController::aDto);
   }
 

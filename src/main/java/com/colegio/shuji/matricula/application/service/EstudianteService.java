@@ -5,9 +5,11 @@ import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoApoderadoRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoEstudianteRequestDto;
+import com.colegio.shuji.matricula.application.dto.in.ApoderadoMatriculaRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarApoderadoRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoFichaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.ApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
@@ -18,6 +20,8 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.ReniecServicePort;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
+import com.colegio.shuji.matricula.domain.model.Apoderado;
+import com.colegio.shuji.matricula.domain.model.Estudiante;
 import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
@@ -80,7 +84,28 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
     var e = mapper.toDomain(r);
     e.iniciarRegistroManual();
     e.activar();
-    return mapper.toResponse(estudiantes.guardar(e));
+    var guardado = estudiantes.guardar(e);
+    boolean tieneApoderado = r.apoderado() != null;
+    if (tieneApoderado) {
+      var datos = r.apoderado();
+      Long apoderadoId = apoderados.buscarPorNumeroDocumento(datos.numeroDocumento()).stream()
+          .filter(a -> a.getTipoDocumento() == datos.tipoDocumento())
+          .map(Apoderado::getId)
+          .findFirst()
+          .orElseGet(() -> crearApoderado(datos));
+      vincular(new VincularApoderadoRequestDto(
+          guardado.getId(), apoderadoId, datos.parentesco(), true, true, true));
+    }
+    return mapper.toResponse(guardado).conTieneApoderado(tieneApoderado);
+  }
+
+  private Long crearApoderado(ApoderadoMatriculaRequestDto datos) {
+    var request = new RegistrarApoderadoRequestDto(datos.tipoDocumento(), datos.numeroDocumento(),
+        datos.nombres(), datos.apellidoPaterno(), datos.apellidoMaterno(), datos.celular(),
+        datos.email(), datos.direccion(), datos.ubigeoInei(), null);
+    var apoderado = mapper.toDomain(request);
+    apoderado.iniciarRegistroManual();
+    return apoderados.guardar(apoderado).getId();
   }
 
   public ApoderadoResponseDto registrarApoderado(RegistrarApoderadoRequestDto r) {
@@ -106,6 +131,25 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
     return apoderados.listar().stream().map(mapper::toResponse).toList();
   }
 
+  @Transactional(readOnly = true)
+  public List<ApoderadoFichaResponseDto> listarApoderadosPorEstudiante(Long estudianteId) {
+    var relaciones = vinculos.buscarPorEstudianteId(estudianteId);
+    if (relaciones.isEmpty()) {
+      return List.of();
+    }
+    var apoderadosMap =
+        apoderados.buscarPorIds(relaciones.stream().map(v -> v.getApoderadoId()).toList()).stream()
+            .collect(java.util.stream.Collectors.toMap(
+                Apoderado::getId,
+                java.util.function.Function.identity()));
+    return relaciones.stream()
+        .map(v -> new ApoderadoFichaResponseDto(
+            mapper.toResponse(requerido(java.util.Optional.ofNullable(apoderadosMap.get(v.getApoderadoId())))),
+            v.getParentesco(),
+            v.getEsResponsableEconomico()))
+        .toList();
+  }
+
   public EstudianteApoderadoResponseDto vincular(VincularApoderadoRequestDto r) {
     requerido(estudiantes.bloquearPorId(r.estudianteId()));
     requerido(apoderados.buscarPorId(r.apoderadoId()));
@@ -128,7 +172,15 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
 
   @Transactional(readOnly = true)
   public List<EstudianteResponseDto> listarEstudiantes() {
-    return estudiantes.listar().stream().map(mapper::toResponse).toList();
+    var lista = estudiantes.listar();
+    if (lista.isEmpty()) return List.of();
+    var estudiantesConApoderado = vinculos.buscarPorEstudianteIds(
+        lista.stream().map(Estudiante::getId).toList()).stream()
+        .map(com.colegio.shuji.matricula.domain.model.EstudianteApoderado::getEstudianteId)
+        .collect(java.util.stream.Collectors.toSet());
+    return lista.stream()
+        .map(e -> mapper.toResponse(e).conTieneApoderado(estudiantesConApoderado.contains(e.getId())))
+        .toList();
   }
 
   @Transactional(readOnly = true)

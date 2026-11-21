@@ -8,11 +8,13 @@ import com.colegio.shuji.curriculo.application.dto.out.AreaCurricularResponseDto
 import com.colegio.shuji.curriculo.application.dto.out.AsignacionDocenteResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.BloqueHorarioResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.CompetenciaResponseDto;
+import com.colegio.shuji.curriculo.application.dto.out.DocenteOpcionResponseDto;
 import com.colegio.shuji.curriculo.application.port.in.AsignarCargaDocenteUseCase;
 import com.colegio.shuji.curriculo.application.port.in.GestionarCurriculoUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,56 +36,62 @@ public class CurriculoController {
   private final AsignarCargaDocenteUseCase carga;
 
   @PostMapping("/areas")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "curriculo.crearArea")
   public AreaCurricularResponseDto crearArea(@Valid @RequestBody CrearAreaRequestDto r) {
     return curriculo.crearArea(r);
   }
 
   @GetMapping("/areas")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "curriculo.listarAreas")
   public List<AreaCurricularResponseDto> listarAreas(@RequestParam Short nivelId) {
     return curriculo.listarAreas(nivelId);
   }
 
+  @GetMapping("/docentes")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  public List<DocenteOpcionResponseDto> listarDocentes(@RequestParam @Positive Short areaId) {
+    return carga.listarDocentesPorArea(areaId);
+  }
+
   @PostMapping("/competencias")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "curriculo.crearCompetencia")
   public CompetenciaResponseDto crearCompetencia(@Valid @RequestBody CrearCompetenciaRequestDto r) {
     return curriculo.crearCompetencia(r);
   }
 
   @GetMapping("/competencias")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "curriculo.listarCompetencias")
   public List<CompetenciaResponseDto> listarCompetencias(@RequestParam Short areaId) {
     return curriculo.listarCompetencias(areaId);
   }
 
   @PostMapping("/bloques")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "curriculo.crearBloque")
   public BloqueHorarioResponseDto crearBloque(@Valid @RequestBody CrearBloqueRequestDto r) {
     return curriculo.crearBloque(r);
   }
 
   @GetMapping("/bloques")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "curriculo.listarBloques")
   public List<BloqueHorarioResponseDto> listarBloques() {
     return curriculo.listarBloques();
   }
 
   @PostMapping("/asignaciones")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "carga.asignarDocente")
   public AsignacionDocenteResponseDto asignarDocente(@Valid @RequestBody AsignarDocenteRequestDto r) {
     return carga.asignarDocente(r);
   }
 
   @GetMapping("/asignaciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   public List<AsignacionDocenteResponseDto> listarAsignaciones() {
     return carga.listarAsignaciones();
   }

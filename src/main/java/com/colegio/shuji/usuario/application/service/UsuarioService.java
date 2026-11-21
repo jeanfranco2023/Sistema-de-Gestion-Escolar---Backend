@@ -21,6 +21,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,6 +92,11 @@ public class UsuarioService implements GestionUsuarioUseCase {
         .findFirst()
         .orElseThrow(() -> new ReglaNegocioException("El usuario no tiene asignado el rol especificado."));
 
+    if ("ADMINISTRADOR".equalsIgnoreCase(rolARevocar.getCodigo())) {
+      exigirAdministrador();
+      asegurarOtroAdministradorActivo(usuario);
+    }
+
     boolean esRolDireccion = "DIRECCION".equalsIgnoreCase(rolARevocar.getCodigo())
         || "DIRECCION".equalsIgnoreCase(rolARevocar.getNombre())
         || "ROL_DIRECCION".equalsIgnoreCase(rolARevocar.getCodigo());
@@ -154,6 +161,10 @@ public class UsuarioService implements GestionUsuarioUseCase {
             .findByIdWithRoles(usuarioId)
             .orElseThrow(() -> new UserNotFoundException(usuarioId));
 
+    if (usuario.getRoles().stream().anyMatch(rol -> "ADMINISTRADOR".equals(rol.getCodigo()))) {
+      exigirAdministrador();
+      if (!Boolean.TRUE.equals(activo)) asegurarOtroAdministradorActivo(usuario);
+    }
     auditoria.syncCurrentUserFromSecurityContext();
 
     if (Boolean.TRUE.equals(activo)) {
@@ -200,8 +211,37 @@ public class UsuarioService implements GestionUsuarioUseCase {
   @Override
   public UserResponseDto registrarPorDireccion(RegisterUserRequestDto request) {
     log.info("Delegando alta administrativa de usuario institucional a RegisterUserUseCase");
+    if (request != null && request.getRoles() != null && request.getRoles().stream()
+        .anyMatch(rol -> rol != null && "ADMINISTRADOR".equalsIgnoreCase(rol.strip()))) {
+      exigirAdministrador();
+    }
+    boolean incluyeDocente = request != null && request.getRoles() != null && request.getRoles().stream()
+        .anyMatch(r -> r != null && ("DOCENTE".equalsIgnoreCase(r.trim()) || "ROL_DOCENTE".equalsIgnoreCase(r.trim())));
+    if (incluyeDocente) {
+      if (request.getDni() == null || !request.getDni().trim().matches("^\\d{8}$")) {
+        throw new ReglaNegocioException(
+            "El DNI de 8 dígitos numéricos es obligatorio para registrar un docente.",
+            "DNI_OBLIGATORIO_DOCENTE");
+      }
+    }
     auditoria.syncCurrentUserFromSecurityContext();
     return registerUserUseCase.registrarPorDireccion(request);
+  }
+
+  private void exigirAdministrador() {
+    var autenticacion = SecurityContextHolder.getContext().getAuthentication();
+    if (autenticacion == null || autenticacion.getAuthorities().stream()
+        .noneMatch(autoridad -> "ROLE_ADMINISTRADOR".equals(autoridad.getAuthority()))) {
+      throw new AccessDeniedException("Esta operación requiere el rol Administrador.");
+    }
+  }
+
+  private void asegurarOtroAdministradorActivo(Usuario usuario) {
+    if (usuario.estaActivo() && userRepositoryPort.findByRolCodigo("ADMINISTRADOR").stream()
+        .noneMatch(otro -> otro.estaActivo() && !otro.getId().equals(usuario.getId()))) {
+      throw new ReglaNegocioException(
+          "Debe quedar al menos un Administrador activo.", "ULTIMO_ADMINISTRADOR");
+    }
   }
 
   @Override
@@ -213,17 +253,21 @@ public class UsuarioService implements GestionUsuarioUseCase {
             .findByIdWithRoles(usuarioId)
             .orElseThrow(() -> new UserNotFoundException(usuarioId));
 
-    if (request.nuevoDni().equals(usuario.getDni())) {
-      throw new BusinessException("El nuevo DNI es idéntico al DNI actualmente registrado", "DNI_IDENTICO");
+    boolean cambiaDni = !java.util.Objects.equals(request.nuevoDni(), usuario.getDni());
+    boolean actualizaNombre = request.nombreCompleto() != null && !request.nombreCompleto().isBlank();
+    if (!cambiaDni && !actualizaNombre) {
+      throw new BusinessException("Consulta el DNI en RENIEC para actualizar el nombre", "SIN_CAMBIOS");
     }
 
-    if (userRepositoryPort.existsByDni(request.nuevoDni())) {
+    if (cambiaDni && userRepositoryPort.existsByDni(request.nuevoDni())) {
       throw new ReglaNegocioException("El DNI ingresado ya se encuentra asignado a otro usuario", "DNI_DUPLICADO");
     }
 
     auditoria.syncCurrentUserFromSecurityContext();
 
-    usuario.corregirDni(request.nuevoDni(), LocalDateTime.now());
+    LocalDateTime ahora = LocalDateTime.now();
+    if (cambiaDni) usuario.corregirDni(request.nuevoDni(), ahora);
+    if (actualizaNombre) usuario.actualizarNombreCompleto(request.nombreCompleto(), ahora);
 
     Usuario usuarioActualizado = userRepositoryPort.save(usuario);
     log.info("DNI del usuario ID: {} corregido exitosamente a {}", usuarioId, request.nuevoDni());

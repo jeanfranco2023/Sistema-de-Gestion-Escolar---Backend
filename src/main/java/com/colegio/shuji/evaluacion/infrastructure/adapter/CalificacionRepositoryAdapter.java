@@ -41,6 +41,12 @@ public class CalificacionRepositoryAdapter implements CalificacionRepositoryPort
     return repository.findById(id).map(mapper::toDomain);
   }
 
+  @Override
+  public List<CalificacionCneb> buscarPorIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return repository.findAllById(ids).stream().map(mapper::toDomain).toList();
+  }
+
   public Optional<CalificacionCneb> bloquearPorId(Long id) {
     return repository
         .bloquearPorId(id)
@@ -96,5 +102,25 @@ public class CalificacionRepositoryAdapter implements CalificacionRepositoryPort
 
   public List<CalificacionCneb> buscarPorAsignacionYPeriodo(Long asigId, Short periodoId) {
     return repository.buscarPorAsignacionYPeriodo(asigId, periodoId).stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
+  public List<CalificacionCneb> buscarPorAnioYPeriodo(Short anioId, Short periodoId) {
+    return repository.buscarPorAnioYPeriodo(anioId, periodoId).stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
+  public List<CalificacionCneb> buscarRiesgosPorAnio(Short anioId) {
+    return repository.buscarRiesgosPorAnio(anioId).stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
+  public List<CalificacionCneb> buscarRiesgosPorAnioYPeriodo(Short anioId, Short periodoId) {
+    return repository.buscarRiesgosPorAnioYPeriodo(anioId, periodoId).stream().map(mapper::toDomain).toList();
+  }
+
+  @Override
+  public List<CalificacionCneb> buscarRiesgosPorPeriodo(Short periodoId) {
+    return repository.buscarRiesgosPorPeriodo(periodoId).stream().map(mapper::toDomain).toList();
   }
 }

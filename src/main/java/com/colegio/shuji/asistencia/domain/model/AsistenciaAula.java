@@ -61,4 +61,11 @@ public class AsistenciaAula {
     registrarEstado(estado);
     auxiliarUsuarioId = auxiliarId;
   }
+
+  public void actualizarDesdeBiometrico(LocalTime hora, EstadoAsistenciaAula nuevoEstado, Long auxiliarId) {
+    if (Boolean.TRUE.equals(this.justificada)) return;
+    this.horaRegistro = hora;
+    this.estado = nuevoEstado;
+    this.auxiliarUsuarioId = auxiliarId;
+  }
 }

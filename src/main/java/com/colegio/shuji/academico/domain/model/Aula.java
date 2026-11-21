@@ -13,6 +13,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Aula {
+  public static final int CAPACIDAD_MAXIMA = 30;
+
   private Integer id;
   private String codigo;
   private String nombre;
@@ -24,7 +26,26 @@ public class Aula {
     codigo = codigo.trim().toUpperCase(Locale.ROOT);
     nombre = nombre.trim();
     ubicacion = ubicacion == null || ubicacion.isBlank() ? null : ubicacion.trim();
-    exigir(capacidad != null && capacidad > 0, "La capacidad del aula debe ser positiva");
+    exigir(capacidad != null && capacidad > 0 && capacidad <= CAPACIDAD_MAXIMA,
+        "La capacidad del aula debe estar entre 1 y 30 estudiantes");
     activa = true;
+  }
+
+  public void actualizar(String nuevoNombre, String nuevaUbicacion, Short nuevaCapacidad) {
+    if (nuevoNombre != null && !nuevoNombre.isBlank()) {
+      this.nombre = nuevoNombre.trim();
+    }
+    if (nuevaUbicacion != null) {
+      this.ubicacion = nuevaUbicacion.isBlank() ? null : nuevaUbicacion.trim();
+    }
+    if (nuevaCapacidad != null) {
+      exigir(nuevaCapacidad > 0 && nuevaCapacidad <= CAPACIDAD_MAXIMA,
+          "La capacidad del aula debe estar entre 1 y 30 estudiantes");
+      this.capacidad = nuevaCapacidad;
+    }
+  }
+
+  public void cambiarEstado(boolean nuevoEstado) {
+    this.activa = nuevoEstado;
   }
 }

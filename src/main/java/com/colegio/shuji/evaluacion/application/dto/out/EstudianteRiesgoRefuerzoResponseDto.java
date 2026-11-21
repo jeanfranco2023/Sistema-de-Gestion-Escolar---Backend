@@ -1,0 +1,28 @@
+package com.colegio.shuji.evaluacion.application.dto.out;
+
+public record EstudianteRiesgoRefuerzoResponseDto(
+    Long calificacionId,
+    Long matriculaId,
+    Long estudianteId,
+    String nombreEstudiante,
+    String dniEstudiante,
+    Short anioLectivoId,
+    Short periodoAcademicoId,
+    String periodoNombre,
+    Integer seccionId,
+    String nivelNombre,
+    String gradoNombre,
+    String seccionLetra,
+    String gradoSeccion,
+    Short areaCurricularId,
+    String areaNombre,
+    Long docenteUsuarioId,
+    String docenteNombre,
+    Short competenciaId,
+    String competenciaNombre,
+    String calificacionCualitativa,
+    String conclusionDescriptiva,
+    boolean derivado,
+    Long sesionRefuerzoId,
+    String sesionTema,
+    String estadoAsistencia) {}

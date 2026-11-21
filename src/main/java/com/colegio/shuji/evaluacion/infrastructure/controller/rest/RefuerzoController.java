@@ -2,8 +2,10 @@ package com.colegio.shuji.evaluacion.infrastructure.controller.rest;
 
 import com.colegio.shuji.evaluacion.application.dto.in.ProgramarRefuerzoRequestDto;
 import com.colegio.shuji.evaluacion.application.dto.in.RegistrarAsistenciaRefuerzoRequestDto;
+import com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoResponseDto;
 import com.colegio.shuji.evaluacion.application.dto.out.SesionRefuerzoResponseDto;
+import com.colegio.shuji.evaluacion.application.dto.out.TableroRefuerzoResponseDto;
 import com.colegio.shuji.evaluacion.application.port.in.DerivarAlumnosRefuerzoUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,34 +32,43 @@ public class RefuerzoController {
   private final DerivarAlumnosRefuerzoUseCase refuerzo;
 
   @GetMapping("/{id}/inscripciones")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
-  public List<com.colegio.shuji.evaluacion.application.dto.out.InscripcionRefuerzoDetalleResponseDto> inscripciones(@PathVariable @Positive Long id) {
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
+  public List<InscripcionRefuerzoDetalleResponseDto> inscripciones(@PathVariable @Positive Long id) {
     return refuerzo.inscripciones(id);
   }
 
+  @GetMapping("/tablero")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
+  @Operation(summary = "refuerzo.tablero")
+  public TableroRefuerzoResponseDto tablero(
+      @RequestParam(required = false) Short anioId,
+      @RequestParam(required = false) Short periodoId) {
+    return refuerzo.tablero(anioId, periodoId);
+  }
+
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "refuerzo.programar")
   public SesionRefuerzoResponseDto programarSesion(@Valid @RequestBody ProgramarRefuerzoRequestDto r) {
     return refuerzo.programar(r);
   }
 
   @GetMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "refuerzo.sesiones")
   public List<SesionRefuerzoResponseDto> listarSesiones(@RequestParam Short periodoId) {
     return refuerzo.sesiones(periodoId);
   }
 
   @PostMapping("/{id}/derivacion")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "refuerzo.derivar")
   public List<InscripcionRefuerzoResponseDto> derivarEstudiantes(@PathVariable @Positive Long id) {
     return refuerzo.derivar(id);
   }
 
   @PostMapping("/asistencia")
-  @PreAuthorize("hasRole('DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "refuerzo.registrarAsistencia")
   public InscripcionRefuerzoResponseDto registrarAsistenciaRefuerzo(
       @Valid @RequestBody RegistrarAsistenciaRefuerzoRequestDto r) {

@@ -22,6 +22,12 @@ import com.colegio.shuji.matricula.domain.model.EstudianteApoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import com.colegio.shuji.tesoreria.application.dto.in.GenerarObligacionMatriculaRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.in.RegistrarPagoCajaRequestDto;
+import com.colegio.shuji.tesoreria.application.dto.out.TransaccionResponseDto;
+import com.colegio.shuji.tesoreria.domain.enums.MetodoPago;
+import com.colegio.shuji.tesoreria.domain.enums.TipoComprobante;
+import com.colegio.shuji.tesoreria.domain.model.PagoTransaccion;
+import org.springframework.security.access.AccessDeniedException;
 import com.colegio.shuji.tesoreria.application.dto.out.ObligacionResponseDto;
 import com.colegio.shuji.tesoreria.application.mapper.TesoreriaMapper;
 import com.colegio.shuji.tesoreria.application.port.in.EmitirComprobanteUseCase;
@@ -84,6 +90,39 @@ class TesoreriaObligacionMatriculaTest {
         Estudiante.builder().id(90L).nombres("Ana").apellidoPaterno("Pérez").apellidoMaterno("Díaz").build()));
     when(mapper.toResponse(any(ObligacionPago.class)))
         .thenAnswer(inv -> toResponse(inv.getArgument(0)));
+  }
+
+  @Test
+  void auxiliarSoloPuedeCobrarUnExtraordinarioYElPagoCompletoEmiteComprobante() {
+    when(actor.tieneRol("AUXILIAR")).thenReturn(true);
+    when(actor.usuarioId()).thenReturn(41L);
+    when(matriculas.buscarPorId(281L)).thenReturn(Optional.of(matricula));
+    var cargo = ObligacionPago.programar(281L, concepto, (short) 0, LocalDate.of(2026, 12, 10));
+    when(obligaciones.bloquearPorId(900L)).thenReturn(Optional.of(cargo));
+    var total = new BigDecimal("350.00");
+    var solicitud = new RegistrarPagoCajaRequestDto(900L, "CAJA-OPERACION", MetodoPago.EFECTIVO, total);
+    when(mapper.toDomain(any(RegistrarPagoCajaRequestDto.class))).thenAnswer(inv -> {
+      RegistrarPagoCajaRequestDto r = inv.getArgument(0);
+      return PagoTransaccion.builder().obligacionPagoId(r.obligacionPagoId())
+          .pasarelaTransaccionId(r.pasarelaTransaccionId()).metodoPago(r.metodoPago())
+          .montoPagado(r.montoPagado()).build();
+    });
+
+    assertThrows(AccessDeniedException.class, () -> service.registrarCaja(solicitud));
+    cargo.setTipoConcepto(TipoConcepto.OTRO);
+    var parcial = new RegistrarPagoCajaRequestDto(900L, "CAJA-PARCIAL", MetodoPago.EFECTIVO, BigDecimal.ONE);
+    assertThrows(BusinessException.class, () -> service.registrarCaja(parcial));
+
+    when(pagos.guardar(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(mapper.toResponse(any(PagoTransaccion.class))).thenAnswer(inv -> {
+      PagoTransaccion p = inv.getArgument(0);
+      assertEquals(41L, p.getPayloadWebhook().get("usuarioCajaId"));
+      return new TransaccionResponseDto(55L, 900L, p.getPasarelaProveedor(),
+          p.getPasarelaTransaccionId(), p.getMetodoPago(), p.getMontoPagado(),
+          p.getFechaPago(), p.getEstadoPago(), p.getPayloadWebhook());
+    });
+    assertEquals(55L, service.registrarCaja(solicitud).id());
+    verify(comprobantes).emitirAutomaticoParaPago(55L, TipoComprobante.BOLETA, "B001");
   }
 
   @Test

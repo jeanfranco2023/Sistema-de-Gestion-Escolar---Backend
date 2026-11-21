@@ -88,7 +88,7 @@ public class EvaluacionService
   }
 
   public List<CalificacionResponseDto> registrar(RegistrarCalificacionesMasivasRequestDto r) {
-    if (!actor.tieneRol("DOCENTE")) {
+    if (!actor.tieneRol("DOCENTE") && !actor.tieneRol("DIRECCION")) {
       throw new org.springframework.security.access.AccessDeniedException(
           "Solo un docente puede registrar calificaciones");
     }
@@ -103,7 +103,7 @@ public class EvaluacionService
           ex.getMessage());
     }
     var a = requerido(asignaciones.buscarPorId(r.asignacionDocenteId()));
-    actor.verificarDocente(a.getDocenteUsuarioId());
+    if (!actor.tieneRol("DIRECCION")) actor.verificarDocente(a.getDocenteUsuarioId());
     exigir(a.getAnioLectivoId().equals(periodo.getAnioLectivoId()), "Asignación de otro año");
     var result = new ArrayList<CalificacionResponseDto>();
     var claves = new HashSet<String>();
@@ -177,9 +177,9 @@ public class EvaluacionService
       if (!docente && !familiar) throw new org.springframework.security.access.AccessDeniedException("La matrícula no está vinculada al usuario");
     }
     var notas = calificaciones.buscarPorMatriculaId(matriculaId);
-    if (actor.tieneRol("DOCENTE") && !gestion && !familiar)
-      notas =
-          notas.stream().filter(c -> c.getDocenteUsuarioId().equals(actor.usuarioId())).toList();
+    if (actor.tieneRol("DOCENTE") && !gestion && !familiar) {
+      notas = notas.stream().filter(c -> c.getSeccionId().equals(matricula.getSeccionId())).toList();
+    }
     return new LibretaNotasResponseDto(
         matriculaId, notas.stream().map(mapper::toResponse).toList());
   }

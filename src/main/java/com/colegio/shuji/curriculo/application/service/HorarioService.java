@@ -54,7 +54,7 @@ public class HorarioService implements GenerarMallaHorariaUseCase {
         bloques.listar().stream()
             .collect(Collectors.toMap(BloqueHorario::getId, Function.identity()));
     for (var h : horarios.buscarPorAnioLectivoId(a.getAnioLectivoId())) {
-      if (h.getDiaSemana() != r.diaSemana().getCodigo()) continue;
+      if (!h.estaActivo() || h.getDiaSemana() != r.diaSemana().getCodigo()) continue;
       var otro = requerido(Optional.ofNullable(bloquesMap.get(h.getBloqueHorarioId())));
       if (!otro.getHoraInicio().isBefore(b.getHoraFin())
           || !otro.getHoraFin().isAfter(b.getHoraInicio())) continue;
@@ -91,7 +91,8 @@ public class HorarioService implements GenerarMallaHorariaUseCase {
         bloques.listar().stream()
             .collect(Collectors.toMap(BloqueHorario::getId, Function.identity()));
     for (var horario : horarios.buscarPorAnioLectivoId(asignacion.getAnioLectivoId())) {
-      if (horario.getId().equals(id) || horario.getDiaSemana() != r.diaSemana().getCodigo()) continue;
+      if (!horario.estaActivo() || horario.getId().equals(id)
+          || horario.getDiaSemana() != r.diaSemana().getCodigo()) continue;
       var otro = requerido(Optional.ofNullable(bloquesMap.get(horario.getBloqueHorarioId())));
       if (!otro.getHoraInicio().isBefore(bloque.getHoraFin())
           || !otro.getHoraFin().isAfter(bloque.getHoraInicio())) continue;
@@ -116,6 +117,15 @@ public class HorarioService implements GenerarMallaHorariaUseCase {
 
   @Transactional(readOnly = true)
   public MallaHorariaResponseDto porSeccion(Integer id, Short anioId) {
+    if (actor.tieneRol("DOCENTE")) {
+      exigir(
+          asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId()).stream()
+              .anyMatch(
+                  asignacion ->
+                      asignacion.getSeccionId().equals(id)
+                          && asignacion.getAnioLectivoId().equals(anioId)),
+          "La sección no pertenece a una de tus asignaciones docentes");
+    }
     return new MallaHorariaResponseDto(
         horarios.buscarPorSeccionId(id).stream()
             .filter(h -> h.getAnioLectivoId().equals(anioId))

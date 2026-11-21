@@ -10,6 +10,8 @@ import java.util.Collection;
 public interface AsistenciaAulaRepositoryPort {
   AsistenciaAula guardar(AsistenciaAula valor);
 
+  List<AsistenciaAula> guardarTodos(Collection<AsistenciaAula> valores);
+
   Optional<AsistenciaAula> buscarPorId(Long id);
 
   Optional<AsistenciaAula> bloquearPorId(Long id);
@@ -21,6 +23,10 @@ public interface AsistenciaAulaRepositoryPort {
   List<AsistenciaAula> buscarPorMatriculaIds(Collection<Long> matriculaIds);
 
   List<AsistenciaAula> buscarPorFechaSesion(LocalDate valor);
+
+  List<SeccionAsistencia> buscarSeccionesPorMatriculaIds(Collection<Long> matriculaIds);
+
+  List<LocalDate> buscarFechasConRegistros(LocalDate desde, LocalDate hasta);
 
   List<AsistenciaAula> buscarPorFechaSesionYMatriculaIds(LocalDate fecha, Collection<Long> matriculaIds);
 

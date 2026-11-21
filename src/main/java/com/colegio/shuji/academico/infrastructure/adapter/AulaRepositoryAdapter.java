@@ -18,7 +18,13 @@ public class AulaRepositoryAdapter implements AulaRepositoryPort {
   private final AuditContextPort auditoria;
 
   public Aula guardar(Aula aula) {
-    var entity = new AulaEntity();
+    AulaEntity entity;
+    if (aula.getId() != null) {
+      entity = repository.findById(aula.getId()).orElseGet(AulaEntity::new);
+      entity.setId(aula.getId());
+    } else {
+      entity = new AulaEntity();
+    }
     entity.setCodigo(aula.getCodigo());
     entity.setNombre(aula.getNombre());
     entity.setUbicacion(aula.getUbicacion());
@@ -30,6 +36,10 @@ public class AulaRepositoryAdapter implements AulaRepositoryPort {
 
   public Optional<Aula> buscarPorCodigo(String codigo) {
     return repository.findByCodigoIgnoreCase(codigo).map(this::toDomain);
+  }
+
+  public Optional<Aula> buscarPorId(Integer id) {
+    return repository.findById(id).map(this::toDomain);
   }
 
   public List<Aula> listar() {

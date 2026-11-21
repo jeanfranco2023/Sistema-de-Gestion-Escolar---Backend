@@ -5,6 +5,7 @@ import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoEstudianteReq
 import com.colegio.shuji.matricula.application.dto.in.RegistrarApoderadoRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoFichaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.ApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
@@ -19,6 +20,8 @@ public interface RegistrarFichaFamiliarUseCase {
   ApoderadoResponseDto registrarApoderado(RegistrarApoderadoRequestDto r);
 
   List<ApoderadoResponseDto> listarApoderados();
+
+  List<ApoderadoFichaResponseDto> listarApoderadosPorEstudiante(Long estudianteId);
 
   EstudianteApoderadoResponseDto vincular(VincularApoderadoRequestDto r);
 

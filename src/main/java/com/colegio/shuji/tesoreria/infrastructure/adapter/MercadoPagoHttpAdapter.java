@@ -64,26 +64,79 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
   @Override
   public PreferenciaMercadoPagoResponseDto crearPreferencia(
       ObligacionPago obligacion, String descripcion, String backUrlSuccess, String backUrlFailure) {
+    return ejecutarPreferencia(
+        obligacion.getId().toString(),
+        obligacion.getId() + "-" + obligacion.saldo(),
+        obligacion.saldo(),
+        descripcion,
+        backUrlSuccess,
+        backUrlFailure,
+        false,
+        null);
+  }
+
+  @Override
+  public PreferenciaMercadoPagoResponseDto crearPreferenciaResumen(
+      String referencia, BigDecimal monto, String descripcion, String backUrlSuccess, String backUrlFailure) {
+    return ejecutarPreferencia(
+        referencia,
+        referencia + "-" + monto.setScale(2, RoundingMode.HALF_UP),
+        monto.setScale(2, RoundingMode.HALF_UP),
+        descripcion,
+        backUrlSuccess,
+        backUrlFailure,
+        false,
+        "SHUJI PAGO");
+  }
+
+  @Override
+  public PreferenciaMercadoPagoResponseDto crearPreferenciaMatriculaPublica(
+      String referencia, BigDecimal monto, String descripcion) {
+    return ejecutarPreferencia(
+        referencia,
+        referencia + "-" + System.currentTimeMillis(),
+        monto.setScale(2, RoundingMode.HALF_UP),
+        descripcion,
+        matriculaReturnUrl,
+        matriculaReturnUrl,
+        true,
+        "SHUJI MATRICULA");
+  }
+
+  private PreferenciaMercadoPagoResponseDto ejecutarPreferencia(
+      String externalReference,
+      String idempotencyKey,
+      BigDecimal monto,
+      String descripcion,
+      String backUrlSuccess,
+      String backUrlFailure,
+      boolean expira24h,
+      String descriptor) {
     if (backUrlSuccess == null || backUrlSuccess.isBlank()) backUrlSuccess = matriculaReturnUrl;
     if (backUrlFailure == null || backUrlFailure.isBlank()) backUrlFailure = matriculaReturnUrl;
-    if (accessToken == null || accessToken.isBlank()) {
-      throw new BusinessException("Mercado Pago no configurado (access token ausente)");
-    }
-
-    Map<String, Object> item = new HashMap<>();
-    item.put("title", descripcion);
-    item.put("quantity", 1);
-    item.put("unit_price", obligacion.saldo());
-    item.put("currency_id", "PEN");
-
-    Map<String, Object> body = new HashMap<>();
-    body.put("items", List.of(item));
-    body.put("external_reference", obligacion.getId().toString());
-    agregarNotificacion(body);
 
     validarUrlSegura(backUrlSuccess);
     validarUrlSegura(backUrlFailure);
     validarAmbiente();
+
+    Map<String, Object> item = new HashMap<>();
+    item.put("title", descripcion);
+    item.put("quantity", 1);
+    item.put("unit_price", monto);
+    item.put("currency_id", "PEN");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("items", List.of(item));
+    body.put("external_reference", externalReference);
+    agregarNotificacion(body);
+    if (descriptor != null && !descriptor.isBlank()) {
+      body.put("statement_descriptor", descriptor);
+    }
+    if (expira24h) {
+      body.put("expires", true);
+      body.put("expiration_date_from", java.time.OffsetDateTime.now().toString());
+      body.put("expiration_date_to", java.time.OffsetDateTime.now().plusHours(24).toString());
+    }
 
     Map<String, String> backUrls = new HashMap<>();
     if (backUrlSuccess != null && !backUrlSuccess.isBlank()) {
@@ -92,6 +145,9 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     }
     if (backUrlFailure != null && !backUrlFailure.isBlank()) {
       backUrls.put("failure", backUrlFailure);
+      if (expira24h) {
+        backUrls.put("pending", backUrlFailure);
+      }
     }
     if (!backUrls.isEmpty()) {
       body.put("back_urls", backUrls);
@@ -102,7 +158,7 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
             .post()
             .uri(apiUrl + "/checkout/preferences")
             .header("Authorization", "Bearer " + accessToken)
-            .header("X-Idempotency-Key", obligacion.getId() + "-" + obligacion.saldo())
+            .header("X-Idempotency-Key", idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
             .retrieve()
@@ -117,54 +173,6 @@ public class MercadoPagoHttpAdapter implements MercadoPagoPort {
     String sandboxInitPoint =
         response.get("sandbox_init_point") != null ? response.get("sandbox_init_point").toString() : "";
 
-    return new PreferenciaMercadoPagoResponseDto(preferenceId, enlaceCheckout(initPoint, sandboxInitPoint), sandboxInitPoint, publicKey);
-  }
-
-  @Override
-  public PreferenciaMercadoPagoResponseDto crearPreferenciaMatriculaPublica(
-      String referencia, BigDecimal monto, String descripcion) {
-    validarAmbiente();
-    Map<String, Object> item = new HashMap<>();
-    item.put("title", descripcion);
-    item.put("quantity", 1);
-    item.put("unit_price", monto.setScale(2, RoundingMode.HALF_UP));
-    item.put("currency_id", "PEN");
-
-    Map<String, Object> body = new HashMap<>();
-    body.put("items", List.of(item));
-    body.put("external_reference", referencia);
-    agregarNotificacion(body);
-    body.put("statement_descriptor", "SHUJI MATRICULA");
-    body.put("expires", true);
-    body.put("expiration_date_from", java.time.OffsetDateTime.now().toString());
-    body.put("expiration_date_to", java.time.OffsetDateTime.now().plusMinutes(30).toString());
-    if (!matriculaReturnUrl.isBlank()) {
-      validarUrlSegura(matriculaReturnUrl);
-      body.put("back_urls", Map.of(
-          "success", matriculaReturnUrl,
-          "failure", matriculaReturnUrl,
-          "pending", matriculaReturnUrl));
-      body.put("auto_return", "approved");
-    }
-
-    var response =
-        client
-            .post()
-            .uri(apiUrl + "/checkout/preferences")
-            .header("Authorization", "Bearer " + accessToken)
-            .header("X-Idempotency-Key", referencia)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(body)
-            .retrieve()
-            .body(new ParameterizedTypeReference<Map<String, Object>>() {});
-
-    if (response == null || response.get("id") == null) {
-      throw new BusinessException("Respuesta inválida al crear pago de matrícula");
-    }
-    String preferenceId = response.get("id").toString();
-    String initPoint = response.get("init_point") == null ? "" : response.get("init_point").toString();
-    String sandboxInitPoint = response.get("sandbox_init_point") == null
-        ? "" : response.get("sandbox_init_point").toString();
     return new PreferenciaMercadoPagoResponseDto(preferenceId, enlaceCheckout(initPoint, sandboxInitPoint), sandboxInitPoint, publicKey);
   }
 

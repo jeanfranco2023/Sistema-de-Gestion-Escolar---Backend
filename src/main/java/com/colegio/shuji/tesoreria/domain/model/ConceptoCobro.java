@@ -19,6 +19,8 @@ public class ConceptoCobro {
   private String nombre;
   private TipoConcepto tipoConcepto;
   private BigDecimal montoSugerido;
+  @Builder.Default private boolean activo = true;
+  @Builder.Default private short diaVencimiento = 10;
 
   public void actualizar(String nuevoNombre, BigDecimal nuevoMonto) {
     this.nombre = nuevoNombre;

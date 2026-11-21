@@ -66,6 +66,12 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
   }
 
   @Override
+  public List<Usuario> findByIds(java.util.Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) return List.of();
+    return jpaUsuarioRepository.findResumenByIds(ids).stream().map(userMapper::toDomain).toList();
+  }
+
+  @Override
   public boolean existsByUsername(String username) {
     return jpaUsuarioRepository.existsByUsername(username);
   }

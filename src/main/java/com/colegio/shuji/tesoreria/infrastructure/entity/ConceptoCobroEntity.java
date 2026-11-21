@@ -39,6 +39,12 @@ public class ConceptoCobroEntity {
   @Column(name = "monto_sugerido", nullable = false, precision = 10, scale = 2)
   private BigDecimal montoSugerido;
 
+  @Column(nullable = false)
+  private boolean activo = true;
+
+  @Column(name = "dia_vencimiento", nullable = false)
+  private short diaVencimiento = 10;
+
   @PrePersist
   void inicializar() {}
 }

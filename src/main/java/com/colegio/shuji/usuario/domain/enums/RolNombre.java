@@ -6,6 +6,7 @@ package com.colegio.shuji.usuario.domain.enums;
  */
 public enum RolNombre {
   DIRECCION("Dirección General / Directiva"),
+  ADMINISTRADOR("Administrador del Sistema"),
   SECRETARIA("Secretaría Académica"),
   DOCENTE("Docente de Asignatura"),
   AUXILIAR("Auxiliar de Disciplina y Asistencia"),

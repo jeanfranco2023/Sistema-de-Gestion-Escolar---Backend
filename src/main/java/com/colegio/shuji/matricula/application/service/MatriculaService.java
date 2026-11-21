@@ -1,5 +1,6 @@
 package com.colegio.shuji.matricula.application.service;
 
+import com.colegio.shuji.matricula.domain.service.PoliticaAdmision;
 import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
@@ -20,6 +21,7 @@ import com.colegio.shuji.matricula.application.port.out.EstudianteApoderadoRepos
 import com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort;
 import com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort;
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import com.colegio.shuji.matricula.domain.model.Apoderado;
 import com.colegio.shuji.matricula.domain.model.Matricula;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.tesoreria.application.port.out.ObligacionRepositoryPort;
@@ -56,7 +58,10 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   private final AnioLectivoRepositoryPort anios;
 
   public MatriculaResponseDto solicitar(SolicitarMatriculaRequestDto r) {
-    requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
+    var anio = requerido(anios.bloquearPorId(r.anioLectivoId()));
+    anio.verificarAbierto();
+    exigir(PoliticaAdmision.admiteNuevasMatriculas(anio.getAnio()),
+        PoliticaAdmision.mensajeAnioNoDisponible());
     var e = requerido(estudiantes.bloquearPorId(r.estudianteId()));
     exigir(Boolean.TRUE.equals(e.getActivo()), "Estudiante inactivo");
     if (matriculas.existePorEstudianteIdYAnioLectivoId(r.estudianteId(), r.anioLectivoId()))
@@ -64,10 +69,10 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
           "El estudiante ya tiene una matrícula registrada para el año lectivo seleccionado.");
     var s = requerido(secciones.bloquearPorId(r.seccionId()));
     exigir(s.getAnioLectivoId().equals(r.anioLectivoId()), "Sección de otro año");
+    s.verificarCupo();
     var m = mapper.toDomain(r);
     m.iniciarSolicitud();
     if (r.fechaExpiracionReserva() != null) {
-      s.verificarCupo();
       m.reservar(r.fechaExpiracionReserva());
     }
     return mapper.toResponse(matriculas.guardar(m));
@@ -166,13 +171,14 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   @Transactional(readOnly = true)
   public FichaMatriculaResponseDto ficha(Long id) {
     var m = requerido(matriculas.buscarPorId(id));
-    var estadoPago = estadoPagoMatricula(m.getId());
+    var estadoPago = estadoPagoMatricula(m);
     var matriculaDto = mapper.toResponse(m);
     if (esObservacionPagoObsoleta(m.getObservaciones())) {
       matriculaDto = new MatriculaResponseDto(
           matriculaDto.id(), matriculaDto.anioLectivoId(), matriculaDto.estudianteId(),
           matriculaDto.seccionId(), matriculaDto.fechaMatricula(), matriculaDto.estadoMatricula(),
-          matriculaDto.fechaExpiracionReserva(), null, estadoPago);
+          matriculaDto.fechaExpiracionReserva(), null, estadoPago,
+          matriculaDto.modalidadIngreso(), matriculaDto.colegioProcedencia());
     } else {
       matriculaDto = conEstadoPago(matriculaDto, estadoPago);
     }
@@ -180,7 +186,7 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     var apoderadosMap =
         apoderados.buscarPorIds(relaciones.stream().map(v -> v.getApoderadoId()).toList()).stream()
             .collect(java.util.stream.Collectors.toMap(
-                com.colegio.shuji.matricula.domain.model.Apoderado::getId,
+                Apoderado::getId,
                 java.util.function.Function.identity()));
     return new FichaMatriculaResponseDto(
         matriculaDto,
@@ -194,12 +200,20 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
         estadoPago);
   }
 
-  private EstadoPagoMatriculaFicha estadoPagoMatricula(Long matriculaId) {
-    List<ObligacionPago> cuotas = obligaciones.buscarPorMatriculaId(matriculaId).stream()
+  private EstadoPagoMatriculaFicha estadoPagoMatricula(Matricula matricula) {
+    List<ObligacionPago> cuotas = obligaciones.buscarPorMatriculaId(matricula.getId()).stream()
         .filter(o -> o.getTipoConcepto() == TipoConcepto.MATRICULA
             && o.getNumeroCuota() != null && o.getNumeroCuota() == 0)
         .toList();
-    if (cuotas.isEmpty()) return EstadoPagoMatriculaFicha.SIN_OBLIGACION;
+    return estadoPagoMatricula(matricula, cuotas);
+  }
+  private EstadoPagoMatriculaFicha estadoPagoMatriculaUnused(Matricula matricula, List<ObligacionPago> cuotas) {
+    var filtradas = cuotas.stream()
+
+        .filter(o -> o.getTipoConcepto() == TipoConcepto.MATRICULA
+            && o.getNumeroCuota() != null && o.getNumeroCuota() == 0)
+        .toList();
+    if (cuotas.isEmpty()) return estadoPagoMatricula(matricula, cuotas);
     if (cuotas.stream().allMatch(o -> o.estaPagadoTotal() && o.saldo().signum() == 0))
       return EstadoPagoMatriculaFicha.PAGADO;
     if (cuotas.stream().anyMatch(o -> o.getTotalPagado() != null
@@ -217,12 +231,13 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
         .collect(Collectors.groupingBy(ObligacionPago::getMatriculaId));
     return registros.stream().map(registro -> {
       var response = mapper.toResponse(registro);
-      return conEstadoPago(response, estadoPagoMatricula(cuotasPorMatricula.get(registro.getId())));
+      return conEstadoPago(response, estadoPagoMatricula(registro, cuotasPorMatricula.get(registro.getId())));
     }).toList();
   }
 
-  private EstadoPagoMatriculaFicha estadoPagoMatricula(List<ObligacionPago> cuotas) {
-    if (cuotas == null || cuotas.isEmpty()) return EstadoPagoMatriculaFicha.SIN_OBLIGACION;
+  private EstadoPagoMatriculaFicha estadoPagoMatricula(Matricula matricula, List<ObligacionPago> cuotas) {
+    if (matricula != null && matricula.getEstadoMatricula() == EstadoMatricula.MATRICULADO) return EstadoPagoMatriculaFicha.PAGADO;
+    if (cuotas == null || cuotas.isEmpty()) return EstadoPagoMatriculaFicha.PENDIENTE;
     if (cuotas.stream().allMatch(o -> o.estaPagadoTotal() && o.saldo().signum() == 0))
       return EstadoPagoMatriculaFicha.PAGADO;
     if (cuotas.stream().anyMatch(o -> o.getTotalPagado() != null
@@ -236,7 +251,8 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     return new MatriculaResponseDto(
         matricula.id(), matricula.anioLectivoId(), matricula.estudianteId(), matricula.seccionId(),
         matricula.fechaMatricula(), matricula.estadoMatricula(), matricula.fechaExpiracionReserva(),
-        matricula.observaciones(), estadoPago);
+        matricula.observaciones(), estadoPago,
+        matricula.modalidadIngreso(), matricula.colegioProcedencia());
   }
 
   private boolean esObservacionPagoObsoleta(String observaciones) {

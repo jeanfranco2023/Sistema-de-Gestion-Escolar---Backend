@@ -26,6 +26,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -62,11 +66,25 @@ public class SolicitudMatriculaPublicaController {
   private final AlmacenDocumentosMatriculaPort almacenDocumentos;
   private final ActorActualPort actor;
 
+  @Value("${app.matricula-publica.presentacion-identidad:false}")
+  private boolean presentacionIdentidadConfigurada;
+
+  @Autowired
+  private Environment environment;
+
   @GetMapping("/public/catalogo")
   @PreAuthorize("permitAll()")
   public CatalogoMatriculaPublicaResponseDto catalogo() {
     return solicitudes.catalogo();
   }
+
+  @GetMapping("/public/modo-presentacion")
+  @PreAuthorize("permitAll()")
+  public ModoPresentacionResponse modoPresentacion() {
+    return new ModoPresentacionResponse(presentacionIdentidadActivo());
+  }
+
+  public record ModoPresentacionResponse(boolean activo) {}
 
   @PostMapping("/public")
   @PreAuthorize("permitAll()")
@@ -130,47 +148,75 @@ public class SolicitudMatriculaPublicaController {
     try {
       almacenDocumentos.validarConfiguracion();
       String mimeType = detectarMime(bytes);
-      var firma = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
+      boolean modoPresentacion = presentacionIdentidadActivo();
+      var firma = (modoPresentacion || tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || tipo == TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS)
           ? new FirmaDigitalDocumentoPort.Resultado(com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.NO_APLICA,
-              "La comprobación de firma RENIEC no aplica al recibo de servicio.", null)
+              modoPresentacion
+                  ? "No se verifica firma digital en el modo de presentación."
+                  : tipo == TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS
+                  ? "La comprobación de firma RENIEC no aplica al certificado o libreta de estudios."
+                  : "La comprobación de firma RENIEC no aplica al recibo de servicio.",
+              null)
           : firmas.verificar(bytes, mimeType, tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO);
       GeminiDocumentoMatriculaPort.Resultado resultado;
       Boolean dniApiCoincide = null;
       try {
-        var identidad = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
-            ? com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE
-            : identidades.verificar(declarados.nombres(), declarados.dni());
-        if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
-            && identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE) {
-          identidad = identidades.verificar(declarados.progenitor().nombres(), declarados.progenitor().dni());
-        }
-        if (tipo != TipoDocumentoSolicitud.RECIBO_SERVICIO) {
-          dniApiCoincide = identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE
-              ? null : identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE;
-        }
-        if (firma.estado() == com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.INVALIDA) {
-          resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false, "Archivo o firma inválida.", false);
-        } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE) {
-          resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
-              "La API de DNI no confirmó la identidad; reintenta cuando el proveedor esté disponible.", false);
-        } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE) {
-          resultado = new GeminiDocumentoMatriculaPort.Resultado(true, true, false,
-              "El DNI y los nombres declarados no coinciden con la API de identidad.", false);
+        if (modoPresentacion) {
+          boolean documentoDeIdentidad = tipo == TipoDocumentoSolicitud.DNI_C4
+              || tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
+          resultado = documentoDeIdentidad
+              ? gemini.validarIdentidadParaPresentacion(
+                  tipo, bytes, mimeType, declarados.nombres(), declarados.dni(), declarados.progenitor())
+              : new GeminiDocumentoMatriculaPort.Resultado(true, true, true,
+                  "Modo presentación: archivo recibido; su contenido no se evalúa.", false, null);
         } else {
-          resultado = gemini.validar(tipo, bytes, mimeType, declarados.nombres(), declarados.dni(), declarados.progenitor());
+          var identidad = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
+              ? com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE
+              : identidades.verificar(declarados.nombres(), declarados.dni());
+          if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO
+              && identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE) {
+            identidad = identidades.verificar(declarados.progenitor().nombres(), declarados.progenitor().dni());
+          }
+          if (tipo != TipoDocumentoSolicitud.RECIBO_SERVICIO) {
+            dniApiCoincide = identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE
+                ? null : identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE;
+          }
+          if (firma.estado() == com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.INVALIDA) {
+            resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false, "Archivo o firma inválida.", false);
+          } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_DISPONIBLE) {
+            resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
+                "La API de DNI no confirmó la identidad; reintenta cuando el proveedor esté disponible.", false);
+          } else if (identidad == com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.NO_COINCIDE) {
+            resultado = new GeminiDocumentoMatriculaPort.Resultado(true, true, false,
+                "El DNI y los nombres declarados no coinciden con la API de identidad.", false);
+          } else {
+            resultado = gemini.validar(tipo, bytes, mimeType, declarados.nombres(), declarados.dni(), declarados.progenitor());
+          }
         }
       } catch (ResponseStatusException ex) {
         if (!ex.getStatusCode().is5xxServerError()) throw ex;
+        if (modoPresentacion) {
+          throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+              "No fue posible comparar la identidad para la presentación; vuelve a intentarlo.", ex);
+        }
         resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
             "Análisis automático no disponible; vuelve a intentar la verificación.", false);
       } catch (com.colegio.shuji.shared.domain.exception.BusinessException ex) {
+        if (modoPresentacion) {
+          throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+              "No fue posible interpretar la identidad del documento; vuelve a intentarlo.", ex);
+        }
         resultado = new GeminiDocumentoMatriculaPort.Resultado(false, false, false,
             "La respuesta automática no pudo interpretarse; vuelve a intentar la verificación.", false);
       }
       referenciaArchivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
       String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-      return solicitudes.guardarResultadoDocumento(
-          id, token, tipo, resultado, firma, dniApiCoincide, declarados.versionActual(), referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
+      return modoPresentacion
+          ? solicitudes.guardarResultadoDocumentoPresentacion(id, token, tipo, resultado, firma,
+              declarados.versionActual(), referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256)
+          : solicitudes.guardarResultadoDocumento(
+              id, token, tipo, resultado, firma, dniApiCoincide, declarados.versionActual(),
+              referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
     } catch (NoSuchAlgorithmException ex) {
       throw new IllegalStateException("SHA-256 no está disponible", ex);
     } catch (RuntimeException ex) {
@@ -215,6 +261,15 @@ public class SolicitudMatriculaPublicaController {
     return pagos.confirmarRetorno(id, token, request.paymentId());
   }
 
+  @PostMapping("/public/{id}/simular-pago")
+  @PreAuthorize("permitAll()")
+  public SolicitudMatriculaPublicaResponseDto simularPago(
+      @PathVariable UUID id,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String token,
+      @Valid @RequestBody com.colegio.shuji.tesoreria.application.dto.in.SimularPagoRequestDto request) {
+    return solicitudes.simularPago(id, token, request.metodoPago(), request.referenciaOperacion());
+  }
+
   @PostMapping("/public/{id}/consultar-pago")
   @PreAuthorize("permitAll()")
   public SolicitudMatriculaPublicaResponseDto consultarPago(
@@ -230,6 +285,21 @@ public class SolicitudMatriculaPublicaController {
     return documentoHtml("comprobante-matricula-" + id + ".html", solicitudes.generarComprobanteHtml(id, token));
   }
 
+  @GetMapping("/public/{id}/comprobante-pdf")
+  @PreAuthorize("permitAll()")
+  public ResponseEntity<byte[]> descargarComprobantePdf(
+      @PathVariable UUID id,
+      @RequestHeader(value = TOKEN_HEADER, required = false) String tokenHeader,
+      @RequestParam(value = "token", required = false) String tokenParam) {
+    String token = (tokenParam != null && !tokenParam.isBlank()) ? tokenParam : tokenHeader;
+    byte[] pdf = solicitudes.generarComprobantePdf(id, token);
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_PDF)
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename("Comprobante-Matricula-" + id + ".pdf", StandardCharsets.UTF_8).build().toString())
+        .body(pdf);
+  }
+
   @GetMapping("/public/{id}/ficha")
   @PreAuthorize("permitAll()")
   public ResponseEntity<byte[]> descargarFicha(
@@ -239,20 +309,20 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @GetMapping("/admin")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public List<SolicitudMatriculaPublicaAdminResponseDto> listarAdmin() {
     return solicitudes.listarAdmin();
   }
 
   @PutMapping("/admin/{id}/asignar-seccion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto asignarSeccion(
       @PathVariable UUID id, @Valid @RequestBody AsignarSeccionRequest request) {
     return solicitudes.asignarSeccion(id, request.seccionId());
   }
 
   @PutMapping("/admin/{id}/observar")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto observarAdmin(
       @PathVariable UUID id,
       @Valid @RequestBody ObservarSolicitudMatriculaPublicaRequestDto request) {
@@ -260,14 +330,14 @@ public class SolicitudMatriculaPublicaController {
   }
 
   @GetMapping("/admin/{id}/documentos/{tipo}/historial")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public List<VersionDocumentoMatriculaResponseDto> historialDocumento(@PathVariable UUID id,
       @PathVariable TipoDocumentoSolicitud tipo) {
     return solicitudes.historialDocumento(id, tipo);
   }
 
 @PostMapping("/admin/{id}/dar-visto-bueno")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto darVistoBuenoAdmin(
       @PathVariable UUID id, @RequestBody(required = false) DarVistoBuenoRequest request) {
     String motivo = request != null ? request.motivo() : null;
@@ -277,13 +347,13 @@ public class SolicitudMatriculaPublicaController {
   public record DarVistoBuenoRequest(String motivo) {}
 
   @PostMapping("/admin/{id}/rechazar")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public void rechazarAdmin(@PathVariable UUID id) {
     solicitudes.rechazarAdmin(id);
   }
 
   @PostMapping("/admin/{id}/autorizar-excepcion-edad")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public SolicitudMatriculaPublicaAdminResponseDto autorizarExcepcionEdad(
       @PathVariable UUID id, @Valid @RequestBody AutorizarExcepcionEdadRequest request) {
     return solicitudes.autorizarExcepcionEdad(id, request.motivo(), actor.usuarioId());
@@ -297,7 +367,7 @@ public class SolicitudMatriculaPublicaController {
       @jakarta.validation.constraints.Positive Integer seccionId) {}
 
   @GetMapping("/admin/{id}/documentos/{tipo}/url")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public DocumentoAdminDescarga descargarDocumentoAdmin(
       @PathVariable UUID id, @PathVariable TipoDocumentoSolicitud tipo) {
     var documento = solicitudes.documentoDescargaAdmin(id, tipo);
@@ -321,6 +391,11 @@ public class SolicitudMatriculaPublicaController {
       }
     }
     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los tres documentos deben ser PDF; no se admiten imágenes");
+  }
+
+  private boolean presentacionIdentidadActivo() {
+    return presentacionIdentidadConfigurada && environment != null
+        && environment.acceptsProfiles(Profiles.of("local-docker & presentacion & !prod"));
   }
 
   public record ConfirmarPagoPublicoRequest(@NotBlank String paymentId) {}

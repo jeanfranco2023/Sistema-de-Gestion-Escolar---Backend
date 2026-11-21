@@ -9,5 +9,7 @@ public interface AulaRepositoryPort {
 
   Optional<Aula> buscarPorCodigo(String codigo);
 
+  Optional<Aula> buscarPorId(Integer id);
+
   List<Aula> listar();
 }

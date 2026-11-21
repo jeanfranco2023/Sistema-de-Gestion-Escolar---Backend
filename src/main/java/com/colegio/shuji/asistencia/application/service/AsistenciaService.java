@@ -29,6 +29,8 @@ import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
 import com.colegio.shuji.matricula.domain.enums.TipoDocumento;
 import com.colegio.shuji.shared.application.port.out.ActorActualPort;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -48,6 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RequiredArgsConstructor
 public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarListaAulaUseCase {
+  private static final ZoneId ZONA_HORARIA_ESCOLAR = ZoneId.of("America/Lima");
+
   private final AsistenciaMapper mapper;
   private final BiometricoRepositoryPort lotes;
   private final MarcaPorteriaRepositoryPort marcas;
@@ -134,27 +138,13 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
       paraGuardar.add(marca);
     }
     marcas.guardarTodos(paraGuardar);
+    reflejarMarcasEnAula(paraGuardar);
     lote.registrarResultado(validas, errores);
     return mapper.toResponse(lotes.guardar(lote));
   }
 
   private String calcularHash(ImportarLoteBiometricoRequestDto request) {
-    try {
-      var digest = MessageDigest.getInstance("SHA-256");
-      for (var marca : request.marcas()) {
-        String fila =
-            marca.dniLeido()
-                + '|'
-                + marca.fechaHora().toInstant()
-                + '|'
-                + marca.dispositivoCodigo()
-                + '\n';
-        digest.update(fila.getBytes(StandardCharsets.UTF_8));
-      }
-      return java.util.HexFormat.of().formatHex(digest.digest());
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IllegalStateException("SHA-256 no disponible", ex);
-    }
+    return HuellaImportacionBiometrica.calcular(request);
   }
 
   public AsistenciaAulaResponseDto registrar(RegistrarAsistenciaAulaRequestDto r) {
@@ -214,14 +204,21 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     var estudiantesPorId = estudiantes.buscarPorIds(matriculasPorId.values().stream()
         .map(Matricula::getEstudianteId).distinct().toList()).stream()
         .collect(Collectors.toMap(com.colegio.shuji.matricula.domain.model.Estudiante::getId, Function.identity()));
+    var seccionesPorMatricula = asistencias.buscarSeccionesPorMatriculaIds(matriculasPorId.keySet())
+        .stream().collect(Collectors.toMap(
+            com.colegio.shuji.asistencia.application.port.out.SeccionAsistencia::matriculaId,
+            Function.identity()));
     return registros.stream().map(registro -> {
       var dto = mapper.toResponse(registro);
       var matricula = matriculasPorId.get(registro.getMatriculaId());
       var estudiante = matricula == null ? null : estudiantesPorId.get(matricula.getEstudianteId());
+      var seccion = seccionesPorMatricula.get(registro.getMatriculaId());
       String nombre = estudiante == null ? "Estudiante sin datos" : estudiante.nombreCompleto();
       return new AsistenciaAulaResponseDto(dto.id(), dto.matriculaId(), nombre,
           dto.fechaSesion(), dto.horaRegistro(), dto.estado(), dto.auxiliarUsuarioId(),
-          dto.justificada(), dto.motivoJustificacion(), dto.tieneDocumentoSustento());
+          dto.justificada(), dto.motivoJustificacion(), dto.tieneDocumentoSustento(),
+          matricula == null ? null : matricula.getSeccionId(),
+          seccion == null ? "Sin sección" : seccion.etiqueta());
     }).toList();
   }
 
@@ -233,6 +230,11 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     return matriculasAsignadas.stream()
         .map(m -> new DocenteMatriculaAsistenciaDto(m.getId(), nombres.get(m.getId())))
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<LocalDate> fechasConRegistros(LocalDate desde, LocalDate hasta) {
+    return asistencias.buscarFechasConRegistros(desde, hasta);
   }
 
   @Transactional(readOnly = true)
@@ -307,5 +309,99 @@ public class AsistenciaService implements ProcesarBiometricoUseCase, RegistrarLi
     if (!actor.tieneRol("DOCENTE") && !actor.tieneRol("TUTOR")) {
       throw new AccessDeniedException("El endpoint es exclusivo para docentes y tutores");
     }
+  }
+
+  private void reflejarMarcasEnAula(List<MarcaPorteria> marcasLote) {
+    var marcasValidas = marcasLote.stream()
+        .filter(m -> m.getEstadoProcesamiento() == EstadoMarca.PENDIENTE && m.getEstudianteId() != null)
+        .toList();
+    if (marcasValidas.isEmpty()) return;
+
+    var aniosPorNumero = anios.listar().stream()
+        .filter(a -> a.getAnio() != null && a.getId() != null)
+        .collect(Collectors.toMap(a -> a.getAnio(), Function.identity(), (a, b) -> a));
+    var matriculasPorAnio = new java.util.HashMap<Short, Map<Long, Matricula>>();
+
+    record ClaveSesion(Long matriculaId, LocalDate fecha) {}
+    var primeraMarcaPorSesion = new java.util.HashMap<ClaveSesion, LocalTime>();
+    for (var m : marcasValidas) {
+      var fechaHoraEscolar = m.getFechaHora().atZoneSameInstant(ZONA_HORARIA_ESCOLAR);
+      var fechaSesion = fechaHoraEscolar.toLocalDate();
+      var anio = aniosPorNumero.get((short) fechaSesion.getYear());
+      if (anio == null) continue;
+      var roster = matriculasPorAnio.computeIfAbsent(anio.getId(), anioId ->
+          matriculas.buscarPorAnioLectivoId(anioId).stream()
+              .filter(Matricula::estaMatriculado)
+              .collect(Collectors.toMap(
+                  Matricula::getEstudianteId, Function.identity(), (a, b) -> a)));
+      var matricula = roster.get(m.getEstudianteId());
+      if (matricula == null) continue;
+      var hora = fechaHoraEscolar.toLocalTime();
+      var clave = new ClaveSesion(matricula.getId(), fechaSesion);
+      primeraMarcaPorSesion.merge(clave, hora, (h1, h2) -> h1.isBefore(h2) ? h1 : h2);
+    }
+    if (primeraMarcaPorSesion.isEmpty()) return;
+
+    var fechas = primeraMarcaPorSesion.keySet().stream().map(ClaveSesion::fecha).distinct().toList();
+    var matriculaIds = matriculasPorAnio.values().stream()
+        .flatMap(roster -> roster.values().stream())
+        .map(Matricula::getId)
+        .distinct()
+        .toList();
+    var asistenciasPorFechaYMatricula = new java.util.HashMap<ClaveSesion, com.colegio.shuji.asistencia.domain.model.AsistenciaAula>();
+    for (var fecha : fechas) {
+      for (var a : asistencias.buscarPorFechaSesionYMatriculaIds(fecha, matriculaIds)) {
+        asistenciasPorFechaYMatricula.put(new ClaveSesion(a.getMatriculaId(), a.getFechaSesion()), a);
+      }
+    }
+
+    final LocalTime horaLimite = LocalTime.of(8, 0, 0);
+    final Long responsableId = actor.usuarioId();
+    var paraGuardar = new ArrayList<com.colegio.shuji.asistencia.domain.model.AsistenciaAula>(primeraMarcaPorSesion.size());
+
+    for (var entry : primeraMarcaPorSesion.entrySet()) {
+      var clave = entry.getKey();
+      var hora = entry.getValue();
+      var estado = hora.isAfter(horaLimite) ? EstadoAsistenciaAula.TARDANZA : EstadoAsistenciaAula.PRESENTE;
+      var existente = asistenciasPorFechaYMatricula.get(clave);
+
+      if (existente != null) {
+        if (!Boolean.TRUE.equals(existente.getJustificada()) && existente.getEstado() != EstadoAsistenciaAula.FALTA_JUSTIFICADA) {
+          existente.actualizarDesdeBiometrico(hora, estado, responsableId);
+          paraGuardar.add(existente);
+        }
+      } else {
+        var nueva = com.colegio.shuji.asistencia.domain.model.AsistenciaAula.builder()
+            .matriculaId(clave.matriculaId())
+            .fechaSesion(clave.fecha())
+            .horaRegistro(hora)
+            .estado(estado)
+            .auxiliarUsuarioId(responsableId)
+            .justificada(false)
+            .build();
+        paraGuardar.add(nueva);
+      }
+    }
+
+    // Un lote biométrico diario representa las marcas de todo el padrón activo.
+    for (var fecha : fechas) {
+      var anio = aniosPorNumero.get((short) fecha.getYear());
+      if (anio == null) continue;
+      var roster = matriculasPorAnio.getOrDefault(anio.getId(), Map.of());
+      for (var matricula : roster.values()) {
+        var clave = new ClaveSesion(matricula.getId(), fecha);
+        if (primeraMarcaPorSesion.containsKey(clave)
+            || asistenciasPorFechaYMatricula.containsKey(clave)) continue;
+        paraGuardar.add(com.colegio.shuji.asistencia.domain.model.AsistenciaAula.builder()
+            .matriculaId(matricula.getId())
+            .fechaSesion(fecha)
+            .horaRegistro(null)
+            .estado(EstadoAsistenciaAula.FALTA_INJUSTIFICADA)
+            .auxiliarUsuarioId(responsableId)
+            .justificada(false)
+            .build());
+      }
+    }
+    asistencias.guardarTodos(paraGuardar);
   }
 }

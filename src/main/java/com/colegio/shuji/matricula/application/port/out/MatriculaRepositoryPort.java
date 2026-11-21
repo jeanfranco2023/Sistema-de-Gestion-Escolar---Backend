@@ -19,6 +19,8 @@ public interface MatriculaRepositoryPort {
 
   List<Matricula> buscarPorEstudianteId(Long valor);
 
+  List<Matricula> buscarPorEstudianteIds(Collection<Long> ids);
+
   boolean existePorEstudianteIdYAnioLectivoId(Long estudianteId, Short anioLectivoId);
 
   List<Long> buscarEstudianteIdsPorAnioLectivoId(Short anioLectivoId);

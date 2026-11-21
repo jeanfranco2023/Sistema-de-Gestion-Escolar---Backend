@@ -17,6 +17,8 @@ public interface RegistrarListaAulaUseCase {
 
   ReporteAsistenciaDiariaResponseDto reporte(LocalDate fecha);
 
+  List<LocalDate> fechasConRegistros(LocalDate desde, LocalDate hasta);
+
   List<DocenteMatriculaAsistenciaDto> matriculasDelDocente();
 
   List<DocenteAsistenciaDiariaResponseDto> reporteDelDocente(LocalDate fecha);

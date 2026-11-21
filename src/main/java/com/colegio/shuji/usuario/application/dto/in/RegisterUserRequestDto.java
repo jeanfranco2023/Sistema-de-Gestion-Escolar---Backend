@@ -3,6 +3,7 @@ package com.colegio.shuji.usuario.application.dto.in;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.Set;
 import lombok.AllArgsConstructor;
@@ -22,6 +23,12 @@ public class RegisterUserRequestDto {
   @NotBlank(message = "El nombre de usuario es obligatorio")
   @Size(min = 3, max = 30, message = "El nombre de usuario debe tener entre 3 y 30 caracteres")
   private String username;
+
+  @Pattern(regexp = "^\\d{8}$", message = "El DNI debe contener exactamente 8 dígitos numéricos")
+  private String dni;
+
+  @Size(max = 200, message = "El nombre completo no puede superar los 200 caracteres")
+  private String nombreCompleto;
 
   @NotBlank(message = "El correo electrónico es obligatorio")
   @Email(message = "El formato del correo electrónico no es válido")

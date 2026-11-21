@@ -38,20 +38,20 @@ public class ComunicadoController {
   private final ConsultarBandejaUseCase consulta;
 
   @PostMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "publicacion.publicar")
   public ComunicadoResponseDto publicarComunicado(@Valid @RequestBody EmitirComunicadoRequestDto r) {
     return publicacion.publicar(r);
   }
 
   @GetMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public List<ComunicadoResponseDto> listarPublicados() {
     return publicacion.listarPublicados();
   }
 
   @GetMapping("/{id}/metricas")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "publicacion.metricas")
   public MetricasLecturaResponseDto consultarMetricas(@PathVariable @Positive Long id) {
     return publicacion.metricas(id);

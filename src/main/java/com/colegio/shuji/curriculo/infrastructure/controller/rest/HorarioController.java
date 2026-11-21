@@ -32,20 +32,20 @@ public class HorarioController {
   private final GenerarMallaHorariaUseCase horarios;
   private final com.colegio.shuji.curriculo.application.port.in.ConsultarCatalogoHorariosUseCase catalogo;
   @GetMapping("/catalogo")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   public java.util.List<com.colegio.shuji.curriculo.application.dto.out.AsignacionHorarioOpcionDto> catalogo() {
     return catalogo.catalogo();
   }
 
   @PostMapping("")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "horarios.programar")
   public HorarioSeccionResponseDto programarHorario(@Valid @RequestBody ProgramarHorarioRequestDto r) {
     return horarios.programar(r);
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "horarios.actualizar")
   public HorarioSeccionResponseDto actualizarHorario(
       @PathVariable @Positive Long id, @Valid @RequestBody ProgramarHorarioRequestDto r) {
@@ -53,14 +53,14 @@ public class HorarioController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "horarios.retirar")
   public HorarioSeccionResponseDto retirarHorario(@PathVariable @Positive Long id) {
     return horarios.retirar(id);
   }
 
   @GetMapping("/seccion/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "horarios.porSeccion")
   public MallaHorariaResponseDto consultarPorSeccion(
       @PathVariable @Positive Integer id, @RequestParam Short anioId) {
@@ -68,7 +68,7 @@ public class HorarioController {
   }
 
   @GetMapping("/docente/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   @Operation(summary = "horarios.porDocente")
   public MallaHorariaResponseDto consultarPorDocente(
       @PathVariable @Positive Long id, @RequestParam Short anioId) {
@@ -76,28 +76,28 @@ public class HorarioController {
   }
 
   @GetMapping("/grado/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
   public java.util.List<MallaHorariaGradoResponseDto> consultarPorGrado(
       @PathVariable @Positive Short id, @RequestParam @Positive Short anioId) {
     return horarios.porGrado(id, anioId);
   }
 
   @PostMapping("/grado")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public MallaHorariaGradoResponseDto programarPorGrado(
       @Valid @RequestBody ProgramarMallaHorariaGradoRequestDto request) {
     return horarios.programarGrado(request);
   }
 
   @PutMapping("/grado/{id}")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public MallaHorariaGradoResponseDto actualizarPorGrado(
       @PathVariable @Positive Long id, @Valid @RequestBody ProgramarMallaHorariaGradoRequestDto request) {
     return horarios.actualizarGrado(id, request);
   }
 
   @DeleteMapping("/grado/{id}")
-  @PreAuthorize("hasRole('DIRECCION')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public MallaHorariaGradoResponseDto retirarPorGrado(@PathVariable @Positive Long id) {
     return horarios.retirarGrado(id);
   }

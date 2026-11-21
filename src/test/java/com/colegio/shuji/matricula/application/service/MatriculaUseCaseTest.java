@@ -62,7 +62,7 @@ class MatriculaUseCaseTest {
     solicitud = Matricula.builder().id(10L).anioLectivoId((short) 2).estudianteId(20L)
         .seccionId(30).estadoMatricula(EstadoMatricula.SOLICITADA).build();
     lenient().when(matriculas.buscarPorId(10L)).thenReturn(Optional.of(solicitud));
-    lenient().when(anios.bloquearPorId((short) 2)).thenReturn(Optional.of(AnioLectivo.builder().id((short) 2).abierto(true).build()));
+    lenient().when(anios.bloquearPorId((short) 2)).thenReturn(Optional.of(AnioLectivo.builder().id((short) 2).anio((short) 2027).abierto(true).build()));
     lenient().when(secciones.bloquearPorId(30)).thenReturn(Optional.of(Seccion.builder().id(30).cupoMaximo((short) 25).vacantesOcupadas((short) 24).build()));
     lenient().when(matriculas.bloquearPorId(10L)).thenReturn(Optional.of(solicitud));
     lenient().when(vinculos.buscarPorEstudianteId(20L)).thenReturn(List.of(EstudianteApoderado.builder()
@@ -97,7 +97,7 @@ class MatriculaUseCaseTest {
     var request = new com.colegio.shuji.matricula.application.dto.in.SolicitarMatriculaRequestDto(
         (short) 2, 20L, 30, null, null);
     when(anios.bloquearPorId((short) 2)).thenReturn(Optional.of(
-        AnioLectivo.builder().id((short) 2).abierto(true).build()));
+        AnioLectivo.builder().id((short) 2).anio((short) 2027).abierto(true).build()));
     when(estudiantes.bloquearPorId(20L)).thenReturn(Optional.of(
         Estudiante.builder().id(20L).activo(true).build()));
     when(matriculas.existePorEstudianteIdYAnioLectivoId(20L, (short) 2)).thenReturn(true);

@@ -34,10 +34,7 @@ public class VerificacionIdentidadMatriculaService {
     if (p.equals(s)) return true;
     var setP = new java.util.HashSet<>(java.util.Arrays.asList(p.split("\\s+")));
     var setS = new java.util.HashSet<>(java.util.Arrays.asList(s.split("\\s+")));
-    if (setP.equals(setS)) return true;
-    long coincidencias = setP.stream().filter(setS::contains).count();
-    int minRequerido = Math.min(2, Math.min(setP.size(), setS.size()));
-    return minRequerido > 0 && coincidencias >= minRequerido;
+    return setP.equals(setS);
   }
 
   private static String normalizar(String valor) {

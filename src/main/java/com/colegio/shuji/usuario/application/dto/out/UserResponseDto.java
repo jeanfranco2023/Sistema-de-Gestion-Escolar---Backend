@@ -20,6 +20,7 @@ public class UserResponseDto {
 
   private Long id;
   private String username;
+  private String nombreCompleto;
   private String email;
   private Boolean activo;
   private Boolean debeCambiarPassword;

@@ -19,6 +19,11 @@ public interface JpaInscripcionRefuerzoRepository
       "select e from InscripcionRefuerzoEntity e where e.sesionRefuerzoId = :valor order by e.id")
   List<InscripcionRefuerzoEntity> buscarPorSesionRefuerzoId(@Param("valor") Long valor);
 
+  @Query(
+      "select e from InscripcionRefuerzoEntity e where e.sesionRefuerzoId in :ids order by e.id")
+  List<InscripcionRefuerzoEntity> buscarPorSesionRefuerzoIds(
+      @Param("ids") java.util.Collection<Long> ids);
+
   @Query("select e from InscripcionRefuerzoEntity e where e.estudianteId = :valor order by e.id")
   List<InscripcionRefuerzoEntity> buscarPorEstudianteId(@Param("valor") Long valor);
 

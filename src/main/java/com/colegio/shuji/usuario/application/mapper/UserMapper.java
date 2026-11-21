@@ -24,7 +24,6 @@ public interface UserMapper {
   @Mapping(target = "fechaCreacion", ignore = true)
   @Mapping(target = "fechaActualizacion", ignore = true)
   @Mapping(target = "debeCambiarPassword", ignore = true)
-  @Mapping(target = "dni", ignore = true)
   @Mapping(target = "telefono", ignore = true)
   @Mapping(target = "direccion", ignore = true)
   @Mapping(target = "especialidad", ignore = true)

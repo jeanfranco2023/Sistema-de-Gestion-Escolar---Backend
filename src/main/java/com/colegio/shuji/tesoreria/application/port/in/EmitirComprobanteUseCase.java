@@ -9,5 +9,7 @@ public interface EmitirComprobanteUseCase {
 
   ComprobanteResponseDto consultar(Long id);
 
+  ComprobanteResponseDto consultarPorPago(Long pagoId);
+
   ComprobanteResponseDto emitirAutomaticoParaPago(Long pagoId, TipoComprobante tipo, String serie);
 }

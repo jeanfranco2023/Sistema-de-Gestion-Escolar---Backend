@@ -22,6 +22,9 @@ public interface JpaMatriculaRepository extends JpaRepository<MatriculaEntity, L
   @Query("select e from MatriculaEntity e where e.estudianteId = :valor order by e.id")
   List<MatriculaEntity> buscarPorEstudianteId(@Param("valor") Long valor);
 
+  @Query("select e from MatriculaEntity e where e.estudianteId in :ids order by e.estudianteId, e.id")
+  List<MatriculaEntity> buscarPorEstudianteIds(@Param("ids") Collection<Long> ids);
+
   boolean existsByEstudianteIdAndAnioLectivoId(Long estudianteId, Short anioLectivoId);
 
   @Query("select distinct e.estudianteId from MatriculaEntity e where e.anioLectivoId = :valor")

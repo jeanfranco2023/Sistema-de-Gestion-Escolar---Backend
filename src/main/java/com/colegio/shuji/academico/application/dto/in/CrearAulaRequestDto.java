@@ -1,5 +1,7 @@
 package com.colegio.shuji.academico.application.dto.in;
 
+import com.colegio.shuji.academico.domain.model.Aula;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,4 +11,4 @@ public record CrearAulaRequestDto(
     @NotBlank @Size(max = 30) String codigo,
     @NotBlank @Size(max = 40) String nombre,
     @Size(max = 60) String ubicacion,
-    @NotNull @Min(1) Short capacidad) {}
+    @NotNull @Min(1) @Max(Aula.CAPACIDAD_MAXIMA) Short capacidad) {}

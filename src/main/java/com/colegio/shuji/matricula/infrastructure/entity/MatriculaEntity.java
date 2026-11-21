@@ -1,6 +1,7 @@
 package com.colegio.shuji.matricula.infrastructure.entity;
 
 import com.colegio.shuji.matricula.domain.enums.EstadoMatricula;
+import com.colegio.shuji.matricula.domain.enums.ModalidadIngreso;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
@@ -54,6 +55,13 @@ public class MatriculaEntity {
   @Column(name = "observaciones", columnDefinition = "text")
   private String observaciones;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "modalidad_ingreso", nullable = false, length = 20)
+  private ModalidadIngreso modalidadIngreso = ModalidadIngreso.REGULAR;
+
+  @Column(name = "colegio_procedencia", length = 150)
+  private String colegioProcedencia;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
     @JoinColumn(
@@ -83,5 +91,6 @@ public class MatriculaEntity {
   void inicializar() {
     if (fechaMatricula == null) fechaMatricula = OffsetDateTime.now(ZoneOffset.UTC);
     if (estadoMatricula == null) estadoMatricula = EstadoMatricula.SOLICITADA;
+    if (modalidadIngreso == null) modalidadIngreso = ModalidadIngreso.REGULAR;
   }
 }

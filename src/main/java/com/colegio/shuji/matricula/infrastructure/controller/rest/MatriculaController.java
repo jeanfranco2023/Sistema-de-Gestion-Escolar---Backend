@@ -34,23 +34,60 @@ import org.springframework.web.bind.annotation.RestController;
 public class MatriculaController {
   private final ProcesarMatriculaUseCase matriculas;
   private final LiberarReservasVencidasUseCase reservas;
+  private final com.colegio.shuji.matricula.infrastructure.service.MatriculaPresencialService presencialService;
+
+  @GetMapping("/presencial/importe")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  public java.math.BigDecimal importeEfectivoPresencial() {
+    return presencialService.importeEfectivo();
+  }
+
+  @PostMapping(value = "/presencial", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  @Operation(summary = "Registrar matrícula presencial con evidencias y pago en efectivo")
+  public com.colegio.shuji.matricula.application.dto.out.MatriculaPresencialResponseDto registrarMatriculaPresencial(
+      @Valid @org.springframework.web.bind.annotation.ModelAttribute com.colegio.shuji.matricula.application.dto.in.RegistrarMatriculaPresencialRequestDto r) {
+    return presencialService.registrar(r);
+  }
+
+  @PostMapping(value = "/presencial/pago-en-linea", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  public com.colegio.shuji.matricula.infrastructure.service.MatriculaPresencialService.PagoEnLinea iniciarPagoEnLinea(
+      @Valid @org.springframework.web.bind.annotation.ModelAttribute com.colegio.shuji.matricula.application.dto.in.RegistrarMatriculaPresencialRequestDto r) {
+    return presencialService.iniciarPagoEnLinea(r);
+  }
+
+  @PostMapping("/presencial/{id}/verificar-pago")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  public com.colegio.shuji.matricula.infrastructure.service.MatriculaPresencialService.EstadoPagoPresencial estadoPago(
+      @PathVariable java.util.UUID id) {
+    return presencialService.estadoPago(id);
+  }
+
+  @PostMapping("/presencial/{id}/simular-pago")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  public com.colegio.shuji.matricula.infrastructure.service.MatriculaPresencialService.EstadoPagoPresencial simularPagoEnLinea(
+      @PathVariable java.util.UUID id,
+      @Valid @RequestBody com.colegio.shuji.tesoreria.application.dto.in.SimularPagoRequestDto request) {
+    return presencialService.simularPagoEnLinea(id, request.metodoPago(), request.referenciaOperacion());
+  }
 
   @PostMapping("")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "matriculas.solicitar")
   public MatriculaResponseDto solicitarMatricula(@Valid @RequestBody SolicitarMatriculaRequestDto r) {
     return matriculas.solicitar(r);
   }
 
   @PostMapping("/confirmacion")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "matriculas.confirmar")
   public MatriculaResponseDto confirmarMatricula(@Valid @RequestBody ConfirmarMatriculaRequestDto r) {
     return matriculas.confirmar(r);
   }
 
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','ADMINISTRADOR')")
   @Operation(summary = "matriculas.cambiarEstado")
   public MatriculaResponseDto cambiarEstado(
       @PathVariable @Positive Long id,
@@ -59,14 +96,14 @@ public class MatriculaController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "matriculas.ficha")
   public FichaMatriculaResponseDto consultarFicha(@PathVariable @Positive Long id) {
     return matriculas.ficha(id);
   }
 
   @GetMapping("/seccion/{seccionId}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "matriculas.listarPorSeccion")
   public List<MatriculaResponseDto> listarPorSeccion(
       @PathVariable @Positive Integer seccionId,
@@ -76,21 +113,21 @@ public class MatriculaController {
   }
 
   @GetMapping("/anio/{anioLectivoId}/registros")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "matriculas.listarPorAnio")
   public List<MatriculaResponseDto> listarPorAnio(@PathVariable @Positive Short anioLectivoId) {
     return matriculas.listarPorAnio(anioLectivoId);
   }
 
   @GetMapping("/anio/{anioLectivoId}/estudiantes-matriculados")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "matriculas.listarEstudianteIdsMatriculados")
   public List<Long> listarEstudianteIdsMatriculados(@PathVariable @Positive Short anioLectivoId) {
     return matriculas.listarEstudianteIdsMatriculados(anioLectivoId);
   }
 
   @PostMapping("/reservas/liberar")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','ADMINISTRADOR')")
   @Operation(summary = "reservas.liberarVencidas")
   public int liberarReservasVencidas() {
     return reservas.liberarVencidas();

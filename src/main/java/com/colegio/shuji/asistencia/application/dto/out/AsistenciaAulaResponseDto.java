@@ -14,4 +14,33 @@ public record AsistenciaAulaResponseDto(
     Long auxiliarUsuarioId,
     Boolean justificada,
     String motivoJustificacion,
-    boolean tieneDocumentoSustento) {}
+    boolean tieneDocumentoSustento,
+    Integer seccionId,
+    String seccion) {
+
+  public AsistenciaAulaResponseDto(
+      Long id,
+      Long matriculaId,
+      String nombreEstudiante,
+      LocalDate fechaSesion,
+      LocalTime horaRegistro,
+      EstadoAsistenciaAula estado,
+      Long auxiliarUsuarioId,
+      Boolean justificada,
+      String motivoJustificacion,
+      boolean tieneDocumentoSustento) {
+    this(
+        id,
+        matriculaId,
+        nombreEstudiante,
+        fechaSesion,
+        horaRegistro,
+        estado,
+        auxiliarUsuarioId,
+        justificada,
+        motivoJustificacion,
+        tieneDocumentoSustento,
+        null,
+        null);
+  }
+}

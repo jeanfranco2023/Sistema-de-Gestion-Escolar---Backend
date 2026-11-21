@@ -24,12 +24,12 @@ public class SuplenciaController {
   public SuplenciaResponseDto solicitar(@Valid @RequestBody CrearSuplenciaRequestDto request) { return suplencias.solicitar(request); }
   @GetMapping("/mis-solicitudes") @PreAuthorize("hasRole('APODERADO')")
   public List<SuplenciaResponseDto> misSolicitudes() { return suplencias.misSolicitudes(); }
-  @GetMapping("/pendientes") @PreAuthorize("hasRole('DIRECCION')")
+  @GetMapping("/pendientes") @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public List<SuplenciaResponseDto> pendientes() { return suplencias.bandeja(); }
-  @PutMapping("/{id}/aprobar") @PreAuthorize("hasRole('DIRECCION')")
+  @PutMapping("/{id}/aprobar") @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public SuplenciaResponseDto aprobar(@PathVariable Long id) { return suplencias.aprobar(id); }
-  @PutMapping("/{id}/rechazar") @PreAuthorize("hasRole('DIRECCION')")
+  @PutMapping("/{id}/rechazar") @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public SuplenciaResponseDto rechazar(@PathVariable Long id,@Valid @RequestBody Motivo request) { return suplencias.rechazar(id,request.motivo()); }
-  @PutMapping("/{id}/revocar") @PreAuthorize("hasRole('DIRECCION')")
+  @PutMapping("/{id}/revocar") @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
   public SuplenciaResponseDto revocar(@PathVariable Long id,@Valid @RequestBody Motivo request) { return suplencias.revocar(id,request.motivo()); }
 }

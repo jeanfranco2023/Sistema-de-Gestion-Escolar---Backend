@@ -8,7 +8,7 @@ spring:
     import: optional:file:.env[.properties],optional:file:backend/.env[.properties]
   mail:
     host: ${SMTP_HOST:smtp-relay.brevo.com}
-    port: ${SMTP_PORT:587}
+    port: ${SMTP_PORT:2525}
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     properties:
@@ -21,17 +21,27 @@ spring:
           timeout: 5000
           writetimeout: 5000
   flyway:
+    baseline-on-migrate: true
+    baseline-version: 49
+    ignore-migration-patterns:
+      - versioned:missing
     init-sqls:
       - "SELECT set_config('app.seed_password_hash', '${SHUJI_SEED_PASSWORD_HASH:}', false)"
   application:
     name: shuji-backend
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2s}
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
 
   datasource:
-    url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=${SUPABASE_DB_SSLMODE:require}
+    url: jdbc:postgresql://${SUPABASE_DB_HOST:localhost}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=${SUPABASE_DB_SSLMODE:require}&prepareThreshold=${SUPABASE_DB_PREPARE_THRESHOLD:0}
     username: ${SUPABASE_DB_USER:postgres}
     password: ${SUPABASE_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
@@ -60,6 +70,12 @@ spring:
 
 # Configuración institucional de la aplicación
 app:
+  biometrico:
+    queue-enabled: ${BIOMETRICO_QUEUE_ENABLED:false}
+    workers: ${BIOMETRICO_IMPORT_WORKERS:2}
+    max-pending: ${BIOMETRICO_IMPORT_MAX_PENDING:20}
+    poll-ms: ${BIOMETRICO_IMPORT_POLL_MS:250}
+    stale-minutes: ${BIOMETRICO_IMPORT_STALE_MINUTES:60}
   jwt:
     secret: ${JWT_SECRET:}
     expiration-ms: ${JWT_EXPIRATION_MS:900000}
@@ -79,6 +95,7 @@ app:
       token: ${RENIEC_API_TOKEN:}
   matricula-publica:
     monto-matricula: ${MATRICULA_PAGO_MONTO:350.00}
+    monto-cobro: ${MATRICULA_PAGO_MONTO_COBRO:350.00}
     duracion-reserva-minutos: ${MATRICULA_RESERVA_MINUTOS:30}
     gemini:
       api-key: ${GEMINI_API_KEY:}

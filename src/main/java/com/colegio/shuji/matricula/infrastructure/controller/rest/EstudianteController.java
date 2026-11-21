@@ -3,6 +3,7 @@ package com.colegio.shuji.matricula.infrastructure.controller.rest;
 import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.RegistrarEstudianteRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.VincularApoderadoRequestDto;
+import com.colegio.shuji.matricula.application.dto.out.ApoderadoFichaResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteApoderadoResponseDto;
 import com.colegio.shuji.matricula.application.dto.out.EstudianteResponseDto;
 import com.colegio.shuji.matricula.application.port.in.RegistrarFichaFamiliarUseCase;
@@ -35,21 +36,21 @@ public class EstudianteController {
   private final RegistrarFichaFamiliarUseCase familias;
 
   @PostMapping("")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "familias.registrarEstudiante")
   public EstudianteResponseDto registrarEstudiante(@Valid @RequestBody RegistrarEstudianteRequestDto r) {
     return familias.registrarEstudiante(r);
   }
 
   @GetMapping("")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "familias.listarEstudiantes")
   public List<EstudianteResponseDto> listarEstudiantes() {
     return familias.listarEstudiantes();
   }
 
   @GetMapping("/dni/{dni}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "Consultar nombres y apellidos por DNI en proveedor externo")
   public Identidad consultarDni(@PathVariable String dni) {
     return familias.consultarDni(dni)
@@ -58,14 +59,14 @@ public class EstudianteController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "familias.consultarEstudiante")
   public EstudianteResponseDto consultarEstudiante(@PathVariable @Positive Long id) {
     return familias.consultarEstudiante(id);
   }
 
   @PatchMapping("/{id}/dni")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "Corregir DNI del estudiante con auditoría")
   public EstudianteResponseDto corregirDni(
       @PathVariable @Positive Long id,
@@ -74,7 +75,7 @@ public class EstudianteController {
   }
 
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "Cambiar estado de estudiante (borrado lógico formal)")
   public EstudianteResponseDto cambiarEstado(
       @PathVariable @Positive Long id,
@@ -82,8 +83,15 @@ public class EstudianteController {
     return familias.cambiarEstadoEstudiante(id, request);
   }
 
+  @GetMapping("/{id}/apoderados")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  @Operation(summary = "familias.listarApoderadosPorEstudiante")
+  public List<ApoderadoFichaResponseDto> listarApoderadosPorEstudiante(@PathVariable @Positive Long id) {
+    return familias.listarApoderadosPorEstudiante(id);
+  }
+
   @PostMapping("/apoderados")
-  @PreAuthorize("hasRole('SECRETARIA')")
+  @PreAuthorize("hasAnyRole('SECRETARIA','DIRECCION','ADMINISTRADOR')")
   @Operation(summary = "familias.vincular")
   public EstudianteApoderadoResponseDto vincularApoderado(
       @Valid @RequestBody VincularApoderadoRequestDto r) {

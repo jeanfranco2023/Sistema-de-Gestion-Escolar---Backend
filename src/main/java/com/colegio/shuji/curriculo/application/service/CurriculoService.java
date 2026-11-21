@@ -15,6 +15,7 @@ import com.colegio.shuji.curriculo.application.dto.out.AreaCurricularResponseDto
 import com.colegio.shuji.curriculo.application.dto.out.AsignacionDocenteResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.BloqueHorarioResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.CompetenciaResponseDto;
+import com.colegio.shuji.curriculo.application.dto.out.DocenteOpcionResponseDto;
 import com.colegio.shuji.curriculo.application.mapper.CurriculoMapper;
 import com.colegio.shuji.curriculo.application.port.in.AsignarCargaDocenteUseCase;
 import com.colegio.shuji.curriculo.application.port.in.GestionarCurriculoUseCase;
@@ -49,6 +50,11 @@ public class CurriculoService implements GestionarCurriculoUseCase, AsignarCarga
     var lista = actor.tieneRol("DIRECCION")
         ? asignaciones.listar() : asignaciones.buscarPorDocenteUsuarioId(actor.usuarioId());
     return lista.stream().map(mapper::toResponse).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<DocenteOpcionResponseDto> listarDocentesPorArea(Short areaId) {
+    return docentes.listarPorArea(areaId);
   }
 
   public AreaCurricularResponseDto crearArea(CrearAreaRequestDto r) {
@@ -97,7 +103,16 @@ public class CurriculoService implements GestionarCurriculoUseCase, AsignarCarga
         || !area.getNivelId().equals(r.nivelId()))
       throw new com.colegio.shuji.curriculo.domain.exception.NivelCurricularIncompatibleException(
           "Año o nivel curricular incompatible");
-    exigir(docentes.estaHabilitado(r.docenteUsuarioId()), "Usuario sin rol docente activo");
+    exigir(docentes.listarPorArea(r.areaCurricularId()).stream()
+            .anyMatch(docente -> docente.id().equals(r.docenteUsuarioId())),
+        "El docente no tiene una especialidad aprobada para este curso");
+    exigir(
+        asignaciones.buscarPorSeccionId(r.seccionId()).stream()
+            .noneMatch(
+                existente ->
+                    existente.getAnioLectivoId().equals(r.anioLectivoId())
+                        && existente.getAreaCurricularId().equals(r.areaCurricularId())),
+        "Esta sección ya tiene una asignación para el curso seleccionado");
     return mapper.toResponse(asignaciones.guardar(mapper.toDomain(r)));
   }
 }
