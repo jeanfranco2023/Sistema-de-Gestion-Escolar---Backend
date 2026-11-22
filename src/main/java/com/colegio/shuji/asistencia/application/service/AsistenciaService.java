@@ -16,6 +16,7 @@ import com.colegio.shuji.asistencia.application.port.in.RegistrarListaAulaUseCas
 import com.colegio.shuji.asistencia.application.port.out.AsistenciaAulaRepositoryPort;
 import com.colegio.shuji.asistencia.application.port.out.BiometricoRepositoryPort;
 import com.colegio.shuji.asistencia.application.port.out.MarcaPorteriaRepositoryPort;
+import com.colegio.shuji.asistencia.application.support.HuellaImportacionBiometrica;
 import com.colegio.shuji.asistencia.domain.enums.EstadoAsistenciaAula;
 import com.colegio.shuji.asistencia.domain.enums.EstadoMarca;
 import com.colegio.shuji.asistencia.domain.model.LoteBiometrico;

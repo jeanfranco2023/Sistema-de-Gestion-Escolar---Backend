@@ -20,14 +20,7 @@ $containerRunning = docker inspect --format '{{.State.Running}}' shuji-postgres 
 if ($LASTEXITCODE -ne 0) { throw 'Docker container shuji-postgres was not found' }
 if ($containerRunning -ne 'true') { docker start shuji-postgres | Out-Null }
 
-$redisCompose = Join-Path $backendRoot 'docker-compose.redis.yml'
-docker compose -f $redisCompose up -d redis
-if ($LASTEXITCODE -ne 0) { throw 'Could not start the shuji-redis container' }
-
 if (-not $env:SPRING_PROFILES_ACTIVE) { $env:SPRING_PROFILES_ACTIVE = 'local-docker' }
-if (-not $env:BIOMETRICO_QUEUE_ENABLED) { $env:BIOMETRICO_QUEUE_ENABLED = 'true' }
-if (-not $env:REDIS_HOST) { $env:REDIS_HOST = '127.0.0.1' }
-if (-not $env:REDIS_PORT) { $env:REDIS_PORT = '6379' }
 
 Push-Location $backendRoot
 try {

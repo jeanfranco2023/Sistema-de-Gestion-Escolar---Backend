@@ -1,4 +1,4 @@
-package com.colegio.shuji.asistencia.application.service;
+package com.colegio.shuji.asistencia.application.support;
 
 import com.colegio.shuji.asistencia.application.dto.in.ImportarLoteBiometricoRequestDto;
 import java.nio.charset.StandardCharsets;
@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
+/** Utilitario para calcular la huella SHA-256 determinista de un lote biométrico. */
 public final class HuellaImportacionBiometrica {
   private HuellaImportacionBiometrica() {}
 

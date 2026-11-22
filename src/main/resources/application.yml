@@ -29,12 +29,6 @@ spring:
       - "SELECT set_config('app.seed_password_hash', '${SHUJI_SEED_PASSWORD_HASH:}', false)"
   application:
     name: shuji-backend
-  data:
-    redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_TIMEOUT:2s}
   servlet:
     multipart:
       max-file-size: 5MB
@@ -70,12 +64,6 @@ spring:
 
 # Configuración institucional de la aplicación
 app:
-  biometrico:
-    queue-enabled: ${BIOMETRICO_QUEUE_ENABLED:false}
-    workers: ${BIOMETRICO_IMPORT_WORKERS:2}
-    max-pending: ${BIOMETRICO_IMPORT_MAX_PENDING:20}
-    poll-ms: ${BIOMETRICO_IMPORT_POLL_MS:250}
-    stale-minutes: ${BIOMETRICO_IMPORT_STALE_MINUTES:60}
   jwt:
     secret: ${JWT_SECRET:}
     expiration-ms: ${JWT_EXPIRATION_MS:900000}
