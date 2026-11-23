@@ -98,8 +98,14 @@ public class CorsConfig implements WebMvcConfigurer {
         new ArrayList<>(
             Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
+                .map(s -> s.replaceAll("/+$", ""))
                 .filter(s -> !s.isEmpty())
                 .toList());
+
+    if (environment.acceptsProfiles(Profiles.of("render-test"))
+        && !origins.contains("https://shuji-frontend.onrender.com")) {
+      origins.add("https://shuji-frontend.onrender.com");
+    }
 
     // Vite's local frontend runs on 4201 here; don't require editing the user's .env.
     if (!environment.acceptsProfiles(Profiles.of("prod"))) {
