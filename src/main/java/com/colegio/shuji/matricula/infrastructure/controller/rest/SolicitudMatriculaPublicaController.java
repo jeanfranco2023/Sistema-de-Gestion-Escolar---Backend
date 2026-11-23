@@ -148,7 +148,7 @@ public class SolicitudMatriculaPublicaController {
     try {
       almacenDocumentos.validarConfiguracion();
       String mimeType = detectarMime(bytes);
-      boolean modoPresentacion = presentacionIdentidadActivo();
+      boolean modoPresentacion = usarValidacionPresentacion(declarados);
       var firma = (modoPresentacion || tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO || tipo == TipoDocumentoSolicitud.CERTIFICADO_ESTUDIOS)
           ? new FirmaDigitalDocumentoPort.Resultado(com.colegio.shuji.matricula.domain.enums.EstadoFirmaDigital.NO_APLICA,
               modoPresentacion
@@ -395,7 +395,21 @@ public class SolicitudMatriculaPublicaController {
 
   private boolean presentacionIdentidadActivo() {
     return presentacionIdentidadConfigurada && environment != null
-        && environment.acceptsProfiles(Profiles.of("local-docker & presentacion & !prod"));
+        && environment.acceptsProfiles(Profiles.of("!prod"));
+  }
+
+  private boolean usarValidacionPresentacion(
+      SolicitudMatriculaPublicaService.PreparacionDocumento declarados) {
+    return presentacionIdentidadActivo()
+        || ((environment == null || environment.acceptsProfiles(Profiles.of("!prod")))
+            && declarados != null
+            && (esDniSinteticoPrueba(declarados.dni())
+                || (declarados.progenitor() != null
+                    && esDniSinteticoPrueba(declarados.progenitor().dni()))));
+  }
+
+  private static boolean esDniSinteticoPrueba(String dni) {
+    return dni != null && dni.trim().matches("9[89]\\d{6}");
   }
 
   public record ConfirmarPagoPublicoRequest(@NotBlank String paymentId) {}

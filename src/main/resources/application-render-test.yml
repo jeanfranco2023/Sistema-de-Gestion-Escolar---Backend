@@ -12,6 +12,8 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://shuji-frontend.onrender.com,http://localhost:4200}
   security:
     behind-trusted-proxy: true
+  matricula-publica:
+    presentacion-identidad: ${MATRICULA_PRESENTACION_IDENTIDAD:true}
 
 logging:
   level:
