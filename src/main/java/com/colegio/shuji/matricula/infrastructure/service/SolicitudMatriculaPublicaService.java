@@ -467,6 +467,43 @@ public class SolicitudMatriculaPublicaService {
     return respuesta(solicitudConToken(id, token), null);
   }
 
+  @Transactional
+  public SolicitudMatriculaPublicaResponseDto consultarConVistoBuenoPresentacion(UUID id, String token) {
+    var s = solicitudConTokenBloqueada(id, token);
+    if (s.getEstado() == EstadoSolicitudMatriculaPublica.DOCUMENTOS_PENDIENTES
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.DOCUMENTOS_EN_VALIDACION
+        || s.getEstado() == EstadoSolicitudMatriculaPublica.DOCUMENTOS_OBSERVADOS) {
+      boolean huboCambios = false;
+      for (TipoDocumentoSolicitud tipo : s.tiposRequeridos()) {
+        var estadoDoc = s.estadoDocumento(tipo);
+        if (estadoDoc == EstadoValidacionDocumento.EN_VALIDACION
+            || estadoDoc == EstadoValidacionDocumento.OBSERVADO) {
+          var docOpt = documentos.findById(new SolicitudMatriculaDocumentoId(s.getId(), tipo));
+          if (docOpt.isPresent() && docOpt.get().getVersionId() != null) {
+            versiones.findById(docOpt.get().getVersionId()).ifPresent(v -> {
+              v.setIaValida(true);
+              v.setDniApiCoincide(tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO ? null : true);
+              if (tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO) {
+                v.setVinculoParentalCoincide(true);
+              }
+              v.setEstadoFirma(EstadoFirmaDigital.NO_APLICA);
+              v.setObservacionIa("Aprobado automáticamente con visto bueno institucional.");
+              versiones.save(v);
+            });
+          }
+          s.actualizarDocumento(tipo, EstadoValidacionDocumento.VALIDADO,
+              "Aprobado automáticamente con visto bueno institucional.");
+          huboCambios = true;
+        }
+      }
+      if (huboCambios) {
+        actualizarEtapaDocumental(s);
+        solicitudes.saveAndFlush(s);
+      }
+    }
+    return respuesta(s, null);
+  }
+
   @Transactional(readOnly = true)
   public SolicitudMatriculaPublicaResponseDto consultarPorToken(String token) {
     if (token == null || token.isBlank()) throw noEncontrada();

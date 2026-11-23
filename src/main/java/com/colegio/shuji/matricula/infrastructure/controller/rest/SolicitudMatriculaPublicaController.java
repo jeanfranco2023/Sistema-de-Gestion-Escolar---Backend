@@ -122,7 +122,9 @@ public class SolicitudMatriculaPublicaController {
       @RequestHeader(value = TOKEN_HEADER, required = false) String tokenHeader,
       @RequestParam(value = "token", required = false) String tokenParam) {
     String token = (tokenParam != null && !tokenParam.isBlank()) ? tokenParam : tokenHeader;
-    return solicitudes.consultar(id, token);
+    return presentacionIdentidadActivo()
+        ? solicitudes.consultarConVistoBuenoPresentacion(id, token)
+        : solicitudes.consultar(id, token);
   }
 
   @PostMapping(value = "/public/{id}/documentos/{tipo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
