@@ -102,14 +102,15 @@ public class CorsConfig implements WebMvcConfigurer {
                 .filter(s -> !s.isEmpty())
                 .toList());
 
-    if (environment.acceptsProfiles(Profiles.of("render-test"))
-        && !origins.contains("https://shuji-frontend.onrender.com")) {
+    if (!origins.contains("https://shuji-frontend.onrender.com")) {
       origins.add("https://shuji-frontend.onrender.com");
     }
 
-    // Vite's local frontend runs on 4201 here; don't require editing the user's .env.
+    // Include local dev origins whenever prod profile is inactive so local dev servers
+    // work even when environment overrides replace the default CORS_ALLOWED_ORIGINS list.
     if (!environment.acceptsProfiles(Profiles.of("prod"))) {
-      for (String localOrigin : List.of("http://localhost:4201", "http://127.0.0.1:4201")) {
+      for (String localOrigin :
+          List.of("http://localhost:4200", "http://localhost:4201", "http://127.0.0.1:4201")) {
         if (!origins.contains(localOrigin)) {
           origins.add(localOrigin);
         }
