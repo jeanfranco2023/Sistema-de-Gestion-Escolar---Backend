@@ -28,7 +28,7 @@ public class CorsConfig implements WebMvcConfigurer {
   }
 
   @Value(
-      "${app.cors.allowed-origins:http://localhost:4200,http://localhost:3000,http://localhost:5173}")
+      "${app.cors.allowed-origins:http://localhost:4200,http://localhost:3000,http://localhost:5173,https://shuji-frontend.onrender.com}")
   private String allowedOrigins;
 
   @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}")
