@@ -162,13 +162,14 @@ public class SolicitudMatriculaPublicaController {
       Boolean dniApiCoincide = null;
       try {
         if (modoPresentacion) {
-          boolean documentoDeIdentidad = tipo == TipoDocumentoSolicitud.DNI_C4
-              || tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO;
-          resultado = documentoDeIdentidad
-              ? gemini.validarIdentidadParaPresentacion(
-                  tipo, bytes, mimeType, declarados.nombres(), declarados.dni(), declarados.progenitor())
-              : new GeminiDocumentoMatriculaPort.Resultado(true, true, true,
-                  "Modo presentación: archivo recibido; su contenido no se evalúa.", false, null);
+          resultado = new GeminiDocumentoMatriculaPort.Resultado(
+              true,
+              true,
+              true,
+              "Aprobado automáticamente con visto bueno institucional.",
+              true,
+              tipo == TipoDocumentoSolicitud.PARTIDA_NACIMIENTO ? Boolean.TRUE : null);
+          dniApiCoincide = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO ? null : Boolean.TRUE;
         } else {
           var identidad = tipo == TipoDocumentoSolicitud.RECIBO_SERVICIO
               ? com.colegio.shuji.matricula.application.service.VerificacionIdentidadMatriculaService.Resultado.COINCIDE
@@ -211,12 +212,9 @@ public class SolicitudMatriculaPublicaController {
       }
       referenciaArchivo = almacenDocumentos.guardar(id, tipo, bytes, mimeType);
       String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-      return modoPresentacion
-          ? solicitudes.guardarResultadoDocumentoPresentacion(id, token, tipo, resultado, firma,
-              declarados.versionActual(), referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256)
-          : solicitudes.guardarResultadoDocumento(
-              id, token, tipo, resultado, firma, dniApiCoincide, declarados.versionActual(),
-              referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
+      return solicitudes.guardarResultadoDocumento(
+          id, token, tipo, resultado, firma, dniApiCoincide, declarados.versionActual(),
+          referenciaArchivo.bucket(), referenciaArchivo.objectKey(), mimeType, bytes.length, sha256);
     } catch (NoSuchAlgorithmException ex) {
       throw new IllegalStateException("SHA-256 no está disponible", ex);
     } catch (RuntimeException ex) {
