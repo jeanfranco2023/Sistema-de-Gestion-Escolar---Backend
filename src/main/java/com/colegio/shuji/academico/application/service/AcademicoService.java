@@ -76,14 +76,14 @@ public class AcademicoService
     exigir(
         !r.fechaInicio().isBefore(anio.getFechaInicio())
             && !r.fechaFin().isAfter(anio.getFechaFin()),
-        "PerÃ­odo fuera del aÃ±o lectivo");
+        "Período fuera del año lectivo");
     exigir(
         periodos.buscarPorAnioLectivoId(r.anioLectivoId()).stream()
             .noneMatch(
                 p ->
                     !p.getFechaFin().isBefore(r.fechaInicio())
                         && !p.getFechaInicio().isAfter(r.fechaFin())),
-        "Los perÃ­odos no pueden superponerse");
+        "Los períodos no pueden superponerse");
     var model = mapper.toDomain(r);
     model.abrir();
     return mapper.toResponse(periodos.guardar(model));

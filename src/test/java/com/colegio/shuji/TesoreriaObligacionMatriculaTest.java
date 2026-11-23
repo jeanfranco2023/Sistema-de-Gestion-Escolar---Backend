@@ -160,6 +160,28 @@ class TesoreriaObligacionMatriculaTest {
     verify(obligaciones, times(0)).guardar(any());
   }
 
+  @Test
+  void listaObligacionesGlobalesYExtraordinariasCuandoMatriculaIdEsNuloOCero() {
+    var cuotaMatricula = ObligacionPago.programar(281L, concepto, (short) 0, LocalDate.of(2026, 11, 30));
+    cuotaMatricula.setId(10L);
+    var extraordinario = ObligacionPago.builder()
+        .id(11L).matriculaId(281L).conceptoId((short) 9).tipoConcepto(TipoConcepto.OTRO)
+        .numeroCuota((short) 0).descripcion("Certificado").fechaVencimiento(LocalDate.of(2026, 12, 1))
+        .montoBase(new BigDecimal("25.00")).montoMora(BigDecimal.ZERO).montoDescuento(BigDecimal.ZERO)
+        .totalPagado(BigDecimal.ZERO).estado(EstadoObligacion.PENDIENTE).build();
+    when(obligaciones.listar()).thenReturn(List.of(cuotaMatricula, extraordinario));
+
+    var todas = service.obligacionesMatricula(0L);
+    var globalesNull = service.obligacionesMatricula(null);
+    var extras = service.obligacionesExtraordinarias(null);
+
+    assertEquals(2, todas.size());
+    assertEquals("Ana Pérez Díaz", todas.getFirst().nombreEstudiante());
+    assertEquals(2, globalesNull.size());
+    assertEquals(1, extras.size());
+    assertEquals(11L, extras.getFirst().id());
+  }
+
   private static ObligacionResponseDto toResponse(ObligacionPago obligacion) {
     return new ObligacionResponseDto(
         obligacion.getId(), obligacion.getMatriculaId(), obligacion.getConceptoId(),

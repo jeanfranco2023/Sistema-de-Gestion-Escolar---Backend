@@ -102,4 +102,106 @@ class DashboardControllerTest {
         .andExpect(jsonPath("$.cobertura.porcentajeCobertura").value(50.0))
         .andExpect(jsonPath("$.asistenciaCupos.porcentajeAsistencia").value(100.0));
   }
+
+  @Test
+  void segmentaLogrosYRiesgoPorBimestreSinAcumularBimestresConcluidos() throws Exception {
+    var hoy = java.time.LocalDate.now(java.time.ZoneId.of("America/Lima"));
+    var actual = (short) hoy.getYear();
+    var periodosMock =
+        org.mockito.Mockito.mock(
+            com.colegio.shuji.academico.application.port.out.PeriodoRepositoryPort.class);
+    var seccionesMock =
+        org.mockito.Mockito.mock(
+            com.colegio.shuji.academico.application.port.out.SeccionRepositoryPort.class);
+    var gradosMock =
+        org.mockito.Mockito.mock(
+            com.colegio.shuji.academico.application.port.out.GradoRepositoryPort.class);
+    var nivelesMock =
+        org.mockito.Mockito.mock(
+            com.colegio.shuji.academico.application.port.out.NivelRepositoryPort.class);
+    var estudiantesMock =
+        org.mockito.Mockito.mock(
+            com.colegio.shuji.matricula.application.port.out.EstudianteRepositoryPort.class);
+
+    when(anios.listar()).thenReturn(List.of(AnioLectivo.builder().id((short) 1).anio(actual).build()));
+    when(periodosMock.buscarPorAnioLectivoId((short) 1))
+        .thenReturn(
+            List.of(
+                com.colegio.shuji.academico.domain.model.PeriodoAcademico.builder()
+                    .id((short) 1)
+                    .anioLectivoId((short) 1)
+                    .numeroPeriodo((short) 1)
+                    .nombre("I Bimestre")
+                    .fechaInicio(hoy.minusMonths(4))
+                    .fechaFin(hoy.minusMonths(2))
+                    .cerrado(false)
+                    .activo(true)
+                    .build(),
+                com.colegio.shuji.academico.domain.model.PeriodoAcademico.builder()
+                    .id((short) 4)
+                    .anioLectivoId((short) 1)
+                    .numeroPeriodo((short) 4)
+                    .nombre("IV Bimestre")
+                    .fechaInicio(hoy.minusDays(10))
+                    .fechaFin(hoy.plusDays(20))
+                    .cerrado(false)
+                    .activo(true)
+                    .build()));
+    when(matriculas.buscarPorAnioLectivoId((short) 1))
+        .thenReturn(
+            List.of(
+                com.colegio.shuji.matricula.domain.model.Matricula.builder()
+                    .id(101L)
+                    .anioLectivoId((short) 1)
+                    .estudianteId(10L)
+                    .seccionId(1)
+                    .estadoMatricula(com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO)
+                    .build()));
+    when(calificaciones.buscarPorAnioYPeriodo((short) 1, (short) 4))
+        .thenReturn(
+            List.of(
+                com.colegio.shuji.evaluacion.domain.model.CalificacionCneb.builder()
+                    .id(2L)
+                    .matriculaId(101L)
+                    .anioLectivoId((short) 1)
+                    .periodoAcademicoId((short) 4)
+                    .calificacionCualitativa(
+                        com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa.AD)
+                    .build()));
+    when(asistencias.buscarPorFechaSesion(hoy)).thenReturn(List.of());
+    when(asistencias.buscarPorMatriculaIds(org.mockito.ArgumentMatchers.anyCollection()))
+        .thenReturn(List.of());
+    when(pagos.listar()).thenReturn(List.of());
+
+    var controllerSeg =
+        new DashboardController(
+            anios,
+            matriculas,
+            asistencias,
+            calificaciones,
+            pagos,
+            periodosMock,
+            seccionesMock,
+            gradosMock,
+            nivelesMock,
+            estudiantesMock);
+    var mvcSeg = MockMvcBuilders.standaloneSetup(controllerSeg).build();
+
+    var auth =
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+            "dir",
+            "n/a",
+            List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DIRECCION")));
+
+    mvcSeg
+        .perform(get("/api/v1/dashboard/resumen").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.alumnosRiesgo").value(0));
+
+    mvcSeg
+        .perform(get("/api/v1/dashboard/indicadores"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.desempeno.destacados").value(1))
+        .andExpect(jsonPath("$.desempeno.requierenAcompanamiento").value(0));
+  }
 }

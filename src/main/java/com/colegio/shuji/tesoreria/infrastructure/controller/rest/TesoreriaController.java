@@ -82,7 +82,8 @@ public class TesoreriaController {
 
   @GetMapping("/extraordinarios/obligaciones")
   @PreAuthorize("hasAnyRole('AUXILIAR','ADMINISTRADOR','DIRECCION')")
-  public List<ObligacionResponseDto> obligacionesExtraordinarias(@RequestParam @Positive Long matriculaId) {
+  public List<ObligacionResponseDto> obligacionesExtraordinarias(
+      @RequestParam(required = false) Long matriculaId) {
     return extraordinarios.obligacionesExtraordinarias(matriculaId);
   }
 
@@ -129,7 +130,8 @@ public class TesoreriaController {
   @GetMapping("/obligaciones")
   @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "cronograma.obligacionesMatricula")
-  public List<ObligacionResponseDto> listarObligacionesMatricula(@RequestParam Long matriculaId) {
+  public List<ObligacionResponseDto> listarObligacionesMatricula(
+      @RequestParam(required = false) Long matriculaId) {
     return cronograma.obligacionesMatricula(matriculaId);
   }
 

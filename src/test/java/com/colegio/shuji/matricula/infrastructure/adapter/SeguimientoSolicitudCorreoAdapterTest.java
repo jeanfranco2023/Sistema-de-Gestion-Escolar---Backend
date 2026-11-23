@@ -32,8 +32,15 @@ class SeguimientoSolicitudCorreoAdapterTest {
     Assertions.assertEquals("${SMTP_PASSWORD:}", propiedades.getProperty("spring.mail.password"));
     Assertions.assertEquals("${SMTP_FROM:}", propiedades.getProperty("app.mail.from"));
 
-    Assertions.assertFalse(new YamlPropertySourceLoader()
-        .load("render", new FileSystemResource("render.yaml")).isEmpty());
+    var renderSource = (org.springframework.core.env.EnumerablePropertySource<?>) new YamlPropertySourceLoader()
+        .load("render", new FileSystemResource("render.yaml")).getFirst();
+    Assertions.assertTrue(renderSource.getPropertyNames().length > 0);
+    String clavePuerto = java.util.Arrays.stream(renderSource.getPropertyNames())
+        .filter(nombre -> nombre.endsWith(".key") && "SMTP_PORT".equals(renderSource.getProperty(nombre)))
+        .findFirst()
+        .map(nombre -> nombre.substring(0, nombre.length() - 4) + ".value")
+        .orElseThrow();
+    Assertions.assertEquals("2525", String.valueOf(renderSource.getProperty(clavePuerto)));
   }
 
   @Test

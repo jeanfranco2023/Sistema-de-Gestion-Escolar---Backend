@@ -99,7 +99,7 @@ public class ObligacionPago {
         .conceptoId(concepto.getId())
         .tipoConcepto(concepto.getTipoConcepto())
         .numeroCuota(cuota)
-        .descripcion(concepto.getNombre() + " - " + cuota)
+        .descripcion(cuota == 0 ? concepto.getNombre() : concepto.getNombre() + " - " + cuota)
         .fechaVencimiento(vencimiento)
         .montoBase(importe)
         .montoMora(BigDecimal.ZERO)

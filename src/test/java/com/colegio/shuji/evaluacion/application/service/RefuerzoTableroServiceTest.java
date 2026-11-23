@@ -449,4 +449,93 @@ class RefuerzoTableroServiceTest {
     assertEquals("Resuelve problemas de cantidad", item.competenciaNombre());
     assertEquals("Requiere apoyo en ecuaciones", item.conclusionOrigen());
   }
+
+  @Test
+  void rechazaProgramarODerivarEnBimestrePrevioConcluidoYFiltraTableroSinPeriodo() {
+    var hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+    var b1 =
+        PeriodoAcademico.builder()
+            .id((short) 1)
+            .anioLectivoId((short) 1)
+            .numeroPeriodo((short) 1)
+            .nombre("I Bimestre")
+            .fechaInicio(hoy.minusMonths(5))
+            .fechaFin(hoy.minusMonths(3))
+            .cerrado(false)
+            .activo(true)
+            .build();
+    var b4 =
+        PeriodoAcademico.builder()
+            .id((short) 4)
+            .anioLectivoId((short) 1)
+            .numeroPeriodo((short) 4)
+            .nombre("IV Bimestre")
+            .fechaInicio(hoy.minusDays(10))
+            .fechaFin(hoy.plusDays(20))
+            .cerrado(false)
+            .activo(true)
+            .build();
+
+    when(anios.bloquearPorId((short) 1))
+        .thenReturn(Optional.of(AnioLectivo.builder().id((short) 1).anio((short) 2026).abierto(true).build()));
+    when(periodos.bloquearPorId((short) 1)).thenReturn(Optional.of(b1));
+    when(periodos.buscarPorAnioLectivoId((short) 1)).thenReturn(List.of(b1, b4));
+
+    var req =
+        new com.colegio.shuji.evaluacion.application.dto.in.ProgramarRefuerzoRequestDto(
+            (short) 1,
+            (short) 1,
+            (short) 10,
+            63L,
+            "Refuerzo B1",
+            hoy.plusDays(1),
+            LocalTime.of(15, 0),
+            LocalTime.of(16, 0),
+            "SEC-5-A");
+
+    assertThrows(
+        com.colegio.shuji.shared.domain.exception.BusinessException.class,
+        () -> service.programar(req));
+
+    var sesionB1 =
+        SesionRefuerzo.builder()
+            .id(11L)
+            .anioLectivoId((short) 1)
+            .periodoAcademicoId((short) 1)
+            .areaCurricularId((short) 10)
+            .docenteUsuarioId(63L)
+            .fechaProgramada(hoy.minusMonths(3))
+            .horaInicio(LocalTime.of(15, 0))
+            .horaFin(LocalTime.of(16, 0))
+            .build();
+    when(refuerzos.bloquearPorId(11L)).thenReturn(Optional.of(sesionB1));
+    when(periodos.buscarPorId((short) 1)).thenReturn(Optional.of(b1));
+
+    assertThrows(
+        com.colegio.shuji.shared.domain.exception.BusinessException.class,
+        () -> service.derivar(11L));
+
+    when(actor.tieneRol("DIRECCION")).thenReturn(true);
+    when(curriculos.listar()).thenReturn(List.of());
+    when(competencias.listar()).thenReturn(List.of());
+    when(secciones.buscarPorAnioLectivoId((short) 1)).thenReturn(List.of());
+    when(grados.listar()).thenReturn(List.of());
+    when(niveles.listar()).thenReturn(List.of());
+    when(refuerzos.buscarPorAnioLectivoId((short) 1)).thenReturn(List.of(sesionB1));
+    when(calificaciones.buscarRiesgosPorAnio((short) 1))
+        .thenReturn(
+            List.of(
+                CalificacionCneb.builder()
+                    .id(99L)
+                    .matriculaId(401L)
+                    .anioLectivoId((short) 1)
+                    .periodoAcademicoId((short) 1)
+                    .calificacionCualitativa(CalificacionCualitativa.C)
+                    .build()));
+
+    var tablero = service.tablero((short) 1, null);
+    assertEquals((short) 4, tablero.periodoId());
+    assertEquals(0, tablero.totalSesiones());
+    assertEquals(0, tablero.evaluacionesRiesgoTotal());
+  }
 }

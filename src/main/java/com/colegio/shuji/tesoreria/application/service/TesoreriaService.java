@@ -172,13 +172,13 @@ public class TesoreriaService
 
   public List<ObligacionResponseDto> generarCobrosExtraordinarios(CobroExtraordinarioRequest.Asignacion r) {
     var concepto = requerido(conceptos.bloquearPorId(r.conceptoId()));
-    exigir(esExtraordinario(concepto.getTipoConcepto()) && concepto.isActivo(), "El concepto no esta habilitado");
+    exigir(esExtraordinario(concepto.getTipoConcepto()) && concepto.isActivo(), "El concepto no está habilitado");
     var resultado = new ArrayList<ObligacionResponseDto>();
     for (Long id : r.matriculaIds().stream().distinct().sorted().toList()) {
       var matricula = requerido(matriculas.bloquearPorId(id));
       var anio = requerido(anios.buscarPorId(matricula.getAnioLectivoId()));
       anio.verificarAbierto();
-      exigir(matricula.estaMatriculado() && matricula.getSeccionId() != null, "La matricula debe estar confirmada");
+      exigir(matricula.estaMatriculado() && matricula.getSeccionId() != null, "La matrícula debe estar confirmada");
       var existente = obligaciones.buscarPorMatriculaId(id).stream()
           .filter(o -> o.getConceptoId().equals(concepto.getId())).findFirst();
       if (existente.isPresent()) {
@@ -187,7 +187,7 @@ public class TesoreriaService
       }
       exigir(r.vencimiento().getYear() == anio.getAnio()
           && !r.vencimiento().isBefore(LocalDate.now(ZoneId.of("America/Lima"))),
-          "El vencimiento debe ser vigente y corresponder al ano lectivo");
+          "El vencimiento debe ser vigente y corresponder al año lectivo");
       resultado.add(mapper.toResponse(obligaciones.guardar(
           ObligacionPago.programar(id, concepto, (short) 0, r.vencimiento()))));
     }
@@ -196,6 +196,10 @@ public class TesoreriaService
 
   @Transactional(readOnly = true)
   public List<ObligacionResponseDto> obligacionesExtraordinarias(Long matriculaId) {
+    if (matriculaId == null || matriculaId <= 0) {
+      return conNombres(obligaciones.listar().stream()
+          .filter(o -> esExtraordinario(o.getTipoConcepto())).map(mapper::toResponse).toList());
+    }
     var matricula = requerido(matriculas.buscarPorId(matriculaId));
     requerido(anios.buscarPorId(matricula.getAnioLectivoId())).verificarAbierto();
     return conNombres(obligaciones.buscarPorMatriculaId(matriculaId).stream()
@@ -314,7 +318,10 @@ public class TesoreriaService
 
   @Transactional(readOnly = true)
   public List<ObligacionResponseDto> obligacionesMatricula(Long id) {
-    return conNombres(obligaciones.buscarPorMatriculaId(id).stream().map(mapper::toResponse).toList());
+    var lista = (id == null || id <= 0)
+        ? obligaciones.listar()
+        : obligaciones.buscarPorMatriculaId(id);
+    return conNombres(lista.stream().map(mapper::toResponse).toList());
   }
 
   @Transactional(readOnly = true)

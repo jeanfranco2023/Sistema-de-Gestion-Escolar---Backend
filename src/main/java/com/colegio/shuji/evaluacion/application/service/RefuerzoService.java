@@ -201,6 +201,10 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
     requerido(anios.bloquearPorId(r.anioLectivoId())).verificarAbierto();
     var p = requerido(periodos.bloquearPorId(r.periodoAcademicoId()));
     p.verificarActivo();
+    p.verificarAbierto();
+    exigir(
+        !esPeriodoConcluidoParaRefuerzo(p, r.anioLectivoId(), LocalDate.now(ZONA_LIMA)),
+        "El bimestre seleccionado ya concluyó; el reforzamiento solo aplica al bimestre pendiente actual");
     String codigoAula = null;
     if (r.aulaAsignada() != null && !r.aulaAsignada().isBlank()) {
       var aula = requerido(aulas.buscarPorCodigo(r.aulaAsignada().trim()));
@@ -238,6 +242,13 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
   public List<InscripcionRefuerzoResponseDto> derivar(Long sesionId) {
     var s = requerido(refuerzos.bloquearPorId(sesionId));
     actor.verificarDocente(s.getDocenteUsuarioId());
+    periodos
+        .buscarPorId(s.getPeriodoAcademicoId())
+        .ifPresent(
+            p ->
+                exigir(
+                    !esPeriodoConcluidoParaRefuerzo(p, s.getAnioLectivoId(), LocalDate.now(ZONA_LIMA)),
+                    "El bimestre de esta sesión ya concluyó; el reforzamiento solo aplica al bimestre pendiente actual"));
     var result = new ArrayList<InscripcionRefuerzoResponseDto>();
     var existentes = inscripciones.buscarPorSesionRefuerzoId(sesionId);
     var inscritos = new HashSet<Long>();
@@ -305,9 +316,18 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
   @Transactional(readOnly = true)
   public TableroRefuerzoResponseDto tablero(Short anioId, Short periodoId) {
     Short targetAnioId = resolverAnioObjetivo(anioId, periodoId);
+    LocalDate hoy = LocalDate.now(ZONA_LIMA);
+    Short periodoEfectivoId =
+        periodoId != null
+            ? periodoId
+            : resolverPeriodoVigente(targetAnioId, hoy).map(PeriodoAcademico::getId).orElse(null);
     List<SesionRefuerzo> visibles =
         buscarSesionesObjetivo(targetAnioId, periodoId).stream()
             .filter(this::sesionVisible)
+            .filter(
+                s ->
+                    periodoEfectivoId == null
+                        || Objects.equals(s.getPeriodoAcademicoId(), periodoEfectivoId))
             .sorted(
                 Comparator.comparing(
                         SesionRefuerzo::getFechaProgramada,
@@ -325,6 +345,10 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
 
     var calificacionesRiesgo =
         buscarCalificacionesScope(targetAnioId, periodoId).stream()
+            .filter(
+                c ->
+                    periodoEfectivoId == null
+                        || Objects.equals(c.getPeriodoAcademicoId(), periodoEfectivoId))
             .filter(
                 c ->
                     c.getCalificacionCualitativa() == CalificacionCualitativa.C
@@ -399,13 +423,13 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
       }
     }
 
-    LocalDate hoy = LocalDate.now(ZONA_LIMA);
+    LocalDate hoyTabla = LocalDate.now(ZONA_LIMA);
     List<SesionRefuerzoDetalleResponseDto> sesionesDto =
         visibles.stream()
             .map(
                 s ->
                     mapearSesionDetalle(
-                        s, inscPorSesion.getOrDefault(s.getId(), List.of()), califMap, ctx, hoy))
+                        s, inscPorSesion.getOrDefault(s.getId(), List.of()), califMap, ctx, hoyTabla))
             .toList();
 
     List<EstudianteRiesgoRefuerzoResponseDto> riesgosDto =
@@ -458,7 +482,7 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
 
     return new TableroRefuerzoResponseDto(
         targetAnioId,
-        periodoId,
+        periodoEfectivoId,
         sesionesDto.size(),
         todasInscripciones.size(),
         pendientes,
@@ -479,6 +503,69 @@ public class RefuerzoService implements DerivarAlumnosRefuerzoUseCase {
   private boolean sesionVisible(SesionRefuerzo s) {
     return esGestionGeneral()
         || (s.getDocenteUsuarioId() != null && s.getDocenteUsuarioId().equals(actor.usuarioId()));
+  }
+
+  private Optional<PeriodoAcademico> resolverPeriodoVigente(Short anioId, LocalDate hoy) {
+    if (anioId == null) return Optional.empty();
+    var lista = periodos.buscarPorAnioLectivoId(anioId);
+    if (lista == null || lista.isEmpty()) return Optional.empty();
+    var ordenados =
+        lista.stream()
+            .filter(Objects::nonNull)
+            .sorted(
+                Comparator.comparing(
+                        PeriodoAcademico::getNumeroPeriodo,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(
+                        PeriodoAcademico::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+            .toList();
+    if (ordenados.isEmpty()) return Optional.empty();
+    return ordenados.stream()
+        .filter(p -> !Boolean.TRUE.equals(p.getCerrado()) && !Boolean.FALSE.equals(p.getActivo()))
+        .filter(
+            p ->
+                p.getFechaInicio() != null
+                    && p.getFechaFin() != null
+                    && !hoy.isBefore(p.getFechaInicio())
+                    && !hoy.isAfter(p.getFechaFin()))
+        .findFirst()
+        .or(
+            () ->
+                ordenados.stream()
+                    .filter(
+                        p ->
+                            !Boolean.TRUE.equals(p.getCerrado())
+                                && !Boolean.FALSE.equals(p.getActivo()))
+                    .filter(p -> p.getFechaInicio() != null && !hoy.isBefore(p.getFechaInicio()))
+                    .reduce((first, second) -> second))
+        .or(
+            () ->
+                ordenados.stream()
+                    .filter(
+                        p ->
+                            !Boolean.TRUE.equals(p.getCerrado())
+                                && !Boolean.FALSE.equals(p.getActivo()))
+                    .findFirst())
+        .or(() -> Optional.of(ordenados.get(ordenados.size() - 1)));
+  }
+
+  private boolean esPeriodoConcluidoParaRefuerzo(
+      PeriodoAcademico periodo, Short anioId, LocalDate hoy) {
+    if (periodo == null) return false;
+    if (Boolean.TRUE.equals(periodo.getCerrado()) || Boolean.FALSE.equals(periodo.getActivo())) {
+      return true;
+    }
+    var vigenteOpt = resolverPeriodoVigente(anioId != null ? anioId : periodo.getAnioLectivoId(), hoy);
+    if (vigenteOpt.isPresent()) {
+      var vigente = vigenteOpt.get();
+      if (Objects.equals(vigente.getId(), periodo.getId())) {
+        return false;
+      }
+      if (periodo.getNumeroPeriodo() != null && vigente.getNumeroPeriodo() != null) {
+        return periodo.getNumeroPeriodo() < vigente.getNumeroPeriodo();
+      }
+    }
+    return periodo.getFechaFin() != null && periodo.getFechaFin().isBefore(hoy);
   }
 
   private Short resolverAnioObjetivo(Short anioId, Short periodoId) {

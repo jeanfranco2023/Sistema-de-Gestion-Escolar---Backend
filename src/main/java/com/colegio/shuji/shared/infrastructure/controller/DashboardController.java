@@ -178,8 +178,25 @@ public class DashboardController {
                                 || "ROLE_ADMINISTRADOR".equals(authority.getAuthority()));
         if (direccion) {
           try {
+            PeriodoAcademico periodoVigente = resolverPeriodoVigente(anio.getId(), hoy);
+            List<CalificacionCneb> notasRiesgoBase;
+            if (periodoVigente != null && periodoVigente.getId() != null) {
+              var porPeriodo =
+                  calificaciones.buscarPorAnioYPeriodo(anio.getId(), periodoVigente.getId());
+              notasRiesgoBase =
+                  (porPeriodo != null && !porPeriodo.isEmpty())
+                      ? porPeriodo
+                      : calificaciones.buscarPorAnioLectivoId(anio.getId());
+            } else {
+              notasRiesgoBase = calificaciones.buscarPorAnioLectivoId(anio.getId());
+            }
             alumnosRiesgo =
-                calificaciones.buscarPorAnioLectivoId(anio.getId()).stream()
+                notasRiesgoBase.stream()
+                    .filter(
+                        c ->
+                            periodoVigente == null
+                                || periodoVigente.getId() == null
+                                || periodoVigente.getId().equals(c.getPeriodoAcademicoId()))
                     .filter(c -> c.getCalificacionCualitativa() == CalificacionCualitativa.C)
                     .map(CalificacionCneb::getMatriculaId)
                     .distinct()
@@ -250,9 +267,18 @@ public class DashboardController {
       @RequestParam(required = false) Long seccionId) {
 
     String reglaExplicativa =
-        "Cada estudiante matriculado cuenta una sola vez en el corte seleccionado según su nivel de logro predominante (promedio CNEB ponderado AD=4, A=3, B=2, C=1; si presenta al menos una competencia en C sin alcanzar logro esperado, se prioriza en Requieren acompañamiento para intervención oportuna).";
+        "Cada estudiante matriculado cuenta una sola vez por bimestre según su nivel de logro predominante (promedio CNEB ponderado AD=4, A=3, B=2, C=1; la clasificación y el reforzamiento corresponden exclusivamente al bimestre evaluado y no arrastran recuperaciones de bimestres ya concluidos).";
 
     Short anioId = resolverAnioId(anioLectivoId);
+    LocalDate hoyLima = LocalDate.now(ZoneId.of("America/Lima"));
+    PeriodoAcademico periodoEfectivo =
+        periodoId != null
+            ? resolverPeriodo(anioId, periodoId)
+            : resolverPeriodoVigente(anioId, hoyLima);
+    Long periodoEfectivoId =
+        periodoEfectivo != null && periodoEfectivo.getId() != null
+            ? Long.valueOf(periodoEfectivo.getId().longValue())
+            : periodoId;
     Map<Short, Nivel> mapaNiveles = cargarMapaNiveles();
     Map<Short, Grado> mapaGrados = cargarMapaGrados();
     List<Seccion> seccionesAlcance =
@@ -302,21 +328,25 @@ public class DashboardController {
 
     List<CalificacionCneb> notasCorte = new ArrayList<>();
     if (anioId != null) {
-      List<CalificacionCneb> notasAnio =
-          periodoId != null
-              ? java.util.Optional.ofNullable(
-                      calificaciones.buscarPorAnioYPeriodo(anioId, periodoId.shortValue()))
-                  .filter(l -> !l.isEmpty())
-                  .orElseGet(() -> calificaciones.buscarPorAnioLectivoId(anioId))
-              : calificaciones.buscarPorAnioLectivoId(anioId);
+      List<CalificacionCneb> notasAnio;
+      if (periodoEfectivoId != null) {
+        List<CalificacionCneb> porPeriodo =
+            calificaciones.buscarPorAnioYPeriodo(anioId, periodoEfectivoId.shortValue());
+        notasAnio =
+            (porPeriodo != null && !porPeriodo.isEmpty())
+                ? porPeriodo
+                : calificaciones.buscarPorAnioLectivoId(anioId);
+      } else {
+        notasAnio = calificaciones.buscarPorAnioLectivoId(anioId);
+      }
       if (notasAnio != null) {
         for (CalificacionCneb c : notasAnio) {
           if (c == null || c.getMatriculaId() == null || !matriculaIds.contains(c.getMatriculaId())) {
             continue;
           }
-          if (periodoId != null
+          if (periodoEfectivoId != null
               && (c.getPeriodoAcademicoId() == null
-                  || c.getPeriodoAcademicoId().longValue() != periodoId.longValue())) {
+                  || c.getPeriodoAcademicoId().longValue() != periodoEfectivoId.longValue())) {
             continue;
           }
           notasCorte.add(c);
@@ -384,7 +414,7 @@ public class DashboardController {
     AsistenciaCuposIndicador asistenciaCupos =
         calcularAsistenciaYCupos(
             anioId,
-            periodoId,
+            periodoEfectivoId,
             matriculaIds,
             matriculasActivas,
             seccionesAlcance,
@@ -591,6 +621,61 @@ public class DashboardController {
           .filter(p -> p.getId() != null && p.getId().longValue() == periodoId.longValue())
           .findFirst()
           .orElse(null);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private PeriodoAcademico resolverPeriodoVigente(Short anioId, LocalDate hoy) {
+    if (periodos == null || anioId == null) {
+      return null;
+    }
+    try {
+      List<PeriodoAcademico> lista = periodos.buscarPorAnioLectivoId(anioId);
+      if (lista == null || lista.isEmpty()) {
+        return null;
+      }
+      List<PeriodoAcademico> ordenados =
+          lista.stream()
+              .filter(Objects::nonNull)
+              .sorted(
+                  Comparator.comparing(
+                          PeriodoAcademico::getNumeroPeriodo,
+                          Comparator.nullsLast(Comparator.naturalOrder()))
+                      .thenComparing(
+                          PeriodoAcademico::getId,
+                          Comparator.nullsLast(Comparator.naturalOrder())))
+              .toList();
+      if (ordenados.isEmpty()) {
+        return null;
+      }
+      return ordenados.stream()
+          .filter(p -> !Boolean.TRUE.equals(p.getCerrado()) && !Boolean.FALSE.equals(p.getActivo()))
+          .filter(
+              p ->
+                  p.getFechaInicio() != null
+                      && p.getFechaFin() != null
+                      && !hoy.isBefore(p.getFechaInicio())
+                      && !hoy.isAfter(p.getFechaFin()))
+          .findFirst()
+          .or(
+              () ->
+                  ordenados.stream()
+                      .filter(
+                          p ->
+                              !Boolean.TRUE.equals(p.getCerrado())
+                                  && !Boolean.FALSE.equals(p.getActivo()))
+                      .filter(p -> p.getFechaInicio() != null && !hoy.isBefore(p.getFechaInicio()))
+                      .reduce((first, second) -> second))
+          .or(
+              () ->
+                  ordenados.stream()
+                      .filter(
+                          p ->
+                              !Boolean.TRUE.equals(p.getCerrado())
+                                  && !Boolean.FALSE.equals(p.getActivo()))
+                      .findFirst())
+          .orElseGet(() -> ordenados.get(ordenados.size() - 1));
     } catch (Exception e) {
       return null;
     }
