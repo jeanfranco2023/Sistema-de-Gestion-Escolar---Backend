@@ -4,6 +4,7 @@ import com.colegio.shuji.matricula.application.port.out.SeguimientoSolicitudCorr
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +12,8 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Adaptador de mensajería y correo institucional para notificaciones, seguimiento de solicitudes
@@ -63,7 +66,7 @@ public class SeguimientoSolicitudCorreoAdapter implements SeguimientoSolicitudCo
     String enlaceSecundario = enlaceDirecto(enlace);
 
     String html = plantillaBase("SOLICITUD DE MATRÍCULA · SEGUIMIENTO", cuerpoHtml, ctaHtml, enlaceSecundario);
-    enviar(destinatario, asunto, textoPlano, html, solicitudId);
+    enviarTrasCommit(() -> enviar(destinatario, asunto, textoPlano, html, solicitudId));
   }
 
   @Override
@@ -313,20 +316,27 @@ public class SeguimientoSolicitudCorreoAdapter implements SeguimientoSolicitudCo
         """.formatted(enlaceSeguimiento);
 
     String html = plantillaBase("PAGO DE MATRÍCULA CONFIRMADO · PLATAFORMA EDUCATIVA", cuerpoHtml, ctaHtml, enlaceSecundario);
-    if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-      org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-          new org.springframework.transaction.support.TransactionSynchronization() {
+    enviarTrasCommit(() -> enviar(destinatario, asunto, textoPlano, html, solicitudId, pdfComprobante, nombreAdjunto));
+  }
+
+  private void enviarTrasCommit(Runnable tarea) {
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-              enviar(destinatario, asunto, textoPlano, html, solicitudId, pdfComprobante, nombreAdjunto);
+              CompletableFuture.runAsync(tarea);
             }
           });
     } else {
-      enviar(destinatario, asunto, textoPlano, html, solicitudId, pdfComprobante, nombreAdjunto);
+      tarea.run();
     }
   }
 
   private String enlaceSeguimiento(UUID solicitudId, String token) {
+    if (token == null || token.isBlank()) {
+      return "%s/matricula/inicio".formatted(frontendUrl);
+    }
     return "%s/matricula/inicio?token=%s&id=%s".formatted(frontendUrl, token, solicitudId);
   }
 

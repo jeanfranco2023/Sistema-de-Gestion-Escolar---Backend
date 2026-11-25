@@ -178,7 +178,10 @@ public class HorarioService implements GenerarMallaHorariaUseCase {
 
   @Transactional(readOnly = true)
   public List<MallaHorariaGradoResponseDto> porGrado(Short gradoId, Short anioId) {
-    if (actor.tieneRol("DOCENTE")) {
+    if (actor.tieneRol("DOCENTE")
+        && !actor.tieneRol("DIRECCION")
+        && !actor.tieneRol("ADMINISTRADOR")
+        && !actor.tieneRol("SECRETARIA")) {
       exigir(catalogo.catalogo().stream().anyMatch(a -> a.gradoId().equals(gradoId)
           && a.anioLectivoId().equals(anioId)), "El grado no pertenece a una sección asignada");
     }

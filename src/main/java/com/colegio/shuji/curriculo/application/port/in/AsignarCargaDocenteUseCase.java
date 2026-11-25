@@ -7,6 +7,14 @@ import java.util.List;
 
 public interface AsignarCargaDocenteUseCase {
   AsignacionDocenteResponseDto asignarDocente(AsignarDocenteRequestDto r);
+
+  AsignacionDocenteResponseDto reasignarDocente(Long asignacionId, Long nuevoDocenteUsuarioId);
+
   List<AsignacionDocenteResponseDto> listarAsignaciones();
+
+  default List<AsignacionDocenteResponseDto> listarAsignaciones(Short anioId) {
+    return listarAsignaciones();
+  }
+
   List<DocenteOpcionResponseDto> listarDocentesPorArea(Short areaId);
 }

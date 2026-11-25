@@ -31,11 +31,20 @@ public final class ReglaEdadMatricula {
   }
 
   public record Rango(int minima, int maxima) {
-    public boolean admite(LocalDate nacimiento, int anioLectivo) {
+    public int edadAlCorte(LocalDate nacimiento, int anioLectivo) {
       LocalDate corte = LocalDate.of(anioLectivo, 3, 31);
-      if (nacimiento == null || nacimiento.isAfter(corte)) return false;
-      int edad = Period.between(nacimiento, corte).getYears();
+      if (nacimiento == null || nacimiento.isAfter(corte)) return -1;
+      return Period.between(nacimiento, corte).getYears();
+    }
+
+    public boolean admite(LocalDate nacimiento, int anioLectivo) {
+      int edad = edadAlCorte(nacimiento, anioLectivo);
       return edad >= minima && edad <= maxima;
+    }
+
+    public boolean admiteConExcepcion(LocalDate nacimiento, int anioLectivo) {
+      int edad = edadAlCorte(nacimiento, anioLectivo);
+      return edad >= Math.max(2, minima - 1) && edad <= Math.min(20, maxima + 1);
     }
   }
 }

@@ -2,6 +2,7 @@ package com.colegio.shuji.usuario.infrastructure.controller.rest;
 
 import com.colegio.shuji.config.security.UserPrincipal;
 import com.colegio.shuji.shared.application.dto.ApiResponse;
+import com.colegio.shuji.usuario.application.dto.in.ActualizarUsuarioAdminRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CambiarEstadoRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
@@ -62,12 +63,25 @@ public class UsuarioController {
           + "expediente vacío. Los documentos laborales son opcionales y se adjuntan por separado "
           + "después del alta.")
   @PostMapping
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<UserResponseDto>> crearUsuario(
       @Valid @RequestBody RegisterUserRequestDto requestDto) {
     UserResponseDto usuario = gestionUsuarioUseCase.registrarPorDireccion(requestDto);
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.created(usuario, "Usuario creado exitosamente"));
+  }
+
+  @Operation(
+      summary = "Actualizar datos completos de un usuario institucional",
+      description = "Permite editar datos personales, laborales, roles habilitados según jerarquía y cursos reales del docente")
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
+  public ResponseEntity<ApiResponse<UserResponseDto>> actualizarUsuario(
+      @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
+          Long id,
+      @Valid @RequestBody ActualizarUsuarioAdminRequestDto requestDto) {
+    UserResponseDto usuario = gestionUsuarioUseCase.actualizarUsuario(id, requestDto);
+    return ResponseEntity.ok(ApiResponse.ok(usuario, "Usuario actualizado exitosamente"));
   }
 
   @Operation(
@@ -102,7 +116,7 @@ public class UsuarioController {
           "Lista todos los usuarios o filtra según el código de rol institucional (ej: DOCENTE,"
               + " SECRETARIA)")
   @GetMapping
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<List<UserResponseDto>>> listarUsuarios(
       @Parameter(description = "Código del rol (opcional)", example = "DOCENTE")
           @RequestParam(name = "rol", required = false)
@@ -116,7 +130,7 @@ public class UsuarioController {
       summary = "Cambiar estado activo/inactivo de un usuario (borrado lógico)",
       description = "Permite a Dirección activar o suspender una cuenta institucional")
   @PatchMapping("/{id}/estado")
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<UserResponseDto>> cambiarEstado(
       @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
           Long id,
@@ -139,7 +153,7 @@ public class UsuarioController {
       summary = "Corregir DNI de un usuario institucional",
       description = "Acción transaccional restringida a Dirección para corregir el DNI con registro de auditoría")
   @PatchMapping("/{id}/dni")
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<UserResponseDto>> corregirDni(
       @Parameter(description = "ID del usuario a modificar", required = true) @PathVariable("id")
           Long id,
@@ -208,7 +222,7 @@ public class UsuarioController {
       summary = "Obtener un enlace temporal de descarga del expediente de empleado",
       description = "Solo Dirección puede generar el enlace firmado de corta duración para un documento del empleado indicado.")
   @GetMapping("/{id}/documentos/{documentoId}/descarga")
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   public ResponseEntity<ApiResponse<String>> obtenerEnlaceDescargaDocumento(
       @Parameter(description = "ID del usuario empleado", required = true) @PathVariable("id") Long id,
       @Parameter(description = "ID del documento", required = true) @PathVariable("documentoId") Long documentoId) {

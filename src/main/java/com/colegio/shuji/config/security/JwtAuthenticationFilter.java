@@ -37,6 +37,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final SupabaseAuditInterceptor supabaseAuditInterceptor;
   private final UserRepositoryPort userRepositoryPort;
   private final SessionRepositoryPort sessionRepositoryPort;
+  @Autowired(required = false)
+  private JwtAuthCache authCache;
 
   @Autowired
   public JwtAuthenticationFilter(
@@ -69,19 +71,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       if (StringUtils.hasText(jwt) && tokenProvider.validateAccessToken(jwt)) {
         Long sessionId = tokenProvider.getSessionIdFromToken(jwt);
-        if (sessionId != null && sessionRepositoryPort != null && !sessionRepositoryPort.existsById(sessionId)) {
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.setContentType("application/json");
-          response.setCharacterEncoding("UTF-8");
-          response.getWriter().write("{\"success\":false,\"status\":401,\"errorCode\":\"SESSION_REVOKED\",\"message\":\"Sesión cerrada o token revocado\"}");
-          return;
+        if (sessionId != null && sessionRepositoryPort != null) {
+          Boolean sesionActiva = authCache != null ? authCache.getSessionExists(sessionId) : null;
+          if (sesionActiva == null) {
+            sesionActiva = sessionRepositoryPort.existsById(sessionId);
+            if (authCache != null) {
+              authCache.putSessionExists(sessionId, sesionActiva);
+            }
+          }
+          if (!sesionActiva) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write("{\"success\":false,\"status\":401,\"errorCode\":\"SESSION_REVOKED\",\"message\":\"Sesión cerrada o token revocado\"}");
+            return;
+          }
         }
 
         String username = tokenProvider.getUsernameFromToken(jwt);
         Long userId = tokenProvider.getUserIdFromToken(jwt);
 
         if (userId != null) {
-          Optional<Usuario> usuarioOpt = userRepositoryPort.obtenerPorId(userId);
+          Optional<Usuario> usuarioOpt = authCache != null ? authCache.getUser(userId) : null;
+          if (usuarioOpt == null) {
+            usuarioOpt = userRepositoryPort.obtenerPorId(userId);
+            if (authCache != null) {
+              authCache.putUser(userId, usuarioOpt);
+            }
+          }
           if (usuarioOpt.isEmpty() || !usuarioOpt.get().estaActivo()) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");

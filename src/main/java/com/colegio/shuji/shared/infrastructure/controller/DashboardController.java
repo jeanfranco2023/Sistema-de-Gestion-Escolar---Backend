@@ -58,6 +58,34 @@ public class DashboardController {
   private final NivelRepositoryPort niveles;
   private final EstudianteRepositoryPort estudiantes;
 
+  private static final long TTL_DASHBOARD_MS = 20_000L;
+  private static final long TTL_CATALOGO_MS = 60_000L;
+
+  private record EntradaCache<T>(T valor, long expiraEnMs) {
+    boolean vigente() {
+      return System.currentTimeMillis() < expiraEnMs;
+    }
+  }
+
+  private final java.util.concurrent.ConcurrentHashMap<String, EntradaCache<?>> cache =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  @SuppressWarnings("unchecked")
+  private <T> T obtenerDeCache(String clave) {
+    EntradaCache<?> entrada = cache.get(clave);
+    if (entrada != null && entrada.vigente()) {
+      return (T) entrada.valor();
+    }
+    return null;
+  }
+
+  private <T> T guardarEnCache(String clave, T valor, long ttlMs) {
+    if (valor != null) {
+      cache.put(clave, new EntradaCache<>(valor, System.currentTimeMillis() + ttlMs));
+    }
+    return valor;
+  }
+
   public DashboardController(
       AnioLectivoRepositoryPort anios,
       MatriculaRepositoryPort matriculas,
@@ -148,7 +176,21 @@ public class DashboardController {
 
   @GetMapping("/resumen")
   @PreAuthorize("hasAnyRole('DIRECCION','SECRETARIA','ADMINISTRADOR')")
+  @Transactional(readOnly = true)
   public Resumen resumen(Authentication authentication) {
+    boolean direccion =
+        authentication != null
+            && authentication.getAuthorities().stream()
+                .anyMatch(
+                    authority ->
+                        "ROLE_DIRECCION".equals(authority.getAuthority())
+                            || "ROLE_ADMINISTRADOR".equals(authority.getAuthority()));
+    String claveCache = "resumen:" + direccion;
+    Resumen enCache = obtenerDeCache(claveCache);
+    if (enCache != null) {
+      return enCache;
+    }
+
     var hoy = LocalDate.now(ZoneId.of("America/Lima"));
     int anioActual = hoy.getYear();
     Long totalEstudiantes = null;
@@ -157,7 +199,8 @@ public class DashboardController {
     Long alumnosRiesgo = null;
 
     try {
-      var anioOpt = anios.listar().stream().filter(a -> a.getAnio() == hoy.getYear()).findFirst();
+      var listaAnios = listarAniosCacheados();
+      var anioOpt = listaAnios.stream().filter(a -> a.getAnio() == hoy.getYear()).findFirst();
       if (anioOpt.isPresent()) {
         var anio = anioOpt.get();
         anioActual = (int) anio.getAnio();
@@ -169,13 +212,6 @@ public class DashboardController {
         } catch (Exception e) {
           log.warn("Error calculando matriculas activas: {}", e.getMessage());
         }
-        boolean direccion =
-            authentication != null
-                && authentication.getAuthorities().stream()
-                    .anyMatch(
-                        authority ->
-                            "ROLE_DIRECCION".equals(authority.getAuthority())
-                                || "ROLE_ADMINISTRADOR".equals(authority.getAuthority()));
         if (direccion) {
           try {
             PeriodoAcademico periodoVigente = resolverPeriodoVigente(anio.getId(), hoy);
@@ -211,49 +247,65 @@ public class DashboardController {
     }
 
     try {
-      var asistencia = asistencias.buscarPorFechaSesion(hoy);
-      if (asistencia != null) {
+      var conteoHoy = asistencias.contarPorEstadoEnFecha(hoy);
+      if (conteoHoy != null) {
+        long presentesHoy = conteoHoy.presentes() + conteoHoy.tardanzas();
+        long totalHoy = conteoHoy.total();
         porcentajeAsistencia =
-            asistencia.isEmpty()
-                ? 0
-                : (int)
-                    Math.round(
-                        100.0
-                            * asistencia.stream().filter(AsistenciaAula::esPresente).count()
-                            / asistencia.size());
+            totalHoy == 0 ? 0 : (int) Math.round(100.0 * presentesHoy / totalHoy);
+      } else {
+        var asistencia = asistencias.buscarPorFechaSesion(hoy);
+        if (asistencia != null) {
+          porcentajeAsistencia =
+              asistencia.isEmpty()
+                  ? 0
+                  : (int)
+                      Math.round(
+                          100.0
+                              * asistencia.stream().filter(AsistenciaAula::esPresente).count()
+                              / asistencia.size());
+        }
       }
     } catch (Exception e) {
       log.warn("Error calculando asistencia: {}", e.getMessage());
     }
 
     try {
-      var listaPagos = pagos.listar();
-      if (listaPagos != null) {
-        recaudacion =
-            listaPagos.stream()
-                .filter(
-                    p ->
-                        p != null
-                            && p.estaAprobado()
-                            && p.getFechaPago() != null
-                            && p.getMontoPagado() != null
-                            && p.getFechaPago()
-                                    .atZoneSameInstant(ZoneId.of("America/Lima"))
-                                    .getYear()
-                                == hoy.getYear()
-                            && p.getFechaPago()
-                                    .atZoneSameInstant(ZoneId.of("America/Lima"))
-                                    .getMonthValue()
-                                == hoy.getMonthValue())
-                .map(p -> p.getMontoPagado())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+      ZoneId lima = ZoneId.of("America/Lima");
+      var inicioMes = hoy.withDayOfMonth(1).atStartOfDay(lima).toOffsetDateTime();
+      var inicioMesSig = hoy.plusMonths(1).withDayOfMonth(1).atStartOfDay(lima).toOffsetDateTime();
+      BigDecimal recaudacionDirecta = pagos.sumarAprobadosEntre(inicioMes, inicioMesSig);
+      if (recaudacionDirecta != null) {
+        recaudacion = recaudacionDirecta;
+      } else {
+        var listaPagos = pagos.listar();
+        if (listaPagos != null) {
+          recaudacion =
+              listaPagos.stream()
+                  .filter(
+                      p ->
+                          p != null
+                              && p.estaAprobado()
+                              && p.getFechaPago() != null
+                              && p.getMontoPagado() != null
+                              && p.getFechaPago().atZoneSameInstant(lima).getYear() == hoy.getYear()
+                              && p.getFechaPago().atZoneSameInstant(lima).getMonthValue()
+                                  == hoy.getMonthValue())
+                  .map(p -> p.getMontoPagado())
+                  .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
       }
     } catch (Exception e) {
       log.warn("Error calculando recaudacion del mes: {}", e.getMessage());
     }
 
-    return new Resumen(
-        anioActual, totalEstudiantes, porcentajeAsistencia, recaudacion, alumnosRiesgo);
+    Resumen resultado =
+        new Resumen(
+            anioActual, totalEstudiantes, porcentajeAsistencia, recaudacion, alumnosRiesgo);
+    if (totalEstudiantes != null || porcentajeAsistencia != null || recaudacion != null) {
+      guardarEnCache(claveCache, resultado, TTL_DASHBOARD_MS);
+    }
+    return resultado;
   }
 
   @GetMapping("/indicadores")
@@ -265,6 +317,22 @@ public class DashboardController {
       @RequestParam(required = false) String nivel,
       @RequestParam(required = false) Long gradoId,
       @RequestParam(required = false) Long seccionId) {
+
+    String claveCache =
+        "indicadores:"
+            + anioLectivoId
+            + ":"
+            + periodoId
+            + ":"
+            + (nivel == null ? "" : nivel.trim().toUpperCase())
+            + ":"
+            + gradoId
+            + ":"
+            + seccionId;
+    IndicadoresDireccionResponse enCache = obtenerDeCache(claveCache);
+    if (enCache != null) {
+      return enCache;
+    }
 
     String reglaExplicativa =
         "Cada estudiante matriculado cuenta una sola vez por bimestre según su nivel de logro predominante (promedio CNEB ponderado AD=4, A=3, B=2, C=1; la clasificación y el reforzamiento corresponden exclusivamente al bimestre evaluado y no arrastran recuperaciones de bimestres ya concluidos).";
@@ -421,7 +489,10 @@ public class DashboardController {
             mapaGrados,
             mapaNiveles);
 
-    return new IndicadoresDireccionResponse(desempeno, cobertura, asistenciaCupos);
+    return guardarEnCache(
+        claveCache,
+        new IndicadoresDireccionResponse(desempeno, cobertura, asistenciaCupos),
+        TTL_DASHBOARD_MS);
   }
 
   private CalificacionCualitativa clasificarEstudianteUnico(List<CalificacionCneb> notas) {
@@ -468,36 +539,66 @@ public class DashboardController {
       Map<Short, Grado> mapaGrados,
       Map<Short, Nivel> mapaNiveles) {
 
-    List<AsistenciaAula> registros = new ArrayList<>();
+    PeriodoAcademico periodoSeleccionado = resolverPeriodo(anioId, periodoId);
+    LocalDate desde = periodoSeleccionado != null ? periodoSeleccionado.getFechaInicio() : null;
+    LocalDate hasta = periodoSeleccionado != null ? periodoSeleccionado.getFechaFin() : null;
+
+    long presentes = 0;
+    long tardanzas = 0;
+    long faltasJustificadas = 0;
+    long faltasInjustificadas = 0;
+    long inasistencias = 0;
+    List<AsistenciaAula> registrosFallback = null;
+
     if (!matriculaIds.isEmpty()) {
-      List<AsistenciaAula> porMatriculas = asistencias.buscarPorMatriculaIds(matriculaIds);
-      if (porMatriculas != null) {
-        registros.addAll(porMatriculas);
+      var conteos = asistencias.contarPorEstadoYMatriculaIdsYRango(matriculaIds, desde, hasta);
+      if (conteos != null) {
+        presentes = conteos.presentes();
+        tardanzas = conteos.tardanzas();
+        faltasJustificadas = conteos.faltasJustificadas();
+        faltasInjustificadas = conteos.faltasInjustificadas();
+        inasistencias = conteos.inasistencias();
+      } else {
+        List<AsistenciaAula> porMatriculas = asistencias.buscarPorMatriculaIds(matriculaIds);
+        registrosFallback = porMatriculas != null ? porMatriculas : List.of();
+        List<AsistenciaAula> registrosCorte =
+            filtrarAsistenciasPorPeriodo(registrosFallback, periodoSeleccionado);
+        presentes =
+            registrosCorte.stream()
+                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.PRESENTE)
+                .count();
+        tardanzas =
+            registrosCorte.stream()
+                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.TARDANZA)
+                .count();
+        faltasJustificadas =
+            registrosCorte.stream()
+                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_JUSTIFICADA)
+                .count();
+        faltasInjustificadas =
+            registrosCorte.stream()
+                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_INJUSTIFICADA)
+                .count();
+        inasistencias =
+            registrosCorte.stream().filter(a -> a != null && a.esFalta()).count();
       }
     }
 
-    PeriodoAcademico periodoSeleccionado = resolverPeriodo(anioId, periodoId);
-    List<AsistenciaAula> registrosCorte =
-        filtrarAsistenciasPorPeriodo(registros, periodoSeleccionado);
-
-    long presentes =
-        registrosCorte.stream()
-            .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.PRESENTE)
-            .count();
-    long tardanzas =
-        registrosCorte.stream()
-            .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.TARDANZA)
-            .count();
-    long inasistencias =
-        registrosCorte.stream().filter(a -> a != null && a.esFalta()).count();
     long totalRegistros = presentes + tardanzas + inasistencias;
     Double porcentajeAsistencia =
         totalRegistros == 0
             ? null
             : Math.round(((presentes + tardanzas) * 1000.0) / totalRegistros) / 10.0;
 
-    Double variacionPeriodoAnterior = porcentajeAsistencia == null ? null
-        : calcularVariacionPeriodoAnterior(anioId, periodoSeleccionado, registros, porcentajeAsistencia);
+    Double variacionPeriodoAnterior =
+        porcentajeAsistencia == null
+            ? null
+            : calcularVariacionPeriodoAnterior(
+                anioId,
+                periodoSeleccionado,
+                matriculaIds,
+                registrosFallback,
+                porcentajeAsistencia);
 
     Map<Integer, Long> matriculadosPorSeccion =
         matriculasActivas.stream()
@@ -536,8 +637,8 @@ public class DashboardController {
         presentes,
         tardanzas,
         inasistencias,
-        registrosCorte.stream().filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_JUSTIFICADA).count(),
-        registrosCorte.stream().filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_INJUSTIFICADA).count(),
+        faltasJustificadas,
+        faltasInjustificadas,
         matriculasActivas.size(),
         totalVacantesAlcance,
         itemsSeccion);
@@ -561,7 +662,8 @@ public class DashboardController {
   private Double calcularVariacionPeriodoAnterior(
       Short anioId,
       PeriodoAcademico periodoActual,
-      List<AsistenciaAula> todosRegistros,
+      Set<Long> matriculaIds,
+      List<AsistenciaAula> todosRegistrosFallback,
       double porcentajeActual) {
     if (periodos == null
         || anioId == null
@@ -573,14 +675,25 @@ public class DashboardController {
     try {
       short numAnterior = (short) (periodoActual.getNumeroPeriodo() - 1);
       PeriodoAcademico anterior =
-          periodos.buscarPorAnioLectivoId(anioId).stream()
+          listarPeriodosCacheados(anioId).stream()
               .filter(p -> p.getNumeroPeriodo() != null && p.getNumeroPeriodo() == numAnterior)
               .findFirst()
               .orElse(null);
       if (anterior == null) {
         return null;
       }
-      List<AsistenciaAula> regAnterior = filtrarAsistenciasPorPeriodo(todosRegistros, anterior);
+      if (todosRegistrosFallback == null) {
+        var conteoAnt =
+            asistencias.contarPorEstadoYMatriculaIdsYRango(
+                matriculaIds, anterior.getFechaInicio(), anterior.getFechaFin());
+        if (conteoAnt == null || conteoAnt.total() == 0) {
+          return null;
+        }
+        long asisAnt = conteoAnt.presentes() + conteoAnt.tardanzas();
+        double porcAnt = Math.round((asisAnt * 1000.0) / conteoAnt.total()) / 10.0;
+        return Math.round((porcentajeActual - porcAnt) * 10.0) / 10.0;
+      }
+      List<AsistenciaAula> regAnterior = filtrarAsistenciasPorPeriodo(todosRegistrosFallback, anterior);
       if (regAnterior.isEmpty()) {
         return null;
       }
@@ -592,14 +705,32 @@ public class DashboardController {
     }
   }
 
+  private List<AnioLectivo> listarAniosCacheados() {
+    List<AnioLectivo> enCache = obtenerDeCache("cat:anios");
+    if (enCache != null) return enCache;
+    List<AnioLectivo> lista = anios.listar();
+    if (lista == null) return List.of();
+    return guardarEnCache("cat:anios", lista, TTL_CATALOGO_MS);
+  }
+
+  private List<PeriodoAcademico> listarPeriodosCacheados(Short anioId) {
+    if (periodos == null || anioId == null) return List.of();
+    String clave = "cat:periodos:" + anioId;
+    List<PeriodoAcademico> enCache = obtenerDeCache(clave);
+    if (enCache != null) return enCache;
+    List<PeriodoAcademico> lista = periodos.buscarPorAnioLectivoId(anioId);
+    if (lista == null) return List.of();
+    return guardarEnCache(clave, lista, TTL_CATALOGO_MS);
+  }
+
   private Short resolverAnioId(Long anioLectivoIdParam) {
     if (anioLectivoIdParam != null) {
       return anioLectivoIdParam.shortValue();
     }
     try {
       int anioHoy = LocalDate.now(ZoneId.of("America/Lima")).getYear();
-      List<AnioLectivo> lista = anios.listar();
-      if (lista == null || lista.isEmpty()) {
+      List<AnioLectivo> lista = listarAniosCacheados();
+      if (lista.isEmpty()) {
         return null;
       }
       return lista.stream()
@@ -617,7 +748,7 @@ public class DashboardController {
       return null;
     }
     try {
-      return periodos.buscarPorAnioLectivoId(anioId).stream()
+      return listarPeriodosCacheados(anioId).stream()
           .filter(p -> p.getId() != null && p.getId().longValue() == periodoId.longValue())
           .findFirst()
           .orElse(null);
@@ -631,8 +762,8 @@ public class DashboardController {
       return null;
     }
     try {
-      List<PeriodoAcademico> lista = periodos.buscarPorAnioLectivoId(anioId);
-      if (lista == null || lista.isEmpty()) {
+      List<PeriodoAcademico> lista = listarPeriodosCacheados(anioId);
+      if (lista.isEmpty()) {
         return null;
       }
       List<PeriodoAcademico> ordenados =
@@ -683,12 +814,16 @@ public class DashboardController {
 
   private Map<Short, Nivel> cargarMapaNiveles() {
     if (niveles == null) return Map.of();
+    Map<Short, Nivel> enCache = obtenerDeCache("cat:niveles");
+    if (enCache != null) return enCache;
     try {
       List<Nivel> lista = niveles.listar();
       if (lista == null) return Map.of();
-      return lista.stream()
-          .filter(n -> n != null && n.getId() != null)
-          .collect(Collectors.toMap(Nivel::getId, n -> n, (a, b) -> a));
+      Map<Short, Nivel> mapa =
+          lista.stream()
+              .filter(n -> n != null && n.getId() != null)
+              .collect(Collectors.toMap(Nivel::getId, n -> n, (a, b) -> a));
+      return guardarEnCache("cat:niveles", mapa, TTL_CATALOGO_MS);
     } catch (Exception e) {
       return Map.of();
     }
@@ -696,12 +831,16 @@ public class DashboardController {
 
   private Map<Short, Grado> cargarMapaGrados() {
     if (grados == null) return Map.of();
+    Map<Short, Grado> enCache = obtenerDeCache("cat:grados");
+    if (enCache != null) return enCache;
     try {
       List<Grado> lista = grados.listar();
       if (lista == null) return Map.of();
-      return lista.stream()
-          .filter(g -> g != null && g.getId() != null)
-          .collect(Collectors.toMap(Grado::getId, g -> g, (a, b) -> a));
+      Map<Short, Grado> mapa =
+          lista.stream()
+              .filter(g -> g != null && g.getId() != null)
+              .collect(Collectors.toMap(Grado::getId, g -> g, (a, b) -> a));
+      return guardarEnCache("cat:grados", mapa, TTL_CATALOGO_MS);
     } catch (Exception e) {
       return Map.of();
     }

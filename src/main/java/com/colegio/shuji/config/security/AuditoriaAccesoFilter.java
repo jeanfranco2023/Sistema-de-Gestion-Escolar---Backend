@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -42,24 +43,32 @@ public class AuditoriaAccesoFilter extends OncePerRequestFilter {
       throw ex;
     } finally {
       long duracionMs = (System.nanoTime() - inicio) / 1_000_000;
-      try {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Long usuarioId =
-            authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal
-                ? principal.getId()
-                : null;
-        auditoria.registrar(
-            request.getMethod(),
-            request.getRequestURI(),
-            estado,
-            request.getRemoteAddr(),
-            request.getHeader("User-Agent"),
-            duracionMs,
-            usuarioId,
-            authentication);
-      } catch (RuntimeException ex) {
-        log.error("No se pudo persistir el registro de acceso a la API", ex);
-      }
+      String metodo = request.getMethod();
+      String uri = request.getRequestURI();
+      String ip = request.getRemoteAddr();
+      String userAgent = request.getHeader("User-Agent");
+      int estadoFinal = estado;
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      Long usuarioId =
+          authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal
+              ? principal.getId()
+              : null;
+      CompletableFuture.runAsync(
+          () -> {
+            try {
+              auditoria.registrar(
+                  metodo,
+                  uri,
+                  estadoFinal,
+                  ip,
+                  userAgent,
+                  duracionMs,
+                  usuarioId,
+                  authentication);
+            } catch (RuntimeException ex) {
+              log.error("No se pudo persistir el registro de acceso a la API", ex);
+            }
+          });
     }
   }
 }

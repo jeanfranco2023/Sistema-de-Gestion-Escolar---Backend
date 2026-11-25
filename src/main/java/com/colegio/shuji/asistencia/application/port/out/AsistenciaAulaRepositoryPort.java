@@ -33,4 +33,24 @@ public interface AsistenciaAulaRepositoryPort {
   List<AsistenciaAula> buscarPorEstado(EstadoAsistenciaAula valor);
 
   List<AsistenciaAula> buscarPorAuxiliarUsuarioId(Long valor);
+
+  record ResumenConteoAsistencia(
+      long presentes, long tardanzas, long faltasJustificadas, long faltasInjustificadas) {
+    public long inasistencias() {
+      return faltasJustificadas + faltasInjustificadas;
+    }
+
+    public long total() {
+      return presentes + tardanzas + faltasJustificadas + faltasInjustificadas;
+    }
+  }
+
+  default ResumenConteoAsistencia contarPorEstadoEnFecha(LocalDate fecha) {
+    return null;
+  }
+
+  default ResumenConteoAsistencia contarPorEstadoYMatriculaIdsYRango(
+      Collection<Long> matriculaIds, LocalDate desde, LocalDate hasta) {
+    return null;
+  }
 }

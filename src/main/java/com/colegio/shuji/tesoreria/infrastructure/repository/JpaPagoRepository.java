@@ -1,7 +1,10 @@
 package com.colegio.shuji.tesoreria.infrastructure.repository;
 
+import com.colegio.shuji.tesoreria.domain.enums.EstadoPago;
 import com.colegio.shuji.tesoreria.infrastructure.entity.PagoTransaccionEntity;
 import jakarta.persistence.LockModeType;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +23,12 @@ public interface JpaPagoRepository extends JpaRepository<PagoTransaccionEntity, 
   @Query(
       "select e from PagoTransaccionEntity e where e.pasarelaTransaccionId = :valor order by e.id")
   List<PagoTransaccionEntity> buscarPorPasarelaTransaccionId(@Param("valor") String valor);
+
+  @Query(
+      "select coalesce(sum(e.montoPagado), 0) from PagoTransaccionEntity e "
+          + "where e.estadoPago = :estado and e.fechaPago >= :desde and e.fechaPago < :hasta")
+  BigDecimal sumarPorEstadoYFecha(
+      @Param("estado") EstadoPago estado,
+      @Param("desde") OffsetDateTime desde,
+      @Param("hasta") OffsetDateTime hasta);
 }

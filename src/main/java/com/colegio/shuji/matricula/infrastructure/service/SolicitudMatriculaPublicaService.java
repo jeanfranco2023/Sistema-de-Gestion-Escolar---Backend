@@ -130,8 +130,8 @@ public class SolicitudMatriculaPublicaService {
   @Value("${app.matricula-publica.duracion-reserva-minutos:30}")
   private long duracionReservaMinutos;
 
-  @Value("${app.matricula-publica.validar-edad:false}")
-  private boolean validarEdad;
+  @Value("${app.matricula-publica.validar-edad:true}")
+  private boolean validarEdad = true;
 
   @Value("${integraciones.pagos.mercadopago.sandbox:false}")
   private boolean mercadoPagoSandbox;
@@ -223,8 +223,6 @@ public class SolicitudMatriculaPublicaService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "No hay vacantes disponibles para el grado seleccionado");
     }
     var edades = limitesEdad(seccion);
-    boolean requiereAutorizacionEdad = validarEdad
-        && !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
     var estudianteExistente = estudiantes.buscarPorNumeroDocumento(r.numeroDocumentoEstudiante().trim());
     if (!estudianteExistente.isEmpty()) {
       Long estudianteId = estudianteExistente.getFirst().getId();
@@ -236,6 +234,14 @@ public class SolicitudMatriculaPublicaService {
         r.numeroDocumentoEstudiante().trim(), SOLICITUDES_ACTIVAS)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una solicitud en trámite para este DNI. Puedes solicitar el reenvío de tu enlace de seguimiento.");
     }
+    if (validarEdad && !edades.admiteConExcepcion(r.fechaNacimientoEstudiante(), anio.getAnio())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "La edad del estudiante al 31 de marzo de " + anio.getAnio()
+              + " no corresponde al grado seleccionado (rango permitido: "
+              + edades.minima() + " a " + edades.maxima() + " años).");
+    }
+    boolean requiereAutorizacionEdad = validarEdad
+        && !edades.admite(r.fechaNacimientoEstudiante(), anio.getAnio());
 
     ModalidadIngreso modalidad = r.modalidadIngreso() != null ? r.modalidadIngreso() : ModalidadIngreso.REGULAR;
     String colegioProcedencia = r.colegioProcedencia() == null ? null : r.colegioProcedencia().trim();
@@ -803,8 +809,8 @@ public class SolicitudMatriculaPublicaService {
 
     var existentes = estudiantes.buscarPorNumeroDocumento(s.getNumeroDocumentoEstudiante());
     var estudiante = existentes.isEmpty() ? new EstudianteEntity() : existentes.getFirst();
-    if (!existentes.isEmpty() && (!s.isPresencial()
-        || matriculas.existsByEstudianteIdAndAnioLectivoId(estudiante.getId(), s.getAnioLectivoId()))) {
+    if (!existentes.isEmpty()
+        && matriculas.existsByEstudianteIdAndAnioLectivoId(estudiante.getId(), s.getAnioLectivoId())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Pago confirmado; el DNI del estudiante requiere conciliación administrativa");
     }
     if (existentes.isEmpty()) {
@@ -903,14 +909,15 @@ public class SolicitudMatriculaPublicaService {
     s.setEstudianteId(estudiante.getId());
     s.setApoderadoId(apoderado.getId());
     s.setMatriculaId(matricula.getId());
-    s.setComprobantePagoCodigo(cobrosMatricula.registrar(matricula.getId(), s.getPagoMonto(), pago));
+    s.setComprobantePagoCodigo(cobrosMatricula.registrar(matricula.getId(), montoEsperado, pago));
     s.setFechaEmisionDocumentos(OffsetDateTime.now(ZoneOffset.UTC));
     s.setSeccionId(matricula.getSeccionId());
     s.setEstado(seccion == null ? EstadoSolicitudMatriculaPublica.PAGO_CONFIRMADO_PENDIENTE_ASIGNACION
         : EstadoSolicitudMatriculaPublica.MATRICULADA);
     s.setFechaExpiracionPago(null);
     String tokenSeguimiento = token;
-    if (tokenSeguimiento == null || tokenSeguimiento.isBlank()) {
+    if ((tokenSeguimiento == null || tokenSeguimiento.isBlank())
+        && (s.getTokenHash() == null || s.getTokenHash().isBlank())) {
       byte[] secreto = new byte[32];
       RANDOM.nextBytes(secreto);
       tokenSeguimiento = Base64.getUrlEncoder().withoutPadding().encodeToString(secreto);
@@ -943,7 +950,7 @@ public class SolicitudMatriculaPublicaService {
                 guardada.getNumeroDocumentoEstudiante(),
                 detalleGrado,
                 "FIC-MAT-" + guardada.getMatriculaId(),
-                guardada.getPagoMonto(),
+                montoEsperado,
                 "Derecho de Matricula Escolar"
             );
             pdfBytes = comprobantePdfAdapter.generarPdf(pdfDto, usernameApoderado, passwordTemporal);
@@ -951,7 +958,6 @@ public class SolicitudMatriculaPublicaService {
             log.warn("No fue posible compilar PDF del voucher para la solicitud {}: {}", guardada.getId(), exPdf.getMessage());
           }
         }
-        if (pdfBytes == null) throw new IllegalStateException("No se generó la constancia de pago");
         correoSeguimiento.enviarCredencialesMatricula(
             guardada.getEmailApoderado().trim(),
             nombreApoderado(guardada),
@@ -1013,6 +1019,17 @@ public class SolicitudMatriculaPublicaService {
         || !seccion.getGradoId().equals(solicitud.getGradoId())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
           "La sección debe pertenecer al grado solicitado y al año lectivo correspondiente");
+    }
+    var anio = anios.findById(solicitud.getAnioLectivoId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Año lectivo inexistente"));
+    var edades = limitesEdad(seccion);
+    boolean edadAdmitida = edades.admite(solicitud.getFechaNacimientoEstudiante(), anio.getAnio())
+        || (solicitud.getFechaAutorizacionEdad() != null
+            && edades.admiteConExcepcion(solicitud.getFechaNacimientoEstudiante(), anio.getAnio()));
+    if (validarEdad && !edadAdmitida) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "La edad del estudiante no corresponde al grado de la sección seleccionada (rango EBR: "
+              + edades.minima() + "–" + edades.maxima() + " años).");
     }
     if (seccion.getVacantesOcupadas() >= seccion.getCupoMaximo()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "La sección ya alcanzó su capacidad máxima");

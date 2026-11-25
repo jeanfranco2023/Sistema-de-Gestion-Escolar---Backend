@@ -76,7 +76,7 @@ public class HorarioController {
   }
 
   @GetMapping("/grado/{id}")
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE')")
   public java.util.List<MallaHorariaGradoResponseDto> consultarPorGrado(
       @PathVariable @Positive Short id, @RequestParam @Positive Short anioId) {
     return horarios.porGrado(id, anioId);

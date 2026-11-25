@@ -22,10 +22,12 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
 
   private final JpaUsuarioRepository jpaUsuarioRepository;
   private final UserPersistenceMapper userMapper;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.colegio.shuji.config.security.JwtAuthCache authCache;
 
   @Override
   public Optional<Usuario> findById(Long id) {
-    return jpaUsuarioRepository.findById(id).map(userMapper::toDomain);
+    return jpaUsuarioRepository.findByIdWithRoles(id).map(userMapper::toDomain);
   }
 
   @Override
@@ -91,6 +93,9 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     auditoria.syncCurrentUserFromSecurityContext();
     UsuarioEntity entity = userMapper.toEntity(usuario);
     UsuarioEntity saved = jpaUsuarioRepository.save(entity);
+    if (authCache != null && saved.getId() != null) {
+      authCache.evictUser(saved.getId());
+    }
     return userMapper.toDomain(saved);
   }
 }

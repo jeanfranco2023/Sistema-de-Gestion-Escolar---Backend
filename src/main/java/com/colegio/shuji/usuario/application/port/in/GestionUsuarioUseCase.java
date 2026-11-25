@@ -1,5 +1,6 @@
 package com.colegio.shuji.usuario.application.port.in;
 
+import com.colegio.shuji.usuario.application.dto.in.ActualizarUsuarioAdminRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CambiarPasswordRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
 import com.colegio.shuji.usuario.application.dto.in.RegisterUserRequestDto;
@@ -27,4 +28,9 @@ public interface GestionUsuarioUseCase {
   UserResponseDto corregirDni(Long usuarioId, CorregirDniRequestDto request);
 
   UserResponseDto revocarRol(Long usuarioId, Short rolId);
+
+  default UserResponseDto actualizarUsuario(
+      Long usuarioId, ActualizarUsuarioAdminRequestDto request) {
+    throw new UnsupportedOperationException("Operación no soportada");
+  }
 }

@@ -26,6 +26,9 @@ import com.colegio.shuji.shared.application.port.out.AuditContextPort;
 import com.colegio.shuji.shared.domain.exception.BusinessException;
 import com.colegio.shuji.usuario.application.dto.in.CorregirDniRequestDto;
 import com.colegio.shuji.usuario.domain.exception.ReglaNegocioException;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -75,8 +78,19 @@ public class EstudianteService implements RegistrarFichaFamiliarUseCase {
           "Solo se admite DNI peruano de ocho dígitos");
   }
 
+  private void validarFechaNacimientoEscolar(LocalDate fechaNacimiento) {
+    exigir(fechaNacimiento != null, "La fecha de nacimiento es obligatoria");
+    LocalDate hoy = LocalDate.now(ZoneId.of("America/Lima"));
+    exigir(fechaNacimiento.isBefore(hoy), "La fecha de nacimiento debe ser anterior a hoy");
+    int edad = Period.between(fechaNacimiento, hoy).getYears();
+    exigir(
+        edad >= 2 && edad <= 22,
+        "La edad del estudiante (" + edad + " años) no corresponde a educación escolar (2 a 22 años)");
+  }
+
   public EstudianteResponseDto registrarEstudiante(RegistrarEstudianteRequestDto r) {
     validarDocumento(r.tipoDocumento(), r.numeroDocumento());
+    validarFechaNacimientoEscolar(r.fechaNacimiento());
     exigir(
         estudiantes.buscarPorNumeroDocumento(r.numeroDocumento()).stream()
             .noneMatch(e -> e.getTipoDocumento() == r.tipoDocumento()),

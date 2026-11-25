@@ -5,7 +5,13 @@ import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 import static com.colegio.shuji.shared.domain.model.Reglas.requerido;
 
 import com.colegio.shuji.academico.application.port.out.AnioLectivoRepositoryPort;
+import com.colegio.shuji.academico.application.port.out.GradoRepositoryPort;
+import com.colegio.shuji.academico.application.port.out.NivelRepositoryPort;
 import com.colegio.shuji.academico.application.port.out.SeccionRepositoryPort;
+import com.colegio.shuji.academico.domain.model.Seccion;
+import com.colegio.shuji.matricula.domain.model.Estudiante;
+import com.colegio.shuji.matricula.domain.service.ReglaEdadMatricula;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.colegio.shuji.matricula.application.dto.in.ConfirmarMatriculaRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.CambiarEstadoMatriculaRequestDto;
 import com.colegio.shuji.matricula.application.dto.in.SolicitarMatriculaRequestDto;
@@ -57,6 +63,20 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
   private final SeccionRepositoryPort secciones;
   private final AnioLectivoRepositoryPort anios;
 
+  @Autowired(required = false)
+  private GradoRepositoryPort grados;
+
+  @Autowired(required = false)
+  private NivelRepositoryPort niveles;
+
+  public void setGrados(GradoRepositoryPort grados) {
+    this.grados = grados;
+  }
+
+  public void setNiveles(NivelRepositoryPort niveles) {
+    this.niveles = niveles;
+  }
+
   public MatriculaResponseDto solicitar(SolicitarMatriculaRequestDto r) {
     var anio = requerido(anios.bloquearPorId(r.anioLectivoId()));
     anio.verificarAbierto();
@@ -69,6 +89,7 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
           "El estudiante ya tiene una matrícula registrada para el año lectivo seleccionado.");
     var s = requerido(secciones.bloquearPorId(r.seccionId()));
     exigir(s.getAnioLectivoId().equals(r.anioLectivoId()), "Sección de otro año");
+    validarEdadParaSeccion(e, s, anio.getAnio());
     s.verificarCupo();
     var m = mapper.toDomain(r);
     m.iniciarSolicitud();
@@ -83,9 +104,14 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     exigir(snapshot.getEstadoMatricula() != EstadoMatricula.PENDIENTE_ASIGNACION
         && snapshot.getSeccionId() != null,
         "Secretaría debe asignar el grado y aula antes de confirmar la matrícula.");
-    requerido(anios.bloquearPorId(snapshot.getAnioLectivoId())).verificarAbierto();
+    var anio = requerido(anios.bloquearPorId(snapshot.getAnioLectivoId()));
+    anio.verificarAbierto();
     var s = requerido(secciones.bloquearPorId(snapshot.getSeccionId()));
     var m = requerido(matriculas.bloquearPorId(r.matriculaId()));
+    var estudiante = estudiantes.buscarPorId(m.getEstudianteId()).orElse(null);
+    if (estudiante != null) {
+      validarEdadParaSeccion(estudiante, s, anio.getAnio());
+    }
     if (m.getEstadoMatricula() == EstadoMatricula.SOLICITADA) s.verificarCupo();
     exigir(
         vinculos.buscarPorEstudianteId(m.getEstudianteId()).stream()
@@ -124,6 +150,26 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
     }
 
     return mapper.toResponse(matriculas.guardar(m));
+  }
+
+  private void validarEdadParaSeccion(Estudiante estudiante, Seccion seccion, Short anioNumero) {
+    if (grados == null || niveles == null || anioNumero == null || estudiante == null
+        || estudiante.getFechaNacimiento() == null || seccion == null || seccion.getGradoId() == null) {
+      return;
+    }
+    var gradoOpt = grados.buscarPorId(seccion.getGradoId());
+    if (gradoOpt.isEmpty()) return;
+    var grado = gradoOpt.get();
+    var nivelOpt = niveles.buscarPorId(grado.getNivelId());
+    if (nivelOpt.isEmpty() || nivelOpt.get().getCodigo() == null) return;
+    var rango = ReglaEdadMatricula.paraGrado(nivelOpt.get().getCodigo().name(), grado.getNumeroGrado());
+    if (!rango.admiteConExcepcion(estudiante.getFechaNacimiento(), anioNumero)) {
+      int edad = rango.edadAlCorte(estudiante.getFechaNacimiento(), anioNumero);
+      throw new BusinessException(
+          "La edad del estudiante (" + (edad < 0 ? "fecha inválida" : edad + " años")
+              + " al 31 de marzo de " + anioNumero + ") no corresponde a " + grado.getNombre()
+              + " (rango EBR: " + rango.minima() + " a " + rango.maxima() + " años).");
+    }
   }
 
   private void validarPagoMatricula(Long matriculaId) {
@@ -224,11 +270,16 @@ public class MatriculaService implements ProcesarMatriculaUseCase, LiberarReserv
 
   private List<MatriculaResponseDto> conEstadosPago(List<Matricula> registros) {
     if (registros.isEmpty()) return List.of();
-    var ids = registros.stream().map(Matricula::getId).toList();
-    Map<Long, List<ObligacionPago>> cuotasPorMatricula = obligaciones.buscarPorMatriculaIds(ids).stream()
-        .filter(o -> o.getTipoConcepto() == TipoConcepto.MATRICULA
-            && o.getNumeroCuota() != null && o.getNumeroCuota() == 0)
-        .collect(Collectors.groupingBy(ObligacionPago::getMatriculaId));
+    var idsPendientes = registros.stream()
+        .filter(m -> m != null && m.getEstadoMatricula() != EstadoMatricula.MATRICULADO)
+        .map(Matricula::getId)
+        .toList();
+    Map<Long, List<ObligacionPago>> cuotasPorMatricula = idsPendientes.isEmpty()
+        ? Map.of()
+        : obligaciones.buscarPorMatriculaIds(idsPendientes).stream()
+            .filter(o -> o.getTipoConcepto() == TipoConcepto.MATRICULA
+                && o.getNumeroCuota() != null && o.getNumeroCuota() == 0)
+            .collect(Collectors.groupingBy(ObligacionPago::getMatriculaId));
     return registros.stream().map(registro -> {
       var response = mapper.toResponse(registro);
       return conEstadoPago(response, estadoPagoMatricula(registro, cuotasPorMatricula.get(registro.getId())));

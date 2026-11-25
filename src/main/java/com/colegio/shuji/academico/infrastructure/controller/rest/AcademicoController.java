@@ -137,7 +137,7 @@ public class AcademicoController {
   @GetMapping("/grados")
   @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA')")
   @Operation(summary = "estructura.listarGrados")
-  public List<GradoResponseDto> listarGrados(@RequestParam Short nivelId) {
+  public List<GradoResponseDto> listarGrados(@RequestParam(required = false) Short nivelId) {
     return estructura.listarGrados(nivelId);
   }
 

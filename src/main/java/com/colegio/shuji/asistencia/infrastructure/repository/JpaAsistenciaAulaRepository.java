@@ -50,4 +50,20 @@ public interface JpaAsistenciaAulaRepository extends JpaRepository<AsistenciaAul
 
   @Query("select e from AsistenciaAulaEntity e where e.auxiliarUsuarioId = :valor order by e.id")
   List<AsistenciaAulaEntity> buscarPorAuxiliarUsuarioId(@Param("valor") Long valor);
+
+  @Query("select e.estado, count(e) from AsistenciaAulaEntity e where e.fechaSesion = :fecha group by e.estado")
+  List<Object[]> contarPorEstadoEnFecha(@Param("fecha") LocalDate fecha);
+
+  @Query("""
+      select e.estado, count(e)
+      from AsistenciaAulaEntity e
+      where e.matriculaId in :ids
+        and (:desde is null or e.fechaSesion >= :desde)
+        and (:hasta is null or e.fechaSesion <= :hasta)
+      group by e.estado
+      """)
+  List<Object[]> contarPorEstadoYMatriculaIdsYRango(
+      @Param("ids") Collection<Long> matriculaIds,
+      @Param("desde") LocalDate desde,
+      @Param("hasta") LocalDate hasta);
 }

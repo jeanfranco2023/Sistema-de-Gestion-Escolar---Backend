@@ -23,6 +23,8 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
 
   private final JpaSesionRepository jpaSesionRepository;
   private final JpaUsuarioRepository jpaUsuarioRepository;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.colegio.shuji.config.security.JwtAuthCache authCache;
 
   @Override
   public Sesion save(Sesion sesion) {
@@ -62,18 +64,21 @@ public class SessionRepositoryAdapter implements SessionRepositoryPort {
   public void deleteByUsuarioId(Long usuarioId) {
     auditoria.syncCurrentUserFromSecurityContext();
     jpaSesionRepository.deleteByUsuarioId(usuarioId);
+    if (authCache != null) authCache.evictAllSessions();
   }
 
   @Override
   public void deleteByTokenHash(String tokenHash) {
     auditoria.syncCurrentUserFromSecurityContext();
     jpaSesionRepository.deleteByTokenHash(tokenHash);
+    if (authCache != null) authCache.evictAllSessions();
   }
 
   @Override
   public void deleteExpiredSessions(LocalDateTime now) {
     auditoria.syncCurrentUserFromSecurityContext();
     jpaSesionRepository.deleteExpiredSessions(now);
+    if (authCache != null) authCache.evictAllSessions();
   }
 
   private Sesion toDomain(SesionEntity entity) {

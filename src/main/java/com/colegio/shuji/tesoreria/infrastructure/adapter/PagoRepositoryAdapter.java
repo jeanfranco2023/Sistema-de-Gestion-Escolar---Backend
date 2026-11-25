@@ -63,4 +63,12 @@ public class PagoRepositoryAdapter implements PagoRepositoryPort {
   public List<PagoTransaccion> buscarPorPasarelaTransaccionId(String valor) {
     return repository.buscarPorPasarelaTransaccionId(valor).stream().map(mapper::toDomain).toList();
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.math.BigDecimal sumarAprobadosEntre(
+      java.time.OffsetDateTime desde, java.time.OffsetDateTime hasta) {
+    return repository.sumarPorEstadoYFecha(
+        com.colegio.shuji.tesoreria.domain.enums.EstadoPago.APROBADO, desde, hasta);
+  }
 }

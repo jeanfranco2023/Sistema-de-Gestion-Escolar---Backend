@@ -16,7 +16,9 @@ public class SupabaseAuditInterceptor
   private final EntityManager entityManager;
 
   public void setCurrentUserId(Long userId) {
-    if (userId == null || !TransactionSynchronizationManager.isActualTransactionActive()) return;
+    if (userId == null
+        || !TransactionSynchronizationManager.isActualTransactionActive()
+        || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) return;
     establecer(userId, userId.toString());
   }
 
@@ -47,13 +49,16 @@ public class SupabaseAuditInterceptor
   }
 
   public void clearCurrentUserId() {
-    if (!TransactionSynchronizationManager.isActualTransactionActive()) return;
+    if (!TransactionSynchronizationManager.isActualTransactionActive()
+        || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) return;
     var auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null && auth.getPrincipal() instanceof UserPrincipalHolder holder)
       establecer(holder.getUserId(), "");
   }
 
   public void syncCurrentUserFromSecurityContext() {
+    if (!TransactionSynchronizationManager.isActualTransactionActive()
+        || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) return;
     var auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null
         && auth.isAuthenticated()

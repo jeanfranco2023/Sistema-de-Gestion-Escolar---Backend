@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -33,7 +34,7 @@ public class CuentaApoderadoAdapter implements CuentaApoderadoPort {
   private final PasswordHashPort passwordEncoder;
 
   @Override
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public CredencialesApoderado asegurarCuentaApoderado(
       String numeroDocumento,
       String email,

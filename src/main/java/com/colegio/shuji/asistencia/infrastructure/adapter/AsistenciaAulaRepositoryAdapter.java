@@ -98,6 +98,42 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
     return repository.buscarSeccionesPorMatriculaIds(matriculaIds);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public ResumenConteoAsistencia contarPorEstadoEnFecha(LocalDate fecha) {
+    if (fecha == null) return new ResumenConteoAsistencia(0, 0, 0, 0);
+    return mapearConteos(repository.contarPorEstadoEnFecha(fecha));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public ResumenConteoAsistencia contarPorEstadoYMatriculaIdsYRango(
+      Collection<Long> matriculaIds, LocalDate desde, LocalDate hasta) {
+    if (matriculaIds == null || matriculaIds.isEmpty()) return new ResumenConteoAsistencia(0, 0, 0, 0);
+    return mapearConteos(repository.contarPorEstadoYMatriculaIdsYRango(matriculaIds, desde, hasta));
+  }
+
+  private ResumenConteoAsistencia mapearConteos(List<Object[]> filas) {
+    long presentes = 0;
+    long tardanzas = 0;
+    long faltasJust = 0;
+    long faltasInjust = 0;
+    if (filas != null) {
+      for (Object[] fila : filas) {
+        if (fila != null && fila.length >= 2 && fila[0] instanceof EstadoAsistenciaAula estado && fila[1] instanceof Number n) {
+          long c = n.longValue();
+          switch (estado) {
+            case PRESENTE -> presentes += c;
+            case TARDANZA -> tardanzas += c;
+            case FALTA_JUSTIFICADA -> faltasJust += c;
+            case FALTA_INJUSTIFICADA -> faltasInjust += c;
+          }
+        }
+      }
+    }
+    return new ResumenConteoAsistencia(presentes, tardanzas, faltasJust, faltasInjust);
+  }
+
   public List<LocalDate> buscarFechasConRegistros(LocalDate desde, LocalDate hasta) {
     return repository.buscarFechasConRegistros(desde, hasta);
   }

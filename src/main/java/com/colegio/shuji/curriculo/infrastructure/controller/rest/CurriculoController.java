@@ -4,6 +4,7 @@ import com.colegio.shuji.curriculo.application.dto.in.AsignarDocenteRequestDto;
 import com.colegio.shuji.curriculo.application.dto.in.CrearAreaRequestDto;
 import com.colegio.shuji.curriculo.application.dto.in.CrearBloqueRequestDto;
 import com.colegio.shuji.curriculo.application.dto.in.CrearCompetenciaRequestDto;
+import com.colegio.shuji.curriculo.application.dto.in.ReasignarDocenteRequestDto;
 import com.colegio.shuji.curriculo.application.dto.out.AreaCurricularResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.AsignacionDocenteResponseDto;
 import com.colegio.shuji.curriculo.application.dto.out.BloqueHorarioResponseDto;
@@ -20,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,9 +46,9 @@ public class CurriculoController {
   }
 
   @GetMapping("/areas")
-  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','SECRETARIA','DOCENTE')")
   @Operation(summary = "curriculo.listarAreas")
-  public List<AreaCurricularResponseDto> listarAreas(@RequestParam Short nivelId) {
+  public List<AreaCurricularResponseDto> listarAreas(@RequestParam(required = false) Short nivelId) {
     return curriculo.listarAreas(nivelId);
   }
 
@@ -90,9 +93,18 @@ public class CurriculoController {
     return carga.asignarDocente(r);
   }
 
+  @PutMapping("/asignaciones/{id}/docente")
+  @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR')")
+  @Operation(summary = "carga.reasignarDocente")
+  public AsignacionDocenteResponseDto reasignarDocente(
+      @PathVariable @Positive Long id, @Valid @RequestBody ReasignarDocenteRequestDto r) {
+    return carga.reasignarDocente(id, r.docenteUsuarioId());
+  }
+
   @GetMapping("/asignaciones")
   @PreAuthorize("hasAnyRole('DIRECCION','ADMINISTRADOR','DOCENTE')")
-  public List<AsignacionDocenteResponseDto> listarAsignaciones() {
-    return carga.listarAsignaciones();
+  public List<AsignacionDocenteResponseDto> listarAsignaciones(
+      @RequestParam(required = false) Short anioId) {
+    return carga.listarAsignaciones(anioId);
   }
 }

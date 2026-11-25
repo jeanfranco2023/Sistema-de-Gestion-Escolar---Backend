@@ -1,6 +1,7 @@
 package com.colegio.shuji.matricula.infrastructure.service;
 
 import com.colegio.shuji.matricula.domain.service.PoliticaAdmision;
+import com.colegio.shuji.matricula.domain.service.ReglaEdadMatricula;
 import static com.colegio.shuji.shared.domain.model.Reglas.exigir;
 
 import com.colegio.shuji.academico.infrastructure.repository.JpaAnioLectivoRepository;
@@ -127,6 +128,7 @@ public class MatriculaPresencialService {
     var anio = validarAnio(r);
     var grado = grados.bloquearPorId(r.getGradoId())
         .orElseThrow(() -> new BusinessException("El grado seleccionado no existe"));
+    validarEdadPresencial(r.getFechaNacimientoEstudiante(), grado, anio.getAnio());
     var seccion = validarSeccion(r);
     validarSinTramiteActivo(r);
 
@@ -275,8 +277,12 @@ public class MatriculaPresencialService {
 
   public PagoEnLinea iniciarPagoEnLinea(RegistrarMatriculaPresencialRequestDto r) {
     validarArchivos(r);
-    validarAnio(r);
-    validarSeccion(r);
+    var anio = validarAnio(r);
+    var seccion = validarSeccion(r);
+    var grado = seccion.getRelacion1() != null
+        ? seccion.getRelacion1()
+        : grados.findById(r.getGradoId()).orElse(null);
+    validarEdadPresencial(r.getFechaNacimientoEstudiante(), grado, anio.getAnio());
     validarSinTramiteActivo(r);
     var existente = estudiantes.buscarPorNumeroDocumento(r.getNumeroDocumentoEstudiante()).stream().findFirst();
     exigir(existente.isEmpty() || !matriculas.existsByEstudianteIdAndAnioLectivoId(
@@ -363,6 +369,38 @@ public class MatriculaPresencialService {
     exigir(seccion.getVacantesOcupadas() < seccion.getCupoMaximo(),
         "No quedan vacantes disponibles en la sección " + seccion.getLetra());
     return seccion;
+  }
+
+  private void validarEdadPresencial(
+      LocalDate fechaNacimiento,
+      com.colegio.shuji.academico.infrastructure.entity.GradoEntity grado,
+      Short anioLectivo) {
+    LocalDate hoyLima = LocalDate.now(ZoneId.of("America/Lima"));
+    if (fechaNacimiento == null || !fechaNacimiento.isBefore(hoyLima)) {
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.BAD_REQUEST,
+          "La fecha de nacimiento del estudiante debe ser anterior al día de hoy.");
+    }
+    if (grado == null || anioLectivo == null || grado.getNumeroGrado() == null) return;
+    String codigoNivel = grado.getRelacion0() != null && grado.getRelacion0().getCodigo() != null
+        ? grado.getRelacion0().getCodigo().name()
+        : grado.getNivelId() == null ? null
+        : switch (grado.getNivelId()) {
+          case 1 -> "INICIAL";
+          case 2 -> "PRIMARIA";
+          case 3 -> "SECUNDARIA";
+          default -> null;
+        };
+    if (codigoNivel == null) return;
+    var rango = ReglaEdadMatricula.paraGrado(codigoNivel, grado.getNumeroGrado());
+    if (!rango.admiteConExcepcion(fechaNacimiento, anioLectivo)) {
+      int edad = rango.edadAlCorte(fechaNacimiento, anioLectivo);
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.BAD_REQUEST,
+          "La edad del estudiante" + (edad >= 0 ? " (" + edad + " años al 31 de marzo)" : "")
+              + " no corresponde al grado seleccionado (rango EBR: "
+              + rango.minima() + " a " + rango.maxima() + " años).");
+    }
   }
 
   private void validarSinTramiteActivo(RegistrarMatriculaPresencialRequestDto r) {
