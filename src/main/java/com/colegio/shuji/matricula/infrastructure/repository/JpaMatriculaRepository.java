@@ -45,4 +45,15 @@ public interface JpaMatriculaRepository extends JpaRepository<MatriculaEntity, L
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select e from MatriculaEntity e where e.id in :ids order by e.id")
   List<MatriculaEntity> bloquearPorIds(@Param("ids") Collection<Long> ids);
+
+  @Query("""
+      select new com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort$ResumenMatriculaDashboard(
+          e.id, e.estudianteId, e.seccionId)
+      from MatriculaEntity e
+      where e.anioLectivoId = :anioId
+        and e.estadoMatricula = com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO
+      order by e.id
+      """)
+  List<com.colegio.shuji.matricula.application.port.out.MatriculaRepositoryPort.ResumenMatriculaDashboard>
+      listarMatriculadasResumenPorAnio(@Param("anioId") Short anioId);
 }

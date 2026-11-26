@@ -123,4 +123,14 @@ public class CalificacionRepositoryAdapter implements CalificacionRepositoryPort
   public List<CalificacionCneb> buscarRiesgosPorPeriodo(Short periodoId) {
     return repository.buscarRiesgosPorPeriodo(periodoId).stream().map(mapper::toDomain).toList();
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<List<ResumenNotaDashboard>> listarResumenDashboard(Short anioId, Short periodoId) {
+    if (anioId == null) return Optional.of(List.of());
+    return Optional.of(
+        periodoId != null
+            ? repository.listarResumenPorAnioYPeriodo(anioId, periodoId)
+            : repository.listarResumenPorAnio(anioId));
+  }
 }

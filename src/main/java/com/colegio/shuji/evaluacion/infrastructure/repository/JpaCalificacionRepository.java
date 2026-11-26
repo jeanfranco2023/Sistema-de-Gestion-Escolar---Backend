@@ -57,4 +57,23 @@ public interface JpaCalificacionRepository extends JpaRepository<CalificacionCne
 
   @Query("select e from CalificacionCnebEntity e where e.periodoAcademicoId = :periodoId and e.calificacionCualitativa in ('B', 'C') order by e.id")
   List<CalificacionCnebEntity> buscarRiesgosPorPeriodo(@Param("periodoId") Short periodoId);
+
+  @Query("""
+      select new com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryPort$ResumenNotaDashboard(
+          e.matriculaId, e.periodoAcademicoId, e.calificacionCualitativa)
+      from CalificacionCnebEntity e
+      where e.anioLectivoId = :anioId
+      """)
+  List<com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryPort.ResumenNotaDashboard>
+      listarResumenPorAnio(@Param("anioId") Short anioId);
+
+  @Query("""
+      select new com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryPort$ResumenNotaDashboard(
+          e.matriculaId, e.periodoAcademicoId, e.calificacionCualitativa)
+      from CalificacionCnebEntity e
+      where e.anioLectivoId = :anioId
+        and e.periodoAcademicoId = :periodoId
+      """)
+  List<com.colegio.shuji.evaluacion.application.port.out.CalificacionRepositoryPort.ResumenNotaDashboard>
+      listarResumenPorAnioYPeriodo(@Param("anioId") Short anioId, @Param("periodoId") Short periodoId);
 }

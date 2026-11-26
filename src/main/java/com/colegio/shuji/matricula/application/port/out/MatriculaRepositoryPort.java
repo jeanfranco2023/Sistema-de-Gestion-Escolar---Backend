@@ -34,4 +34,10 @@ public interface MatriculaRepositoryPort {
   List<Matricula> buscarPorIds(Collection<Long> ids);
 
   List<Matricula> bloquearPorIds(Collection<Long> ids);
+
+  record ResumenMatriculaDashboard(Long id, Long estudianteId, Integer seccionId) {}
+
+  default Optional<List<ResumenMatriculaDashboard>> listarMatriculadasResumenPorAnio(Short anioId) {
+    return Optional.empty();
+  }
 }

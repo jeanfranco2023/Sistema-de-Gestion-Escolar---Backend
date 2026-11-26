@@ -58,7 +58,7 @@ public class DashboardController {
   private final NivelRepositoryPort niveles;
   private final EstudianteRepositoryPort estudiantes;
 
-  private static final long TTL_DASHBOARD_MS = 20_000L;
+  private static final long TTL_DASHBOARD_MS = 60_000L;
   private static final long TTL_CATALOGO_MS = 60_000L;
 
   private record EntradaCache<T>(T valor, long expiraEnMs) {
@@ -205,38 +205,53 @@ public class DashboardController {
         var anio = anioOpt.get();
         anioActual = (int) anio.getAnio();
         try {
-          totalEstudiantes =
-              matriculas.buscarPorAnioLectivoId(anio.getId()).stream()
-                  .filter(m -> m.getEstadoMatricula() == EstadoMatricula.MATRICULADO)
-                  .count();
+          var optMats = matriculas.listarMatriculadasResumenPorAnio(anio.getId());
+          if (optMats != null && optMats.isPresent()) {
+            totalEstudiantes = (long) optMats.get().size();
+          } else {
+            totalEstudiantes =
+                matriculas.buscarPorAnioLectivoId(anio.getId()).stream()
+                    .filter(m -> m.getEstadoMatricula() == EstadoMatricula.MATRICULADO)
+                    .count();
+          }
         } catch (Exception e) {
           log.warn("Error calculando matriculas activas: {}", e.getMessage());
         }
         if (direccion) {
           try {
             PeriodoAcademico periodoVigente = resolverPeriodoVigente(anio.getId(), hoy);
-            List<CalificacionCneb> notasRiesgoBase;
-            if (periodoVigente != null && periodoVigente.getId() != null) {
-              var porPeriodo =
-                  calificaciones.buscarPorAnioYPeriodo(anio.getId(), periodoVigente.getId());
-              notasRiesgoBase =
-                  (porPeriodo != null && !porPeriodo.isEmpty())
-                      ? porPeriodo
-                      : calificaciones.buscarPorAnioLectivoId(anio.getId());
+            Short periodoVigenteId = periodoVigente != null ? periodoVigente.getId() : null;
+            var optNotas = calificaciones.listarResumenDashboard(anio.getId(), periodoVigenteId);
+            if (optNotas != null && optNotas.isPresent()) {
+              alumnosRiesgo =
+                  optNotas.get().stream()
+                      .filter(
+                          c ->
+                              periodoVigenteId == null
+                                  || periodoVigenteId.equals(c.periodoAcademicoId()))
+                      .filter(c -> c.calificacionCualitativa() == CalificacionCualitativa.C)
+                      .map(CalificacionRepositoryPort.ResumenNotaDashboard::matriculaId)
+                      .distinct()
+                      .count();
             } else {
-              notasRiesgoBase = calificaciones.buscarPorAnioLectivoId(anio.getId());
+              List<CalificacionCneb> notasRiesgoBase =
+                  periodoVigenteId != null
+                      ? calificaciones.buscarPorAnioYPeriodo(anio.getId(), periodoVigenteId)
+                      : calificaciones.buscarPorAnioLectivoId(anio.getId());
+              if (notasRiesgoBase == null) {
+                notasRiesgoBase = List.of();
+              }
+              alumnosRiesgo =
+                  notasRiesgoBase.stream()
+                      .filter(
+                          c ->
+                              periodoVigenteId == null
+                                  || periodoVigenteId.equals(c.getPeriodoAcademicoId()))
+                      .filter(c -> c.getCalificacionCualitativa() == CalificacionCualitativa.C)
+                      .map(CalificacionCneb::getMatriculaId)
+                      .distinct()
+                      .count();
             }
-            alumnosRiesgo =
-                notasRiesgoBase.stream()
-                    .filter(
-                        c ->
-                            periodoVigente == null
-                                || periodoVigente.getId() == null
-                                || periodoVigente.getId().equals(c.getPeriodoAcademicoId()))
-                    .filter(c -> c.getCalificacionCualitativa() == CalificacionCualitativa.C)
-                    .map(CalificacionCneb::getMatriculaId)
-                    .distinct()
-                    .count();
           } catch (Exception e) {
             log.warn("Error calculando alumnos en riesgo: {}", e.getMessage());
           }
@@ -334,6 +349,7 @@ public class DashboardController {
       return enCache;
     }
 
+    long t0 = System.currentTimeMillis();
     String reglaExplicativa =
         "Cada estudiante matriculado cuenta una sola vez por bimestre según su nivel de logro predominante (promedio CNEB ponderado AD=4, A=3, B=2, C=1; la clasificación y el reforzamiento corresponden exclusivamente al bimestre evaluado y no arrastran recuperaciones de bimestres ya concluidos).";
 
@@ -349,8 +365,11 @@ public class DashboardController {
             : periodoId;
     Map<Short, Nivel> mapaNiveles = cargarMapaNiveles();
     Map<Short, Grado> mapaGrados = cargarMapaGrados();
+    boolean sinFiltroSeccion =
+        (nivel == null || nivel.isBlank()) && gradoId == null && seccionId == null;
     List<Seccion> seccionesAlcance =
         filtrarSecciones(anioId, nivel, gradoId, seccionId, mapaNiveles, mapaGrados);
+    long tCat = System.currentTimeMillis();
     Set<Integer> seccionIdsAlcance =
         seccionesAlcance.stream()
             .map(Seccion::getId)
@@ -363,23 +382,44 @@ public class DashboardController {
 
     List<Matricula> matriculasActivas = new ArrayList<>();
     if (anioId != null) {
-      List<Matricula> todasAnio = matriculas.buscarPorAnioLectivoId(anioId);
-      if (todasAnio != null) {
-        boolean hayFiltroSeccion =
-            (nivel != null && !nivel.isBlank())
-                || gradoId != null
-                || seccionId != null
-                || !seccionIdsAlcance.isEmpty();
-        for (Matricula m : todasAnio) {
-          if (m != null && m.getEstadoMatricula() == EstadoMatricula.MATRICULADO) {
-            if (!hayFiltroSeccion
-                || (m.getSeccionId() != null && seccionIdsAlcance.contains(m.getSeccionId()))) {
-              if (seccionId != null
-                  && (m.getSeccionId() == null
-                      || m.getSeccionId().longValue() != seccionId.longValue())) {
-                continue;
+      boolean hayFiltroSeccion =
+          (nivel != null && !nivel.isBlank())
+              || gradoId != null
+              || seccionId != null
+              || !seccionIdsAlcance.isEmpty();
+      var optMats = matriculas.listarMatriculadasResumenPorAnio(anioId);
+      if (optMats != null && optMats.isPresent()) {
+        for (var r : optMats.get()) {
+          if (r == null) continue;
+          if (!hayFiltroSeccion
+              || (r.seccionId() != null && seccionIdsAlcance.contains(r.seccionId()))) {
+            if (seccionId != null
+                && (r.seccionId() == null || r.seccionId().longValue() != seccionId.longValue())) {
+              continue;
+            }
+            matriculasActivas.add(
+                Matricula.builder()
+                    .id(r.id())
+                    .estudianteId(r.estudianteId())
+                    .seccionId(r.seccionId())
+                    .estadoMatricula(EstadoMatricula.MATRICULADO)
+                    .build());
+          }
+        }
+      } else {
+        List<Matricula> todasAnio = matriculas.buscarPorAnioLectivoId(anioId);
+        if (todasAnio != null) {
+          for (Matricula m : todasAnio) {
+            if (m != null && m.getEstadoMatricula() == EstadoMatricula.MATRICULADO) {
+              if (!hayFiltroSeccion
+                  || (m.getSeccionId() != null && seccionIdsAlcance.contains(m.getSeccionId()))) {
+                if (seccionId != null
+                    && (m.getSeccionId() == null
+                        || m.getSeccionId().longValue() != seccionId.longValue())) {
+                  continue;
+                }
+                matriculasActivas.add(m);
               }
-              matriculasActivas.add(m);
             }
           }
         }
@@ -392,38 +432,53 @@ public class DashboardController {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
+    long tMat = System.currentTimeMillis();
     Map<Long, Estudiante> mapaEstudiantes = cargarMapaEstudiantes(matriculasActivas);
+    long tEst = System.currentTimeMillis();
 
-    List<CalificacionCneb> notasCorte = new ArrayList<>();
+    Map<Long, List<CalificacionCualitativa>> notasPorMatricula = new HashMap<>();
     if (anioId != null) {
-      List<CalificacionCneb> notasAnio;
-      if (periodoEfectivoId != null) {
-        List<CalificacionCneb> porPeriodo =
-            calificaciones.buscarPorAnioYPeriodo(anioId, periodoEfectivoId.shortValue());
-        notasAnio =
-            (porPeriodo != null && !porPeriodo.isEmpty())
-                ? porPeriodo
-                : calificaciones.buscarPorAnioLectivoId(anioId);
+      Short pId = periodoEfectivoId != null ? periodoEfectivoId.shortValue() : null;
+      var optNotas = calificaciones.listarResumenDashboard(anioId, pId);
+      if (optNotas != null && optNotas.isPresent()) {
+        for (var n : optNotas.get()) {
+          if (n == null || n.matriculaId() == null || !matriculaIds.contains(n.matriculaId())) {
+            continue;
+          }
+          if (pId != null && !pId.equals(n.periodoAcademicoId())) {
+            continue;
+          }
+          if (n.calificacionCualitativa() != null) {
+            notasPorMatricula
+                .computeIfAbsent(n.matriculaId(), k -> new ArrayList<>())
+                .add(n.calificacionCualitativa());
+          }
+        }
       } else {
-        notasAnio = calificaciones.buscarPorAnioLectivoId(anioId);
-      }
-      if (notasAnio != null) {
-        for (CalificacionCneb c : notasAnio) {
-          if (c == null || c.getMatriculaId() == null || !matriculaIds.contains(c.getMatriculaId())) {
-            continue;
+        List<CalificacionCneb> notasAnio =
+            pId != null
+                ? calificaciones.buscarPorAnioYPeriodo(anioId, pId)
+                : calificaciones.buscarPorAnioLectivoId(anioId);
+        if (notasAnio != null) {
+          for (CalificacionCneb c : notasAnio) {
+            if (c == null || c.getMatriculaId() == null || !matriculaIds.contains(c.getMatriculaId())) {
+              continue;
+            }
+            if (pId != null
+                && (c.getPeriodoAcademicoId() == null
+                    || c.getPeriodoAcademicoId().longValue() != pId.longValue())) {
+              continue;
+            }
+            if (c.getCalificacionCualitativa() != null) {
+              notasPorMatricula
+                  .computeIfAbsent(c.getMatriculaId(), k -> new ArrayList<>())
+                  .add(c.getCalificacionCualitativa());
+            }
           }
-          if (periodoEfectivoId != null
-              && (c.getPeriodoAcademicoId() == null
-                  || c.getPeriodoAcademicoId().longValue() != periodoEfectivoId.longValue())) {
-            continue;
-          }
-          notasCorte.add(c);
         }
       }
     }
-
-    Map<Long, List<CalificacionCneb>> notasPorMatricula =
-        notasCorte.stream().collect(Collectors.groupingBy(CalificacionCneb::getMatriculaId));
+    long tCal = System.currentTimeMillis();
 
     long destacados = 0;
     long logroEsperado = 0;
@@ -432,7 +487,7 @@ public class DashboardController {
     List<EstudianteDesempenoItem> detalleEstudiantes = new ArrayList<>();
 
     for (Matricula m : matriculasActivas) {
-      List<CalificacionCneb> notasAlumno = notasPorMatricula.get(m.getId());
+      List<CalificacionCualitativa> notasAlumno = notasPorMatricula.get(m.getId());
       Estudiante est = mapaEstudiantes.get(m.getEstudianteId());
       String nombreEst =
           est != null ? est.nombreCompleto().trim() : "Matrícula #" + m.getId();
@@ -483,11 +538,25 @@ public class DashboardController {
         calcularAsistenciaYCupos(
             anioId,
             periodoEfectivoId,
+            sinFiltroSeccion,
             matriculaIds,
             matriculasActivas,
             seccionesAlcance,
             mapaGrados,
             mapaNiveles);
+    long tAsis = System.currentTimeMillis();
+    log.debug(
+        "Indicadores anio={} periodo={} sinFiltro={} mats={} | cat={}ms mat={}ms est={}ms cal={}ms asis={}ms total={}ms",
+        anioId,
+        periodoEfectivoId,
+        sinFiltroSeccion,
+        matriculasActivas.size(),
+        tCat - t0,
+        tMat - tCat,
+        tEst - tMat,
+        tCal - tEst,
+        tAsis - tCal,
+        tAsis - t0);
 
     return guardarEnCache(
         claveCache,
@@ -495,16 +564,15 @@ public class DashboardController {
         TTL_DASHBOARD_MS);
   }
 
-  private CalificacionCualitativa clasificarEstudianteUnico(List<CalificacionCneb> notas) {
-    boolean tieneC =
-        notas.stream().anyMatch(n -> n.getCalificacionCualitativa() == CalificacionCualitativa.C);
+  private CalificacionCualitativa clasificarEstudianteUnico(List<CalificacionCualitativa> notas) {
+    boolean tieneC = notas.stream().anyMatch(n -> n == CalificacionCualitativa.C);
     double suma = 0.0;
     int cuenta = 0;
-    for (CalificacionCneb n : notas) {
-      if (n.getCalificacionCualitativa() == null) continue;
+    for (CalificacionCualitativa n : notas) {
+      if (n == null) continue;
       cuenta++;
       suma +=
-          switch (n.getCalificacionCualitativa()) {
+          switch (n) {
             case AD -> 4.0;
             case A -> 3.0;
             case B -> 2.0;
@@ -533,6 +601,7 @@ public class DashboardController {
   private AsistenciaCuposIndicador calcularAsistenciaYCupos(
       Short anioId,
       Long periodoId,
+      boolean sinFiltroSeccion,
       Set<Long> matriculaIds,
       List<Matricula> matriculasActivas,
       List<Seccion> seccionesAlcance,
@@ -551,36 +620,45 @@ public class DashboardController {
     List<AsistenciaAula> registrosFallback = null;
 
     if (!matriculaIds.isEmpty()) {
-      var conteos = asistencias.contarPorEstadoYMatriculaIdsYRango(matriculaIds, desde, hasta);
-      if (conteos != null) {
-        presentes = conteos.presentes();
-        tardanzas = conteos.tardanzas();
-        faltasJustificadas = conteos.faltasJustificadas();
-        faltasInjustificadas = conteos.faltasInjustificadas();
-        inasistencias = conteos.inasistencias();
-      } else {
-        List<AsistenciaAula> porMatriculas = asistencias.buscarPorMatriculaIds(matriculaIds);
-        registrosFallback = porMatriculas != null ? porMatriculas : List.of();
-        List<AsistenciaAula> registrosCorte =
-            filtrarAsistenciasPorPeriodo(registrosFallback, periodoSeleccionado);
-        presentes =
-            registrosCorte.stream()
-                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.PRESENTE)
-                .count();
-        tardanzas =
-            registrosCorte.stream()
-                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.TARDANZA)
-                .count();
-        faltasJustificadas =
-            registrosCorte.stream()
-                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_JUSTIFICADA)
-                .count();
-        faltasInjustificadas =
-            registrosCorte.stream()
-                .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_INJUSTIFICADA)
-                .count();
-        inasistencias =
-            registrosCorte.stream().filter(a -> a != null && a.esFalta()).count();
+      try {
+        var conteos = sinFiltroSeccion
+            ? asistencias.contarPorEstadoEnAnioYRango(anioId, desde, hasta)
+            : null;
+        if (conteos == null) {
+          conteos = asistencias.contarPorEstadoYMatriculaIdsYRango(matriculaIds, desde, hasta);
+        }
+        if (conteos != null) {
+          presentes = conteos.presentes();
+          tardanzas = conteos.tardanzas();
+          faltasJustificadas = conteos.faltasJustificadas();
+          faltasInjustificadas = conteos.faltasInjustificadas();
+          inasistencias = conteos.inasistencias();
+        } else {
+          List<AsistenciaAula> porMatriculas = asistencias.buscarPorMatriculaIds(matriculaIds);
+          registrosFallback = porMatriculas != null ? porMatriculas : List.of();
+          List<AsistenciaAula> registrosCorte =
+              filtrarAsistenciasPorPeriodo(registrosFallback, periodoSeleccionado);
+          presentes =
+              registrosCorte.stream()
+                  .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.PRESENTE)
+                  .count();
+          tardanzas =
+              registrosCorte.stream()
+                  .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.TARDANZA)
+                  .count();
+          faltasJustificadas =
+              registrosCorte.stream()
+                  .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_JUSTIFICADA)
+                  .count();
+          faltasInjustificadas =
+              registrosCorte.stream()
+                  .filter(a -> a != null && a.getEstado() == EstadoAsistenciaAula.FALTA_INJUSTIFICADA)
+                  .count();
+          inasistencias =
+              registrosCorte.stream().filter(a -> a != null && a.esFalta()).count();
+        }
+      } catch (Exception e) {
+        log.warn("Error calculando conteos de asistencia en indicadores: {}", e.getMessage());
       }
     }
 
@@ -596,6 +674,7 @@ public class DashboardController {
             : calcularVariacionPeriodoAnterior(
                 anioId,
                 periodoSeleccionado,
+                sinFiltroSeccion,
                 matriculaIds,
                 registrosFallback,
                 porcentajeAsistencia);
@@ -662,6 +741,7 @@ public class DashboardController {
   private Double calcularVariacionPeriodoAnterior(
       Short anioId,
       PeriodoAcademico periodoActual,
+      boolean sinFiltroSeccion,
       Set<Long> matriculaIds,
       List<AsistenciaAula> todosRegistrosFallback,
       double porcentajeActual) {
@@ -683,9 +763,14 @@ public class DashboardController {
         return null;
       }
       if (todosRegistrosFallback == null) {
-        var conteoAnt =
-            asistencias.contarPorEstadoYMatriculaIdsYRango(
-                matriculaIds, anterior.getFechaInicio(), anterior.getFechaFin());
+        var conteoAnt = sinFiltroSeccion
+            ? asistencias.contarPorEstadoEnAnioYRango(
+                anioId, anterior.getFechaInicio(), anterior.getFechaFin())
+            : null;
+        if (conteoAnt == null) {
+          conteoAnt = asistencias.contarPorEstadoYMatriculaIdsYRango(
+              matriculaIds, anterior.getFechaInicio(), anterior.getFechaFin());
+        }
         if (conteoAnt == null || conteoAnt.total() == 0) {
           return null;
         }

@@ -54,16 +54,44 @@ public interface JpaAsistenciaAulaRepository extends JpaRepository<AsistenciaAul
   @Query("select e.estado, count(e) from AsistenciaAulaEntity e where e.fechaSesion = :fecha group by e.estado")
   List<Object[]> contarPorEstadoEnFecha(@Param("fecha") LocalDate fecha);
 
+  @Query("select e.estado, count(e) from AsistenciaAulaEntity e where e.matriculaId in :ids group by e.estado")
+  List<Object[]> contarPorEstadoYMatriculaIds(@Param("ids") Collection<Long> matriculaIds);
+
   @Query("""
       select e.estado, count(e)
       from AsistenciaAulaEntity e
       where e.matriculaId in :ids
-        and (:desde is null or e.fechaSesion >= :desde)
-        and (:hasta is null or e.fechaSesion <= :hasta)
+        and e.fechaSesion >= :desde
+        and e.fechaSesion <= :hasta
       group by e.estado
       """)
   List<Object[]> contarPorEstadoYMatriculaIdsYRango(
       @Param("ids") Collection<Long> matriculaIds,
+      @Param("desde") LocalDate desde,
+      @Param("hasta") LocalDate hasta);
+
+  @Query("""
+      select e.estado, count(e)
+      from AsistenciaAulaEntity e
+      join MatriculaEntity m on m.id = e.matriculaId
+      where m.anioLectivoId = :anioId
+        and m.estadoMatricula = com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO
+      group by e.estado
+      """)
+  List<Object[]> contarPorEstadoEnAnio(@Param("anioId") Short anioId);
+
+  @Query("""
+      select e.estado, count(e)
+      from AsistenciaAulaEntity e
+      join MatriculaEntity m on m.id = e.matriculaId
+      where m.anioLectivoId = :anioId
+        and m.estadoMatricula = com.colegio.shuji.matricula.domain.enums.EstadoMatricula.MATRICULADO
+        and e.fechaSesion >= :desde
+        and e.fechaSesion <= :hasta
+      group by e.estado
+      """)
+  List<Object[]> contarPorEstadoEnAnioYRango(
+      @Param("anioId") Short anioId,
       @Param("desde") LocalDate desde,
       @Param("hasta") LocalDate hasta);
 }

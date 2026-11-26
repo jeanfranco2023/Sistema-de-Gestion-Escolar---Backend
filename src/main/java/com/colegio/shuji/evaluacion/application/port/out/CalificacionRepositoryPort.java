@@ -65,6 +65,15 @@ public interface CalificacionRepositoryPort {
         .toList();
   }
 
+  record ResumenNotaDashboard(
+      Long matriculaId,
+      Short periodoAcademicoId,
+      com.colegio.shuji.evaluacion.domain.enums.CalificacionCualitativa calificacionCualitativa) {}
+
+  default Optional<List<ResumenNotaDashboard>> listarResumenDashboard(Short anioId, Short periodoId) {
+    return Optional.empty();
+  }
+
   default List<CalificacionCneb> buscarRiesgosPorPeriodo(Short periodoId) {
     return buscarPorPeriodoAcademicoId(periodoId).stream()
         .filter(

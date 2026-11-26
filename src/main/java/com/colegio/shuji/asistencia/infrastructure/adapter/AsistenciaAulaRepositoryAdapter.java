@@ -110,7 +110,35 @@ public class AsistenciaAulaRepositoryAdapter implements AsistenciaAulaRepository
   public ResumenConteoAsistencia contarPorEstadoYMatriculaIdsYRango(
       Collection<Long> matriculaIds, LocalDate desde, LocalDate hasta) {
     if (matriculaIds == null || matriculaIds.isEmpty()) return new ResumenConteoAsistencia(0, 0, 0, 0);
-    return mapearConteos(repository.contarPorEstadoYMatriculaIdsYRango(matriculaIds, desde, hasta));
+    var listaIds = new java.util.ArrayList<>(matriculaIds);
+    long presentes = 0;
+    long tardanzas = 0;
+    long faltasJust = 0;
+    long faltasInjust = 0;
+    final int tamanoLote = 500;
+    for (int i = 0; i < listaIds.size(); i += tamanoLote) {
+      var lote = listaIds.subList(i, Math.min(i + tamanoLote, listaIds.size()));
+      List<Object[]> filas = (desde == null || hasta == null)
+          ? repository.contarPorEstadoYMatriculaIds(lote)
+          : repository.contarPorEstadoYMatriculaIdsYRango(lote, desde, hasta);
+      var parcial = mapearConteos(filas);
+      presentes += parcial.presentes();
+      tardanzas += parcial.tardanzas();
+      faltasJust += parcial.faltasJustificadas();
+      faltasInjust += parcial.faltasInjustificadas();
+    }
+    return new ResumenConteoAsistencia(presentes, tardanzas, faltasJust, faltasInjust);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public ResumenConteoAsistencia contarPorEstadoEnAnioYRango(
+      Short anioId, LocalDate desde, LocalDate hasta) {
+    if (anioId == null) return new ResumenConteoAsistencia(0, 0, 0, 0);
+    List<Object[]> filas = (desde == null || hasta == null)
+        ? repository.contarPorEstadoEnAnio(anioId)
+        : repository.contarPorEstadoEnAnioYRango(anioId, desde, hasta);
+    return mapearConteos(filas);
   }
 
   private ResumenConteoAsistencia mapearConteos(List<Object[]> filas) {

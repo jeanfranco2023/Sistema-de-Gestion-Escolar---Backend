@@ -101,4 +101,11 @@ public class MatriculaRepositoryAdapter implements MatriculaRepositoryPort {
     if (ids == null || ids.isEmpty()) return List.of();
     return repository.bloquearPorIds(ids).stream().map(mapper::toDomain).toList();
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<List<ResumenMatriculaDashboard>> listarMatriculadasResumenPorAnio(Short anioId) {
+    if (anioId == null) return Optional.of(List.of());
+    return Optional.of(repository.listarMatriculadasResumenPorAnio(anioId));
+  }
 }

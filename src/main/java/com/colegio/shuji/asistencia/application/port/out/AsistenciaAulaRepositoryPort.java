@@ -53,4 +53,9 @@ public interface AsistenciaAulaRepositoryPort {
       Collection<Long> matriculaIds, LocalDate desde, LocalDate hasta) {
     return null;
   }
+
+  default ResumenConteoAsistencia contarPorEstadoEnAnioYRango(
+      Short anioId, LocalDate desde, LocalDate hasta) {
+    return null;
+  }
 }
